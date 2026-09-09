@@ -1,6 +1,6 @@
-# Saturday Form
+# Kai Ying Winning
 
-A single-file horse racing form analysis app for metro meetings. It rates each runner from the form, converts ratings to win chances, and adjusts itself during the day as results come in. Built to be used from a phone.
+The Pelicans' single-file horse racing form app for metro meetings. It rates each runner from the form, converts ratings to win chances, and adjusts itself during the day as results come in. Built to be used from a phone.
 
 The whole app is `index.html`. It is published as a Claude artifact; the source here is the record.
 
@@ -26,9 +26,13 @@ Where the artifact runtime allows it, a "Convert raw form text with Claude" butt
 
 Records are `[starts, wins, placings]`. Form strings read oldest to newest, most recent run last, as in Australian form guides. The `last.race` field ("2026-08-22 Rosehill R4") is what links horses for form lines, so it needs to be written consistently across runners.
 
+## Pelicans
+
+On first open each person picks a name. The form, scratchings and results are shared. Each Pelican keeps their own metric weights, adaptation settings, runner calls, notes and tips (one win tip and up to two place tips per race). Every result is replayed through every Pelican's model on their own margin settings, so nobody's weights depend on who entered the result. The Flock tab scores tips (three points for a winner, one for a tip that runs a place) and shows how many winners each model had on top.
+
 ## Storage
 
-State is cached in the browser and, when published with the `db` capability, synced through the artifact's shared store so a meeting loaded on a desktop appears on the phone. Results and weight changes sync the same way.
+State is cached in the browser and, when published with the `db` capability, synced through the artifact's shared store. That store is available only to signed-in members of the publisher's Claude organisation. Sharing with people outside the organisation needs the page hosted elsewhere with its own backend; the storage code is isolated in `pushDb`, `pullMeeting` and `initDb` for that purpose.
 
 ## Limitations
 

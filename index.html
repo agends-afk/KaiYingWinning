@@ -1,193 +1,212 @@
-<title>Saturday Form</title>
-<meta name="description" content="Metro form analysis with live reweighting from results">
+<title>Kai Ying Winning</title>
+<meta name="description" content="The Pelicans' form model for the Saturday metros">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@700;800&family=Libre+Franklin:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Barlow:wght@400;500;600;700&display=swap">
 <style>
 :root{
-  --ground:#F3F4F5; --ink:#16181B; --muted:#45484D; --muted2:#7B7F85; --rule:#D7D9DC;
-  --panel:#0A0B0D; --panel-ink:#F2F3F4; --rule-dark:rgba(242,243,244,0.14);
-  --accent:#0D9488; --accent-soft:rgba(13,148,136,0.12);
-  --surface:#FFFFFF; --good:#0D9488; --warn:#B45309; --bad:#B91C1C;
-  --bar:#16181B; --bar-track:#E4E6E9;
-  --display:"Saira Condensed","Arial Narrow",Arial,sans-serif;
-  --body:"Libre Franklin",Arial,Helvetica,sans-serif;
+  --ground:#F4EFE4; --surface:#FFFDF8; --ink:#141A22; --muted:#4E5866; --muted2:#7E8794; --rule:#DCD5C6;
+  --panel:#0F2B46; --panel-ink:#F4EFE4; --panel-rule:rgba(244,239,228,0.16);
+  --accent:#E8801A; --accent-ink:#141A22; --accent-soft:rgba(232,128,26,0.14);
+  --good:#2F8F5B; --warn:#C27A0C; --bad:#C43C2F;
+  --bar:#0F2B46; --bar-track:#E6DFD0; --bar-dyn:#E8801A;
+  --display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
+  --body:"Barlow",Arial,Helvetica,sans-serif;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --ground:#0A0B0D; --ink:#F2F3F4; --muted:#B9BDC3; --muted2:#7B7F85; --rule:rgba(242,243,244,0.14);
-    --panel:#16181B; --panel-ink:#F2F3F4; --rule-dark:rgba(242,243,244,0.14);
-    --accent:#2DD4BF; --accent-soft:rgba(45,212,191,0.14);
-    --surface:#111316; --good:#2DD4BF; --warn:#F59E0B; --bad:#F87171;
-    --bar:#F2F3F4; --bar-track:#23262B;
+    --ground:#0B1A2B; --surface:#12243A; --ink:#F3EEE3; --muted:#BFC6D1; --muted2:#7E8794; --rule:rgba(243,238,227,0.14);
+    --panel:#06111E; --panel-ink:#F3EEE3; --panel-rule:rgba(243,238,227,0.16);
+    --accent:#FFA24A; --accent-ink:#141A22; --accent-soft:rgba(255,162,74,0.16);
+    --good:#4FC48A; --warn:#F2B04C; --bad:#F27B6E;
+    --bar:#F3EEE3; --bar-track:#1F3450; --bar-dyn:#FFA24A;
   }
 }
 :root[data-theme="dark"]{
-  --ground:#0A0B0D; --ink:#F2F3F4; --muted:#B9BDC3; --muted2:#7B7F85; --rule:rgba(242,243,244,0.14);
-  --panel:#16181B; --panel-ink:#F2F3F4; --rule-dark:rgba(242,243,244,0.14);
-  --accent:#2DD4BF; --accent-soft:rgba(45,212,191,0.14);
-  --surface:#111316; --good:#2DD4BF; --warn:#F59E0B; --bad:#F87171;
-  --bar:#F2F3F4; --bar-track:#23262B;
+  --ground:#0B1A2B; --surface:#12243A; --ink:#F3EEE3; --muted:#BFC6D1; --muted2:#7E8794; --rule:rgba(243,238,227,0.14);
+  --panel:#06111E; --panel-ink:#F3EEE3; --panel-rule:rgba(243,238,227,0.16);
+  --accent:#FFA24A; --accent-ink:#141A22; --accent-soft:rgba(255,162,74,0.16);
+  --good:#4FC48A; --warn:#F2B04C; --bad:#F27B6E;
+  --bar:#F3EEE3; --bar-track:#1F3450; --bar-dyn:#FFA24A;
 }
 *{box-sizing:border-box}
-html,body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;-webkit-text-size-adjust:100%}
+html,body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:15.5px;line-height:1.45;-webkit-text-size-adjust:100%}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
-h1,h2,h3{font-family:var(--display);font-weight:800;text-transform:uppercase;letter-spacing:-0.5px;line-height:0.98;margin:0;text-wrap:balance}
-h1{font-size:34px} h2{font-size:26px} h3{font-size:20px}
-.eyebrow{font-size:11px;font-weight:600;letter-spacing:2.2px;text-transform:uppercase;color:var(--muted2)}
+h1,h2,h3{font-family:var(--display);font-weight:800;text-transform:uppercase;letter-spacing:.5px;line-height:.95;margin:0;text-wrap:balance}
+h1{font-size:40px;font-weight:900} h2{font-size:28px} h3{font-size:22px}
+.eyebrow{font-size:11.5px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted2)}
 .eyebrow .sl{color:var(--accent);padding:0 6px}
 .num{font-variant-numeric:tabular-nums}
-.app{max-width:760px;margin:0 auto;padding-bottom:84px;min-height:100vh}
-header.top{background:var(--panel);color:var(--panel-ink);padding:18px 18px 16px;position:relative}
-header.top .tick{width:44px;height:3px;background:var(--accent);margin-bottom:12px}
+.app{max-width:760px;margin:0 auto;padding-bottom:86px;min-height:100vh}
+header.top{background:var(--panel);color:var(--panel-ink);padding:16px 18px 14px;display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;border-bottom:4px solid var(--accent)}
+header.top svg{width:56px;height:56px;display:block}
+header.top .eyebrow{color:var(--panel-ink);opacity:.72}
 header.top h1{color:var(--panel-ink)}
-header.top .sub{color:var(--panel-ink);opacity:.75;font-size:13px;margin-top:6px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-.sync{display:inline-flex;align-items:center;gap:6px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase}
-.sync::before{content:"";width:8px;height:8px;background:var(--muted2);display:inline-block}
-.sync.on::before{background:var(--accent)} .sync.err::before{background:var(--bad)}
+header.top .sub{opacity:.8;font-size:13px;margin-top:4px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.sync{display:inline-flex;align-items:center;gap:6px;font-size:11px;letter-spacing:1.4px;text-transform:uppercase;font-weight:600}
+.sync::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--muted2);display:inline-block}
+.sync.on::before{background:var(--good)} .sync.err::before{background:var(--bad)}
 main{padding:14px 14px 20px}
 section.block{margin-bottom:22px}
-.rows{border-top:2px solid var(--ink)}
-.row{display:grid;grid-template-columns:44px 1fr auto;gap:10px;padding:12px 0;border-bottom:1px solid var(--rule);align-items:center;text-decoration:none;color:inherit;width:100%;background:none;border-left:0;border-right:0;border-top:0;text-align:left}
-.row .idx{font-family:var(--display);font-weight:800;font-size:22px;color:var(--accent);line-height:1}
+.rows{border-top:3px solid var(--ink)}
+.row{display:grid;grid-template-columns:44px 1fr auto;gap:12px;padding:12px 0;border-bottom:1px solid var(--rule);align-items:center;color:inherit;width:100%;background:none;border-left:0;border-right:0;border-top:0;text-align:left}
+.row .idx{font-family:var(--display);font-weight:900;font-size:26px;color:var(--accent);line-height:1}
 .row .t{font-weight:600}
 .row .s{color:var(--muted);font-size:13px}
-.row .r{text-align:right;font-size:13px;color:var(--muted)}
-.row .r b{display:block;color:var(--ink);font-family:var(--display);font-size:20px;font-weight:800}
-.pill{display:inline-flex;align-items:center;gap:8px;border:2px solid currentColor;border-radius:999px;padding:7px 14px;font-size:12px;font-weight:600;letter-spacing:1.6px;text-transform:uppercase;background:none}
-.pill.dark{background:var(--panel);color:var(--panel-ink);border-color:var(--panel)}
-.pill.acc{color:var(--accent)}
-.pill:disabled{opacity:.4;cursor:default}
-.btn{border:1px solid var(--rule);background:var(--surface);padding:8px 12px;font-size:13px;font-weight:500}
-.btn.primary{background:var(--ink);color:var(--ground);border-color:var(--ink)}
+.row .r{text-align:right;font-size:12.5px;color:var(--muted)}
+.row .r b{display:block;color:var(--ink);font-family:var(--display);font-size:22px;font-weight:800;letter-spacing:.3px}
+.btn{border:1.5px solid var(--rule);background:var(--surface);padding:9px 13px;font-size:13.5px;font-weight:600;border-radius:6px}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.ink{background:var(--ink);color:var(--ground);border-color:var(--ink)}
 .btn.danger{color:var(--bad)}
+.btn.on{background:var(--ink);color:var(--ground);border-color:var(--ink)}
 .btn:disabled{opacity:.45;cursor:default}
-.tag{display:inline-block;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;font-weight:600;padding:2px 7px;border:1px solid var(--rule);color:var(--muted)}
+.tag{display:inline-block;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;font-weight:700;padding:2px 7px;border:1.5px solid var(--rule);color:var(--muted);border-radius:4px;vertical-align:middle}
 .tag.acc{border-color:var(--accent);color:var(--accent)}
+.tag.good{border-color:var(--good);color:var(--good)}
 .tag.warn{border-color:var(--warn);color:var(--warn)}
 .tag.bad{border-color:var(--bad);color:var(--bad)}
-.field{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
-.field input,.field select,.field textarea{border:1px solid var(--rule);background:var(--surface);padding:9px 10px;font-size:15px;color:var(--ink);width:100%}
-textarea{min-height:140px;resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.field{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);font-weight:500}
+.field input,.field select,.field textarea{border:1.5px solid var(--rule);background:var(--surface);padding:9px 10px;font-size:15.5px;color:var(--ink);width:100%;border-radius:6px;font-weight:400}
+textarea{min-height:150px;resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
 .actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
-.note{color:var(--muted);font-size:13px}
-.small{font-size:12px;color:var(--muted2)}
-nav.tabs{position:fixed;bottom:0;left:0;right:0;background:var(--panel);color:var(--panel-ink);display:flex;justify-content:space-around;padding:8px 6px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--rule-dark);z-index:5}
-nav.tabs button{background:none;border:0;color:var(--panel-ink);opacity:.6;font-size:11px;letter-spacing:1.4px;text-transform:uppercase;font-weight:600;padding:8px 6px;border-top:2px solid transparent}
+.note{color:var(--muted);font-size:13.5px}
+.small{font-size:12.5px;color:var(--muted2)}
+nav.tabs{position:fixed;bottom:0;left:0;right:0;background:var(--panel);color:var(--panel-ink);display:flex;justify-content:space-around;padding:6px 6px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--panel-rule);z-index:5}
+nav.tabs button{background:none;border:0;color:var(--panel-ink);opacity:.62;font-family:var(--display);font-size:16px;letter-spacing:1.2px;text-transform:uppercase;font-weight:800;padding:8px 8px 6px;border-top:3px solid transparent}
 nav.tabs button.on{opacity:1;border-top-color:var(--accent)}
-nav.tabs button:focus-visible,.row:focus-visible,.btn:focus-visible,.pill:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-/* runner card */
+nav.tabs button:focus-visible,.row:focus-visible,.btn:focus-visible,.cloth:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* saddlecloth */
+.cloth{display:inline-flex;align-items:center;justify-content:center;width:38px;height:34px;font-family:var(--display);font-weight:900;font-size:22px;border-radius:5px 5px 9px 9px;box-shadow:inset 0 -3px 0 rgba(0,0,0,.18);flex:none;letter-spacing:0}
 .runner{border-bottom:1px solid var(--rule);padding:12px 0}
-.runner .head{display:grid;grid-template-columns:36px 1fr auto;gap:10px;align-items:start;background:none;border:0;padding:0;width:100%;text-align:left;color:inherit}
-.runner .no{font-family:var(--display);font-weight:800;font-size:24px;line-height:1;color:var(--ink)}
-.runner.scr .no,.runner.scr .nm{text-decoration:line-through;color:var(--muted2)}
-.runner .nm{font-weight:600;font-size:16px}
-.runner .meta{font-size:12.5px;color:var(--muted);margin-top:2px}
+.runner .head{display:grid;grid-template-columns:38px 1fr auto;gap:12px;align-items:start;background:none;border:0;padding:0;width:100%;text-align:left;color:inherit}
+.runner.scr .nm{text-decoration:line-through;color:var(--muted2)}
+.runner.scr .cloth{opacity:.35}
+.runner .nm{font-weight:700;font-size:16.5px}
+.runner .meta{font-size:12.5px;color:var(--muted);margin-top:1px}
 .runner .prob{text-align:right}
-.runner .prob b{font-family:var(--display);font-weight:800;font-size:24px;line-height:1;display:block}
-.runner .prob span{font-size:11px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase}
-.bar{height:4px;background:var(--bar-track);margin-top:8px;position:relative}
+.runner .prob b{font-family:var(--display);font-weight:900;font-size:26px;line-height:1;display:block;letter-spacing:.3px}
+.runner .prob span{font-size:11px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase;font-weight:600}
+.bar{height:5px;background:var(--bar-track);margin-top:8px;position:relative;border-radius:3px;overflow:hidden}
 .bar i{position:absolute;left:0;top:0;bottom:0;background:var(--bar)}
-.bar i.dyn{background:var(--accent);opacity:.9}
-.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-.chip{font-size:11px;padding:2px 6px;border:1px solid var(--rule);color:var(--muted);letter-spacing:.3px}
-.chip.up{border-color:var(--good);color:var(--good)} .chip.dn{border-color:var(--bad);color:var(--bad)}
-.detail{margin-top:12px;padding-top:12px;border-top:1px dashed var(--rule)}
-.metrics{display:grid;grid-template-columns:1fr 60px 1fr;gap:4px 10px;font-size:13px;align-items:center}
+.bar i.dyn{background:var(--bar-dyn)}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.chip{font-size:11.5px;padding:2px 7px;border:1.5px solid var(--rule);color:var(--muted);border-radius:4px;font-weight:500}
+.chip.up{border-color:var(--good);color:var(--good)} .chip.dn{border-color:var(--bad);color:var(--bad)} .chip.acc{border-color:var(--accent);color:var(--accent)}
+.flock{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.pel{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:1px 7px 1px 3px;border-radius:12px;background:var(--surface);border:1.5px solid var(--rule)}
+.pel i{width:14px;height:14px;border-radius:50%;display:inline-block;border:2px solid rgba(0,0,0,.15)}
+.detail{margin-top:12px;padding-top:12px;border-top:1.5px dashed var(--rule)}
+.metrics{display:grid;grid-template-columns:1fr 54px 1fr;gap:5px 10px;font-size:13px;align-items:center}
 .metrics .z{text-align:right}
-.metrics .zbar{height:6px;background:var(--bar-track);position:relative}
-.metrics .zbar i{position:absolute;top:0;bottom:0;background:var(--accent)}
+.metrics .zbar{height:7px;background:var(--bar-track);position:relative;border-radius:3px}
+.metrics .zbar i{position:absolute;top:0;bottom:0;background:var(--good);border-radius:3px}
 .metrics .zbar i.neg{background:var(--bad)}
 .metrics .zbar::after{content:"";position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--muted2)}
 .adj{display:flex;align-items:center;gap:10px;margin-top:12px}
 .adj input[type=range]{flex:1}
-.adj b{font-family:var(--display);font-size:20px;min-width:36px;text-align:center}
+.adj b{font-family:var(--display);font-size:22px;min-width:36px;text-align:center}
 input[type=range]{accent-color:var(--accent);width:100%}
 .wrow{padding:12px 0;border-bottom:1px solid var(--rule)}
 .wrow .l{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
-.wrow .l b{font-weight:600}
-.wrow .l span{font-family:var(--display);font-size:20px;font-weight:800}
+.wrow .l b{font-weight:700}
+.wrow .l span{font-family:var(--display);font-size:22px;font-weight:800}
 .wrow .d{font-size:12.5px;color:var(--muted);margin:2px 0 6px}
-.wrow .delta{font-size:12px;color:var(--accent)}
+.wrow .delta{font-size:12.5px;color:var(--accent);font-weight:600}
 .result-entry{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
-.result-entry .field{flex:1;min-width:120px}
+.result-entry .field{flex:1;min-width:150px}
 .logrow{padding:10px 0;border-bottom:1px solid var(--rule);font-size:13.5px}
-.logrow .when{font-size:11px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase}
+.logrow .when{font-size:11px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase;font-weight:700}
 .logrow ul{margin:6px 0 0;padding-left:18px;color:var(--muted)}
-.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:2px solid var(--ink);border-bottom:1px solid var(--rule)}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);border-top:3px solid var(--ink);border-bottom:1px solid var(--rule)}
 .kpi{padding:12px 6px 12px 0}
-.kpi b{display:block;font-family:var(--display);font-size:32px;font-weight:800;line-height:1}
-.kpi span{font-size:11px;letter-spacing:1.3px;text-transform:uppercase;color:var(--muted2)}
-.banner{background:var(--panel);color:var(--panel-ink);padding:14px 16px;margin-bottom:16px}
-.banner .tick{width:44px;height:3px;background:var(--accent);margin-bottom:8px}
-.banner h2{color:var(--panel-ink);font-size:24px}
-.banner p{margin:6px 0 0;font-size:13px;opacity:.8}
-.toast{position:fixed;left:50%;bottom:78px;transform:translateX(-50%);background:var(--ink);color:var(--ground);padding:10px 14px;font-size:13px;z-index:9;max-width:90vw}
+.kpi b{display:block;font-family:var(--display);font-size:36px;font-weight:900;line-height:1}
+.kpi span{font-size:11px;letter-spacing:1.3px;text-transform:uppercase;color:var(--muted2);font-weight:700}
+.banner{background:var(--panel);color:var(--panel-ink);padding:16px 18px;margin-bottom:16px;border-left:6px solid var(--accent);border-radius:0 8px 8px 0}
+.banner h2{color:var(--panel-ink)}
+.banner p{margin:6px 0 0;font-size:13.5px;opacity:.85}
+.toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:var(--ink);color:var(--ground);padding:10px 14px;font-size:13.5px;z-index:9;max-width:90vw;border-radius:8px;border-left:4px solid var(--accent)}
 [hidden]{display:none!important}
-pre.schema{font-size:11px;line-height:1.45;background:var(--surface);border:1px solid var(--rule);padding:10px;overflow-x:auto;white-space:pre}
+pre.schema{font-size:11px;line-height:1.45;background:var(--surface);border:1.5px solid var(--rule);padding:10px;overflow-x:auto;white-space:pre;border-radius:6px}
 .hdr-edit{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
-.back{background:none;border:0;padding:0;color:var(--accent);font-size:13px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:10px}
+.back{background:none;border:0;padding:0;color:var(--accent);font-size:12.5px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;margin-bottom:8px}
 .racehead{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;margin-bottom:8px}
 .racehead .s{font-size:13px;color:var(--muted)}
 .bias{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-top:8px}
 .bias b{color:var(--ink)}
-@media (max-width:420px){h1{font-size:30px}.grid3{grid-template-columns:1fr 1fr}}
+.board{border-top:3px solid var(--ink)}
+.board .brow{display:grid;grid-template-columns:34px 1fr auto auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--rule)}
+.board .brow .pos{font-family:var(--display);font-size:24px;font-weight:900;color:var(--accent)}
+.board .brow .pts{font-family:var(--display);font-size:26px;font-weight:900;text-align:right}
+.board .brow .sub{font-size:12.5px;color:var(--muted)}
+.sheet{position:fixed;inset:0;background:rgba(6,17,30,.7);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.sheet .card{background:var(--ground);color:var(--ink);width:100%;max-width:560px;padding:20px 18px calc(24px + env(safe-area-inset-bottom));border-radius:16px 16px 0 0;border-top:5px solid var(--accent)}
+.sheet .who{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.tipbtns{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+@media (max-width:420px){h1{font-size:34px}}
 @media (prefers-reduced-motion:no-preference){.bar i{transition:width .35s cubic-bezier(.16,1,.3,1)}}
 </style>
 
 <div class="app">
   <header class="top">
-    <div class="tick"></div>
-    <div class="eyebrow" style="color:var(--panel-ink);opacity:.7">Form<span class="sl">/</span>Ratings<span class="sl">/</span>Live adjustment</div>
-    <h1 id="hMeeting">Saturday Form</h1>
-    <div class="sub"><span id="hSub"></span><span class="sync" id="sync">local only</span></div>
+    <svg viewBox="0 0 64 64" aria-hidden="true">
+      <circle cx="26" cy="20" r="12" fill="#F4EFE4"/>
+      <path d="M36 16 L62 26 L58 31 L36 25 Z" fill="#E8801A"/>
+      <path d="M36 25 L58 31 L44 40 Q36 40 34 30 Z" fill="#F4B36B"/>
+      <circle cx="29" cy="17" r="2.2" fill="#141A22"/>
+      <path d="M14 30 Q4 44 14 58 L40 58 Q48 48 36 40 Q26 32 14 30 Z" fill="#F4EFE4"/>
+      <path d="M26 46 Q34 44 40 50 L36 58 L22 58 Z" fill="#141A22"/>
+      <path d="M22 40 Q30 36 38 42" stroke="#DCD5C6" stroke-width="2" fill="none"/>
+    </svg>
+    <div>
+      <div class="eyebrow">The Pelicans<span class="sl">/</span>Rams v 49ers weekend</div>
+      <h1 id="hMeeting">Kai Ying Winning</h1>
+      <div class="sub"><span id="hSub"></span><span class="sync" id="sync">local only</span></div>
+    </div>
   </header>
   <main id="main"></main>
 </div>
 <nav class="tabs" id="tabs">
-  <button data-tab="races">Races</button>
+  <button data-tab="races">Card</button>
   <button data-tab="race">Race</button>
-  <button data-tab="weights">Weights</button>
-  <button data-tab="review">Review</button>
+  <button data-tab="weights">Model</button>
+  <button data-tab="flock">Flock</button>
   <button data-tab="load">Load</button>
 </nav>
 <div class="toast" id="toast" hidden></div>
+<div id="sheet" hidden></div>
 
 <script>
 /* ============================================================
-   Saturday Form: metro form ratings with live reweighting
-   Single file. State is kept in memory, cached in localStorage,
-   and synced through the artifact db capability when available.
+   Kai Ying Winning: the Pelicans' form model
+   One shared form and shared results. Each Pelican keeps their
+   own weights, adjustments and tips, and each model adapts to
+   results on its own margin settings.
    ============================================================ */
 
 const METRICS = [
-  {key:'last',      label:'Last start',            base:1.4, desc:'Finishing position, margin and field size last start, adjusted for a rise or drop in class today.'},
-  {key:'form',      label:'Recent form',           base:1.0, desc:'Last five runs, most recent counting most. Spells are skipped.'},
-  {key:'track',     label:'Track record',          base:0.8, desc:'Win and place rate at this track, shrunk toward the average where starts are few.'},
-  {key:'distance',  label:'Distance record',       base:0.9, desc:'Win and place rate at this distance, shrunk the same way.'},
-  {key:'condition', label:'Track condition',       base:0.9, desc:'Record on today\'s going (good, soft or heavy), taken from the meeting condition.'},
-  {key:'career',    label:'Career strike rate',    base:0.6, desc:'Career win and place percentages.'},
-  {key:'jockey',    label:'Jockey',                base:0.7, desc:'Jockey win percentage or rating supplied in the form.'},
-  {key:'trainer',   label:'Trainer',               base:0.5, desc:'Trainer win percentage or rating supplied in the form.'},
-  {key:'barrier',   label:'Barrier',               base:0.6, desc:'Inside draws favoured over short trips, fading with distance. Track bias learned from today\'s results shifts this.'},
-  {key:'weight',    label:'Weight carried',        base:0.4, desc:'Weight relative to the field average.'},
-  {key:'fitness',   label:'Freshness',             base:0.5, desc:'Days since last run. Fourteen to twenty-eight days is treated as ideal; first-up runs are marked down.'},
-  {key:'market',    label:'Market',                base:0.8, desc:'Implied probability from the odds, where odds are supplied.'},
-  {key:'formline',  label:'Form lines today',      base:1.0, desc:'Live adjustment from earlier results at this meeting: shared last-start races, jockeys winning on the day.'},
-  {key:'manual',    label:'Your assessment',       base:1.0, desc:'Your own plus or minus on a runner, entered on the race screen.'}
+  {key:'last',      label:'Last start',         base:1.4, desc:'Finishing position, margin and field size last start, adjusted for a rise or drop in class today.'},
+  {key:'form',      label:'Recent form',        base:1.0, desc:'Last five runs, most recent counting most. Spells are skipped.'},
+  {key:'track',     label:'Track record',       base:0.8, desc:'Win and place rate at this track, shrunk toward average where starts are few.'},
+  {key:'distance',  label:'Distance record',    base:0.9, desc:'Win and place rate at this distance, shrunk the same way.'},
+  {key:'condition', label:'Track condition',    base:0.9, desc:'Record on today\'s going, taken from the meeting condition on the Card tab.'},
+  {key:'career',    label:'Career strike rate', base:0.6, desc:'Career win and place percentages.'},
+  {key:'jockey',    label:'Jockey',             base:0.7, desc:'Jockey win percentage or rating from the form.'},
+  {key:'trainer',   label:'Trainer',            base:0.5, desc:'Trainer win percentage or rating from the form.'},
+  {key:'barrier',   label:'Barrier',            base:0.6, desc:'Inside draws favoured over short trips, fading with distance. The day\'s barrier bias shifts this.'},
+  {key:'weight',    label:'Weight carried',     base:0.4, desc:'Weight relative to the field average.'},
+  {key:'fitness',   label:'Freshness',          base:0.5, desc:'Days since last run. Fourteen to twenty-eight is treated as ideal; first-up runs are marked down.'},
+  {key:'market',    label:'Market',             base:0.8, desc:'Implied chance from the odds, where odds are in the form.'},
+  {key:'formline',  label:'Form lines today',   base:1.0, desc:'Live: horses out of the same last-start race as one that ran above or below expectation today, and riders winning on the day.'},
+  {key:'manual',    label:'Your call',          base:1.0, desc:'Your own plus or minus on a runner, set on the race screen.'}
 ];
 const DEFAULT_SETTINGS = { marginRank:3, marginProb:0.12, lr:0.18, formlineGain:0.6, beta:2.2, autoAdapt:true };
+const PUNTER_COLOURS = ['#E8801A','#2F8F5B','#3B6FD4','#C43C2F','#8E5BC6','#D4A72C','#1BA5A5','#D45FA0','#6B7F2E','#8C5A2B'];
+// Standard saddlecloth colours (approximate; cosmetic only)
+const CLOTH = {1:['#D7263D','#fff'],2:['#F7F5EF','#141A22'],3:['#1F4FCC','#fff'],4:['#F5C518','#141A22'],5:['#1E8B4B','#fff'],6:['#141A22','#F5C518'],7:['#F07A1A','#141A22'],8:['#F48FB1','#141A22'],9:['#3CC7C0','#141A22'],10:['#6A2C91','#fff'],11:['#9AA0A6','#B00020'],12:['#B6E51D','#141A22'],13:['#6D4322','#fff'],14:['#7B1F2B','#F5C518'],15:['#8B8455','#141A22'],16:['#B87333','#141A22'],17:['#0F2B46','#fff'],18:['#0F5132','#F5C518'],19:['#C9D6D2','#141A22'],20:['#D91E8B','#F5C518'],21:['#FF7F6E','#141A22'],22:['#E9E9E9','#141A22'],23:['#0F2B46','#F4EFE4'],24:['#D4AF37','#141A22']};
 
-let state = {
-  meeting: null,
-  weights: Object.fromEntries(METRICS.map(m=>[m.key,m.base])),
-  settings: {...DEFAULT_SETTINGS},
-  ui: { tab:'races', raceNo:1, open:null },
-  updatedAt: 0
-};
-let db = null, dbReady = false, saveTimer = null, unsub = [];
+let state = { meeting:null, punters:{}, me:null, ui:{tab:'races', raceNo:1, open:null}, updatedAt:0 };
+let db=null, saveTimer=null, sampleFn=null;
 
 /* ---------------- helpers ---------------- */
 const $ = s => document.querySelector(s);
@@ -196,264 +215,163 @@ const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
 const num = v => (v===null||v===undefined||v===''||isNaN(+v)) ? null : +v;
 const pct = p => (p*100).toFixed(p>=0.1?0:1)+'%';
 const fmtOdds = p => p>0 ? '$'+(1/p).toFixed(1/p>=10?0:1) : '';
-function toast(msg){ const t=$('#toast'); t.textContent=msg; t.hidden=false; clearTimeout(t._h); t._h=setTimeout(()=>t.hidden=true,2600); }
-function rec(v){ // accepts [s,w,p] or {starts,wins,places}
-  if(!v) return null;
-  if(Array.isArray(v)) return {s:num(v[0])||0,w:num(v[1])||0,p:num(v[2])||0};
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.hidden=false; clearTimeout(t._h); t._h=setTimeout(()=>t.hidden=true,2800); }
+function rec(v){ if(!v) return null; if(Array.isArray(v)) return {s:num(v[0])||0,w:num(v[1])||0,p:num(v[2])||0};
   if(typeof v==='string'){ const m=v.split(/[-:/ ]+/).map(num); if(m.length>=3) return {s:m[0]||0,w:m[1]||0,p:m[2]||0}; return null; }
-  if(typeof v==='object') return {s:num(v.starts??v.s)||0,w:num(v.wins??v.w)||0,p:num(v.places??v.p)||0};
-  return null;
-}
-function condCategory(cond){ const c=String(cond||'').toLowerCase(); if(c.startsWith('h')) return 'heavy'; if(c.startsWith('so')||c.startsWith('sl')) return 'soft'; if(c.startsWith('sy')) return 'soft'; return 'good'; }
+  if(typeof v==='object') return {s:num(v.starts??v.s)||0,w:num(v.wins??v.w)||0,p:num(v.places??v.p)||0}; return null; }
+function condCategory(cond){ const c=String(cond||'').toLowerCase(); if(c.startsWith('h')) return 'heavy'; if(c.startsWith('so')||c.startsWith('sl')||c.startsWith('sy')) return 'soft'; return 'good'; }
 function normKey(s){ return String(s||'').toLowerCase().replace(/\s+/g,' ').trim(); }
 function active(race){ return race.runners.filter(r=>!r.scratched); }
+function runnerKey(race,r){ return 'r'+race.no+'_'+r.no; }
+function ordinal(n){ const s=['th','st','nd','rd'], v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); }
+function slug(s){ return String(s).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')||'x'; }
+function titleCase(s){ return s.replace(/\b\w/g,c=>c.toUpperCase()); }
+function cloth(no){ const c=CLOTH[no]||['#DCD5C6','#141A22']; return `<span class="cloth num" style="background:${c[0]};color:${c[1]}">${no}</span>`; }
+function me(){ return state.punters[state.me]; }
+function newPunter(name){ const used=Object.values(state.punters).map(p=>p.colour); const colour=PUNTER_COLOURS.find(c=>!used.includes(c))||PUNTER_COLOURS[Object.keys(state.punters).length%PUNTER_COLOURS.length];
+  return {id:slug(name), name:name.trim(), colour, weights:Object.fromEntries(METRICS.map(m=>[m.key,m.base])), settings:{...DEFAULT_SETTINGS}, adj:{}, picks:{}, updatedAt:Date.now()}; }
 
 /* ---------------- scoring ---------------- */
 function rate(w,s,prior,k){ return (w + prior*k)/(s + k); }
 function recScore(r){ if(!r||r.s===0) return null; const wr=rate(r.w,r.s,0.12,4), pr=rate(r.w+r.p,r.s,0.38,4); return 0.5*clamp(wr/0.3,0,1)+0.5*clamp(pr/0.6,0,1); }
 const FORM_PTS = {'1':1,'2':.75,'3':.6,'4':.45,'5':.35,'6':.25,'7':.2,'8':.15,'9':.12,'0':.08};
-function formScore(f){
-  if(!f) return null;
-  const runs = String(f).replace(/[^0-9a-zA-Z]/g,'').split('').filter(c=>!/x/i.test(c)).slice(-5);
-  if(!runs.length) return null;
-  const ws=[.1,.15,.2,.25,.3].slice(-runs.length); let tot=0, sw=0;
-  runs.forEach((c,i)=>{ const p = FORM_PTS[c] ?? 0.1; tot+=p*ws[i]; sw+=ws[i]; });
-  return tot/sw;
-}
-function lastScore(l){
-  if(!l || num(l.pos)==null) return null;
-  const pos=num(l.pos), field=num(l.field)||12, margin=num(l.margin);
-  const posS = pos<=1 ? 1 : clamp(1-(pos-1)/Math.max(field-1,1),0,1);
-  const marS = margin==null ? posS : clamp(1-margin/10,0,1);
-  let s = 0.5*posS+0.5*marS;
-  const cc=num(l.classChange)||0; s -= 0.1*cc; // up in class today (cc=1) discounts the last run
-  return clamp(s,0,1);
-}
-function fitnessScore(l,form){
-  const d = l ? num(l.days) : null; if(d==null) return null;
-  if(d<7) return .55; if(d<14) return .8; if(d<=28) return 1; if(d<=42) return .8; if(d<=90) return .55; return .4;
-}
+function formScore(f){ if(!f) return null; const runs=String(f).replace(/[^0-9a-zA-Z]/g,'').split('').filter(c=>!/x/i.test(c)).slice(-5); if(!runs.length) return null;
+  const ws=[.1,.15,.2,.25,.3].slice(-runs.length); let tot=0,sw=0; runs.forEach((c,i)=>{ tot+=(FORM_PTS[c]??0.1)*ws[i]; sw+=ws[i]; }); return tot/sw; }
+function lastScore(l){ if(!l||num(l.pos)==null) return null; const pos=num(l.pos), field=num(l.field)||12, margin=num(l.margin);
+  const posS=pos<=1?1:clamp(1-(pos-1)/Math.max(field-1,1),0,1); const marS=margin==null?posS:clamp(1-margin/10,0,1);
+  return clamp(0.5*posS+0.5*marS-0.1*(num(l.classChange)||0),0,1); }
+function fitnessScore(l){ const d=l?num(l.days):null; if(d==null) return null; if(d<7) return .55; if(d<14) return .8; if(d<=28) return 1; if(d<=42) return .8; if(d<=90) return .55; return .4; }
 function distanceFactor(dist){ const d=num(dist)||1400; if(d<=1200) return 1; if(d<=1400) return .8; if(d<=1600) return .6; if(d<=2000) return .45; return .3; }
-function barrierScore(r,race,n,bias){
-  const b=num(r.barrier); if(b==null||n<2) return null;
-  const rel=clamp((b-1)/(n-1),0,1);
-  const eff = clamp(distanceFactor(race.distance)*0.6 + (bias||0), -1, 1);
-  return clamp(0.5 - (rel-0.5)*eff, 0, 1);
-}
+function barrierScore(r,race,n,bias){ const b=num(r.barrier); if(b==null||n<2) return null; const rel=clamp((b-1)/(n-1),0,1); const eff=clamp(distanceFactor(race.distance)*0.6+(bias||0),-1,1); return clamp(0.5-(rel-0.5)*eff,0,1); }
 function jockeyScore(r){ const p=num(r.jockeyPct); if(p!=null) return clamp(p/25,0,1); const g=num(r.jockeyRating); if(g!=null) return clamp(g/100,0,1); return null; }
 function trainerScore(r){ const p=num(r.trainerPct); if(p!=null) return clamp(p/20,0,1); const g=num(r.trainerRating); if(g!=null) return clamp(g/100,0,1); return null; }
+function zscores(vals){ const xs=vals.filter(v=>v!=null); if(xs.length<2) return vals.map(()=>0); const m=xs.reduce((a,b)=>a+b,0)/xs.length; const sd=Math.sqrt(xs.reduce((a,b)=>a+(b-m)**2,0)/xs.length)||0; if(sd<1e-9) return vals.map(()=>0); return vals.map(v=>v==null?0:clamp((v-m)/sd,-2.5,2.5)); }
 
-function zscores(vals){ // vals: array of number|null -> z (null -> 0)
-  const xs=vals.filter(v=>v!=null); if(xs.length<2) return vals.map(()=>0);
-  const m=xs.reduce((a,b)=>a+b,0)/xs.length; const sd=Math.sqrt(xs.reduce((a,b)=>a+(b-m)**2,0)/xs.length)||0;
-  if(sd<1e-9) return vals.map(()=>0);
-  return vals.map(v=>v==null?0:clamp((v-m)/sd,-2.5,2.5));
+function scoreRace(race, meeting, weights, settings, dyn, adj){
+  const rs=active(race); const n=rs.length; const cat=condCategory(meeting.condition);
+  const ws=rs.map(r=>num(r.weight)).filter(v=>v!=null); const meanW=ws.length?ws.reduce((a,b)=>a+b,0)/ws.length:null;
+  const maxImp=Math.max(...rs.map(r=>{const o=num(r.odds); return o>1?1/o:0;}),0);
+  const raw={};
+  raw.last=rs.map(r=>lastScore(r.last)); raw.form=rs.map(r=>formScore(r.form)); raw.track=rs.map(r=>recScore(rec(r.track))); raw.distance=rs.map(r=>recScore(rec(r.distance)));
+  raw.condition=rs.map(r=>recScore(rec(r[cat])||rec(r.cond)||(r.condition&&rec(r.condition[cat])))); raw.career=rs.map(r=>recScore(rec(r.career)));
+  raw.jockey=rs.map(jockeyScore); raw.trainer=rs.map(trainerScore); raw.barrier=rs.map(r=>barrierScore(r,race,n,dyn.barrierBias));
+  raw.weight=rs.map(r=>{const w=num(r.weight); return (w==null||meanW==null)?null:clamp(0.5+(meanW-w)/6,0,1);}); raw.fitness=rs.map(r=>fitnessScore(r.last));
+  raw.market=rs.map(r=>{const o=num(r.odds); return (o>1&&maxImp>0)?(1/o)/maxImp:null;});
+  const z={}; for(const k of Object.keys(raw)) z[k]=zscores(raw[k]);
+  z.formline=rs.map(r=>clamp(dyn.formline[runnerKey(race,r)]||0,-2,2));
+  z.manual=rs.map(r=>((adj&&adj[runnerKey(race,r)]&&num(adj[runnerKey(race,r)].adj))||0)*0.5);
+  const wsum=METRICS.reduce((a,m)=>a+(weights[m.key]||0),0)||1;
+  const scored=rs.map((r,i)=>{ let rating=0; const contrib={}; for(const m of METRICS){ const c=(weights[m.key]||0)*(z[m.key][i]||0)/wsum; contrib[m.key]=c; rating+=c; }
+    const missing=['last','form','track','distance','condition','career'].filter(k=>raw[k][i]==null).length;
+    return {r, z:Object.fromEntries(METRICS.map(m=>[m.key,z[m.key][i]])), contrib, rating, missing}; });
+  const beta=settings.beta||2.2; const ex=scored.map(s=>Math.exp(beta*s.rating)); const sum=ex.reduce((a,b)=>a+b,0)||1; scored.forEach((s,i)=>s.prob=ex[i]/sum);
+  const order=[...scored].sort((a,b)=>b.rating-a.rating); order.forEach((s,i)=>s.rank=i+1); return order;
 }
 
-// Score a race. dyn = {formline:{runnerKey:value}, barrierBias:number}
-function scoreRace(race, meeting, weights, settings, dyn){
-  const rs = active(race); const n=rs.length; const cat=condCategory(meeting.condition);
-  const meanW = (()=>{ const ws=rs.map(r=>num(r.weight)).filter(v=>v!=null); return ws.length? ws.reduce((a,b)=>a+b,0)/ws.length : null; })();
-  const maxImp = Math.max(...rs.map(r=>{const o=num(r.odds); return o>1?1/o:0;}),0);
-  const raw = {};
-  raw.last = rs.map(r=>lastScore(r.last));
-  raw.form = rs.map(r=>formScore(r.form));
-  raw.track = rs.map(r=>recScore(rec(r.track)));
-  raw.distance = rs.map(r=>recScore(rec(r.distance)));
-  raw.condition = rs.map(r=>recScore(rec(r[cat]) || rec(r.cond) || (r.condition && rec(r.condition[cat]))));
-  raw.career = rs.map(r=>recScore(rec(r.career)));
-  raw.jockey = rs.map(jockeyScore);
-  raw.trainer = rs.map(trainerScore);
-  raw.barrier = rs.map(r=>barrierScore(r,race,n,dyn.barrierBias));
-  raw.weight = rs.map(r=>{const w=num(r.weight); return (w==null||meanW==null)?null:clamp(0.5+(meanW-w)/6,0,1);});
-  raw.fitness = rs.map(r=>fitnessScore(r.last,r.form));
-  raw.market = rs.map(r=>{const o=num(r.odds); return (o>1&&maxImp>0)?(1/o)/maxImp:null;});
-  const z = {}; for(const k of Object.keys(raw)) z[k]=zscores(raw[k]);
-  z.formline = rs.map(r=>clamp(dyn.formline[runnerKey(race,r)]||0,-2,2));
-  z.manual = rs.map(r=>(num(r.adj)||0)*0.5);
-  const scored = rs.map((r,i)=>{
-    let rating=0; const contrib={}; const wsum=METRICS.reduce((a,m)=>a+(weights[m.key]||0),0)||1;
-    for(const m of METRICS){ const c=(weights[m.key]||0)*(z[m.key][i]||0)/wsum; contrib[m.key]=c; rating+=c; }
-    const missing = ['last','form','track','distance','condition','career'].filter(k=>raw[k][i]==null).length;
-    return {r, z:Object.fromEntries(METRICS.map(m=>[m.key,z[m.key][i]])), raw:Object.fromEntries(Object.keys(raw).map(k=>[k,raw[k][i]])), contrib, rating, missing};
-  });
-  const beta=settings.beta||2.2; const ex=scored.map(s=>Math.exp(beta*s.rating)); const sum=ex.reduce((a,b)=>a+b,0)||1;
-  scored.forEach((s,i)=>s.prob=ex[i]/sum);
-  const order=[...scored].sort((a,b)=>b.rating-a.rating); order.forEach((s,i)=>s.rank=i+1);
-  return order;
-}
-function runnerKey(race,r){ return 'r'+race.no+'_'+r.no; }
-
-/* ---------------- dynamics from results ---------------- */
-// Computes, for each race, the form-line adjustments and barrier bias from results of EARLIER races only.
-function computeDynamics(meeting, weights, settings){
-  const out = {}; const races=[...meeting.races].sort((a,b)=>a.no-b.no);
-  let formline={}, jockeyWins={}, barrierRel=[], results=[];
+/* ---------------- run the day for one punter ----------------
+   Replays results in race order. Returns adapted weights, per-race dynamics,
+   the prediction each race carried when it was run, and the change log. */
+function runDay(punter, meeting){
+  const races=[...meeting.races].sort((a,b)=>a.no-b.no); const settings={...DEFAULT_SETTINGS,...punter.settings};
+  let w={...punter.weights}; let formline={}, jockeyWins={}, barrierRel=[]; const dyn={}, pred={}, changes=[];
   for(const race of races){
-    // dynamics visible to this race are what has accumulated so far
-    const bias = barrierBiasFrom(barrierRel);
-    const fl = {...formline};
-    // jockey day form
-    for(const r of active(race)){ const jw=jockeyWins[normKey(r.jockey)]||0; if(jw>0) fl[runnerKey(race,r)]=(fl[runnerKey(race,r)]||0)+Math.min(0.4,0.2*jw); }
-    out[race.no]={formline:fl, barrierBias:bias, jockeyWins:{...jockeyWins}};
-    if(!race.result || !race.result.positions || !race.result.positions.length) continue;
-    // fold this race's result into the dynamics for later races
-    const scored = scoreRace(race, meeting, weights, settings, out[race.no]);
-    const n=scored.length; const pos=race.result.positions.map(Number);
-    for(const s of scored){
-      const idx=pos.indexOf(s.r.no); const actual = idx>=0 ? idx+1 : (pos.length+1+n)/2;
-      let resid = clamp((s.rank-actual)/Math.max(n/2,1),-1,1);
-      if(idx===0) resid=Math.max(resid,0.15);
-      if(idx===0){ const j=normKey(s.r.jockey); if(j) jockeyWins[j]=(jockeyWins[j]||0)+1; const b=num(s.r.barrier); if(b!=null&&n>1) barrierRel.push({rel:(b-1)/(n-1),w:1}); }
-      if(idx===1){ const b=num(s.r.barrier); if(b!=null&&n>1) barrierRel.push({rel:(b-1)/(n-1),w:0.5}); }
-      const key=normKey(s.r.last&&s.r.last.race); if(!key || Math.abs(resid)<0.05) continue;
-      for(const later of races){ if(later.no<=race.no) continue;
-        for(const q of active(later)){ if(normKey(q.last&&q.last.race)!==key) continue;
-          const qp=num(q.last.pos), rp=num(s.r.last.pos), qm=num(q.last.margin)||0, rm=num(s.r.last.margin)||0;
-          let f=1; if(qp!=null&&rp!=null&&qp>rp) f=clamp(1-(qm-rm)/6,0.3,1);
-          const k=runnerKey(later,q); formline[k]=clamp((formline[k]||0)+resid*settings.formlineGain*f,-1.5,1.5);
-        }
-      }
-    }
-    results.push(race.no);
+    const fl={...formline}; for(const r of active(race)){ const jw=jockeyWins[normKey(r.jockey)]||0; if(jw>0){ const k=runnerKey(race,r); fl[k]=(fl[k]||0)+Math.min(0.4,0.2*jw); } }
+    dyn[race.no]={formline:fl, barrierBias:barrierBiasFrom(barrierRel)};
+    const scored=scoreRace(race,meeting,w,settings,dyn[race.no],punter.adj);
+    pred[race.no]=scored.map(s=>({no:s.r.no,rank:s.rank,prob:s.prob}));
+    const res=race.result; if(!res||!res.positions||!res.positions.length) continue;
+    const pos=res.positions.map(Number); const n=scored.length; const win=scored.find(s=>s.r.no===pos[0]);
+    // form lines, riders and barrier bias for later races
+    for(const s of scored){ const idx=pos.indexOf(s.r.no); const actual=idx>=0?idx+1:(pos.length+1+n)/2; let resid=clamp((s.rank-actual)/Math.max(n/2,1),-1,1); if(idx===0) resid=Math.max(resid,0.15);
+      const b=num(s.r.barrier); if(idx===0){ const j=normKey(s.r.jockey); if(j) jockeyWins[j]=(jockeyWins[j]||0)+1; if(b!=null&&n>1) barrierRel.push({rel:(b-1)/(n-1),w:1}); }
+      if(idx===1&&b!=null&&n>1) barrierRel.push({rel:(b-1)/(n-1),w:0.5});
+      const key=normKey(s.r.last&&s.r.last.race); if(!key||Math.abs(resid)<0.05) continue;
+      for(const later of races){ if(later.no<=race.no) continue; for(const q of active(later)){ if(normKey(q.last&&q.last.race)!==key) continue;
+        const qp=num(q.last.pos), rp=num(s.r.last.pos), qm=num(q.last.margin)||0, rm=num(s.r.last.margin)||0; let f=1; if(qp!=null&&rp!=null&&qp>rp) f=clamp(1-(qm-rm)/6,0.3,1);
+        const k=runnerKey(later,q); formline[k]=clamp((formline[k]||0)+resid*settings.formlineGain*f,-1.5,1.5); } } }
+    // weight adaptation on this punter's margin
+    if(!win){ changes.push({race:race.no,text:`Winner ${pos[0]} not among active runners; no adaptation.`,items:[]}); continue; }
+    const outside=win.rank>settings.marginRank||win.prob<settings.marginProb;
+    const entry={race:race.no,text:`${win.r.name} won, rated ${ordinal(win.rank)} at ${pct(win.prob)}. ${outside?(settings.autoAdapt?'Outside the margin, weights moved.':'Outside the margin, adaptation is off.'):'Inside the margin, weights held.'}`,items:[]};
+    if(outside&&settings.autoAdapt){ const pw=[3,2,1,0.5]; for(const met of METRICS){ if(met.key==='manual'||met.key==='formline') continue; let acc=0,sw=0; pos.slice(0,4).forEach((no,i)=>{ const s=scored.find(x=>x.r.no===no); if(!s) return; acc+=s.z[met.key]*pw[i]; sw+=pw[i]; }); if(!sw) continue;
+      const perf=Math.tanh(acc/sw); const w0=w[met.key]; const w1=clamp(w0*(1+settings.lr*perf),met.base*0.15,met.base*2.5); if(Math.abs(w1-w0)>0.005){ w[met.key]=+w1.toFixed(3); entry.items.push(`${met.label} ${w0.toFixed(2)} to ${w1.toFixed(2)}`); } } }
+    changes.push(entry);
   }
-  out.final = {barrierBias:barrierBiasFrom(barrierRel), barrierRel, jockeyWins};
-  return out;
+  return {weights:w, dyn, pred, changes, final:{barrierBias:barrierBiasFrom(barrierRel), jockeyWins}};
 }
-function barrierBiasFrom(list){
-  if(list.length<2) return 0; const sw=list.reduce((a,b)=>a+b.w,0); const mean=list.reduce((a,b)=>a+b.rel*b.w,0)/sw;
-  const dev=0.5-mean; if(Math.abs(dev)<0.12) return 0; return clamp(dev*1.5,-0.6,0.6);
-}
+function barrierBiasFrom(list){ if(list.length<2) return 0; const sw=list.reduce((a,b)=>a+b.w,0); const mean=list.reduce((a,b)=>a+b.rel*b.w,0)/sw; const dev=0.5-mean; if(Math.abs(dev)<0.12) return 0; return clamp(dev*1.5,-0.6,0.6); }
 
-/* ---------------- learning on a result ---------------- */
-function enterResult(raceNo, positions){
-  const m=state.meeting; const race=m.races.find(r=>r.no===raceNo); if(!race) return;
-  const dyn=computeDynamics(m,state.weights,state.settings)[race.no];
-  const scored=scoreRace(race,m,state.weights,state.settings,dyn);
-  const n=scored.length;
-  race.result={positions, enteredAt:Date.now(), predicted:scored.map(s=>({no:s.r.no,rank:s.rank,prob:+s.prob.toFixed(4)}))};
-  const win=scored.find(s=>s.r.no===positions[0]);
-  const entry={ts:Date.now(), race:raceNo, type:'result', text:'', items:[]};
-  if(!win){ entry.text=`Race ${raceNo}: winner ${positions[0]} not found among active runners. Result stored, no learning applied.`; m.log.push(entry); return; }
-  const outside = win.rank>state.settings.marginRank || win.prob<state.settings.marginProb;
-  entry.text=`Race ${raceNo}: ${win.r.name} won, rated ${ordinal(win.rank)} at ${pct(win.prob)}. `+(outside?'Outside the margin of error, weights adjusted.':'Inside the margin of error, weights held.');
-  // metric performance on this race: weighted mean z of placed runners minus field mean (which is ~0 for z metrics)
-  if(outside && state.settings.autoAdapt){
-    const pw=[3,2,1,0.5]; const before={...state.weights}; const changes=[];
-    for(const met of METRICS){ if(met.key==='manual'||met.key==='formline') continue;
-      let acc=0,sw=0; positions.slice(0,4).forEach((no,i)=>{ const s=scored.find(x=>x.r.no===no); if(!s) return; acc+=s.z[met.key]*pw[i]; sw+=pw[i]; });
-      if(!sw) continue; const perf=Math.tanh(acc/sw); // -1..1
-      const w0=state.weights[met.key]; const w1=clamp(w0*(1+state.settings.lr*perf), met.base*0.15, met.base*2.5);
-      if(Math.abs(w1-w0)>0.005){ state.weights[met.key]=+w1.toFixed(3); changes.push(`${met.label} ${w0.toFixed(2)} to ${w1.toFixed(2)}`); }
-    }
-    entry.before=before; entry.items=changes;
-  }
-  m.log.push(entry);
-  // form line and bias commentary
-  const after=computeDynamics(m,state.weights,state.settings);
-  const beforeDyn=computeDynamicsWithout(m,raceNo);
-  const fin=after.final; if(Math.abs(fin.barrierBias)>0){ entry.items.push(`Barrier bias reading ${fin.barrierBias>0?'favours inside':'favours outside'} (${fin.barrierBias.toFixed(2)}).`); }
-  const linked=[]; for(const later of m.races){ if(later.no<=raceNo) continue; for(const q of active(later)){ const k=runnerKey(later,q); const v=after[later.no].formline[k]||0; const prev=beforeDyn[later.no].formline[k]||0; if(Math.abs(v-prev)>0.02) linked.push(`R${later.no} ${q.name} ${v-prev>0?'+':''}${(v-prev).toFixed(2)}`); } }
-  if(linked.length) entry.items.push('Form lines moved: '+linked.join(', ')+'.');
-}
-function computeDynamicsWithout(m, raceNo){ const clone=JSON.parse(JSON.stringify(m)); const r=clone.races.find(x=>x.no===raceNo); if(r) r.result=null; return computeDynamics(clone,state.weights,state.settings); }
-function ordinal(n){ const s=['th','st','nd','rd'], v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); }
-function undoLastWeights(){
-  const m=state.meeting; for(let i=m.log.length-1;i>=0;i--){ const e=m.log[i]; if(e.type==='result'&&e.before){ state.weights={...e.before}; e.items=e.items.filter(x=>!/ to /.test(x)); e.items.push('Weight changes reverted.'); e.before=null; return true; } }
-  return false;
-}
+/* ---------------- tips and leaderboard ---------------- */
+function tipPoints(punter, meeting){ let pts=0, wins=0, places=0, tipped=0;
+  for(const race of meeting.races){ const pk=punter.picks&&punter.picks[race.no]; if(!pk||!race.result) continue; const pos=race.result.positions.map(Number);
+    if(pk.win){ tipped++; if(pos[0]===pk.win){ pts+=3; wins++; } else if(pos.slice(1,3).includes(pk.win)){ pts+=1; places++; } }
+    for(const p of (pk.place||[])){ if(pos.slice(0,3).includes(p)){ pts+=1; places++; } } }
+  return {pts,wins,places,tipped}; }
+function modelScore(run, meeting){ const done=meeting.races.filter(r=>r.result); let top=0,top3=0,placed=0;
+  for(const r of done){ const p=run.pred[r.no]||[]; const wp=p.find(x=>x.no===r.result.positions[0]); if(wp&&wp.rank===1) top++; if(wp&&wp.rank<=3) top3++; const t=p.find(x=>x.rank===1); if(t&&r.result.positions.slice(0,3).includes(t.no)) placed++; }
+  return {done:done.length,top,top3,placed}; }
 
 /* ---------------- persistence ---------------- */
-function persistLocal(){ try{ localStorage.setItem('satform', JSON.stringify({meeting:state.meeting,weights:state.weights,settings:state.settings,updatedAt:state.updatedAt})); }catch(e){} }
-function loadLocal(){ try{ const j=JSON.parse(localStorage.getItem('satform')||'null'); if(j&&j.meeting){ state.meeting=j.meeting; state.weights={...state.weights,...j.weights}; state.settings={...state.settings,...j.settings}; state.updatedAt=j.updatedAt||0; return true; } }catch(e){} return false; }
-function save(){ state.updatedAt=Date.now(); persistLocal(); render(); if(db){ clearTimeout(saveTimer); saveTimer=setTimeout(pushDb,400); } }
-async function pushDb(){
-  if(!db||!state.meeting) return; const m=state.meeting; const id=m.id||'current';
-  try{
-    setSync('on','saving');
-    const meta={...m, races:undefined, updatedAt:state.updatedAt}; delete meta.races;
-    await db.doc('meetings/'+id).set(meta);
-    for(const r of m.races){ await db.doc('meetings/'+id+'/races/r'+r.no).set({...r, updatedAt:state.updatedAt}); }
-    // remove races that no longer exist
-    const snap=await db.collection('meetings/'+id+'/races').get();
-    for(const d of snap.docs){ if(!m.races.some(r=>'r'+r.no===d.id)) await db.doc('meetings/'+id+'/races/'+d.id).delete(); }
-    await db.doc('settings/main').set({weights:state.weights, settings:state.settings, meetingId:id, updatedAt:state.updatedAt});
-    setSync('on','synced');
-  }catch(e){ console.error(e); setSync('err','sync failed'); }
-}
-async function pullDb(){
-  try{
-    const s=await db.doc('settings/main').get(); if(!s.exists) return false;
-    const sd=s.data(); const id=sd.meetingId||'current';
-    const md=await db.doc('meetings/'+id).get(); if(!md.exists) return false;
-    const remoteAt=sd.updatedAt||0; if(remoteAt<=state.updatedAt && state.meeting) return false;
-    const races=(await db.collection('meetings/'+id+'/races').get()).docs.map(d=>d.data()).sort((a,b)=>a.no-b.no);
-    state.meeting={...md.data(), races}; state.weights={...state.weights,...sd.weights}; state.settings={...state.settings,...sd.settings}; state.updatedAt=remoteAt;
-    persistLocal(); return true;
-  }catch(e){ console.error(e); return false; }
-}
+function persistLocal(){ try{ localStorage.setItem('kyw', JSON.stringify({meeting:state.meeting,punters:state.punters,me:state.me,updatedAt:state.updatedAt})); }catch(e){} }
+function loadLocal(){ try{ const j=JSON.parse(localStorage.getItem('kyw')||'null'); if(j){ state.meeting=j.meeting||null; state.punters=j.punters||{}; state.me=j.me||null; state.updatedAt=j.updatedAt||0; return true; } }catch(e){} return false; }
+function save(what){ state.updatedAt=Date.now(); if(me()) me().updatedAt=state.updatedAt; persistLocal(); render(); if(db){ clearTimeout(saveTimer); saveTimer=setTimeout(()=>pushDb(what||'all'),350); } }
+async function pushDb(what){
+  if(!db) return; try{ setSync('on','saving');
+    if((what==='all'||what==='meeting')&&state.meeting){ const m=state.meeting; const id=m.id||'current'; const meta={...m}; delete meta.races; meta.updatedAt=state.updatedAt;
+      await db.doc('meetings/'+id).set(meta); for(const r of m.races) await db.doc('meetings/'+id+'/races/r'+r.no).set({...r,updatedAt:state.updatedAt});
+      const snap=await db.collection('meetings/'+id+'/races').get(); for(const d of snap.docs){ if(!m.races.some(r=>'r'+r.no===d.id)) await db.doc('meetings/'+id+'/races/'+d.id).delete(); }
+      await db.doc('settings/main').set({meetingId:id, updatedAt:state.updatedAt}); }
+    if((what==='all'||what==='meeting')&&!state.meeting){ await db.doc('settings/main').set({meetingId:null, updatedAt:state.updatedAt}); }
+    if((what==='all'||what==='punter')&&me()) await db.doc('punters/'+state.me).set(me());
+    setSync('on','synced'); }catch(e){ console.error(e); setSync('err','sync failed'); } }
+async function pullMeeting(){ const s=await db.doc('settings/main').get(); if(!s.exists) return false; const sd=s.data(); if(!sd.meetingId){ if(state.meeting&&(sd.updatedAt||0)>state.updatedAt){ state.meeting=null; return true; } return false; }
+  const md=await db.doc('meetings/'+sd.meetingId).get(); if(!md.exists) return false; const meta=md.data(); if(state.meeting&&(meta.updatedAt||0)<=(state.meeting.updatedAt||0)) return false;
+  const races=(await db.collection('meetings/'+sd.meetingId+'/races').get()).docs.map(d=>d.data()).sort((a,b)=>a.no-b.no); state.meeting={...meta,races}; return true; }
 function setSync(cls,txt){ const s=$('#sync'); s.className='sync '+cls; s.textContent=txt; }
 async function initDb(){
-  if(!window.claude||!window.claude.use) return;
-  try{ db=await window.claude.use('db'); }catch(e){ db=null; }
-  if(!db){ setSync('','local only'); return; }
-  setSync('on','connecting');
-  const pulled=await pullDb(); if(pulled){ render(); toast('Loaded latest meeting from shared storage'); } else if(state.meeting){ pushDb(); }
-  setSync('on','synced');
-  // live updates from other devices
-  unsub.push(db.doc('settings/main').onSnapshot(async snap=>{ if(!snap.exists) return; const d=snap.data(); if((d.updatedAt||0)>state.updatedAt+50 && !snap.metadata.hasPendingWrites){ const ok=await pullDb(); if(ok){ render(); toast('Updated from another device'); } } }, e=>{ console.warn(e); setSync('err','live sync off'); }));
+  if(!window.claude||!window.claude.use) return; try{ db=await window.claude.use('db'); }catch(e){ db=null; }
+  if(!db){ setSync('','this phone only'); return; } setSync('on','connecting');
+  try{
+    const changed=await pullMeeting();
+    const ps=await db.collection('punters').get(); for(const d of ps.docs){ const p=d.data(); if(!state.punters[p.id]||(p.updatedAt||0)>(state.punters[p.id].updatedAt||0)) state.punters[p.id]=p; }
+    if(changed||ps.size) { persistLocal(); render(); }
+    if(state.meeting&&!changed) pushDb('meeting'); if(me()) pushDb('punter');
+    setSync('on','synced');
+    db.doc('settings/main').onSnapshot(async snap=>{ if(!snap.exists||snap.metadata.hasPendingWrites) return; const c=await pullMeeting(); if(c){ persistLocal(); render(); toast('Form or results updated by another Pelican'); } }, e=>setSync('err','live sync off'));
+    db.collection('punters').onSnapshot(snap=>{ let ch=false; for(const d of snap.docs){ const p=d.data(); if(p.id===state.me) continue; if(!state.punters[p.id]||(p.updatedAt||0)>(state.punters[p.id].updatedAt||0)){ state.punters[p.id]=p; ch=true; } } if(ch){ persistLocal(); render(); } }, e=>{});
+    // races change (results) without settings/main changing: watch the races collection of the current meeting
+    watchRaces();
+  }catch(e){ console.error(e); setSync('err','sync failed'); }
 }
+let racesUnsub=null, racesWatched=null;
+function watchRaces(){ if(!db||!state.meeting) return; const id=state.meeting.id; if(racesWatched===id) return; if(racesUnsub) racesUnsub(); racesWatched=id;
+  racesUnsub=db.collection('meetings/'+id+'/races').onSnapshot(snap=>{ if(snap.metadata.hasPendingWrites||!state.meeting||state.meeting.id!==id) return; let ch=false;
+    for(const d of snap.docs){ const r=d.data(); const i=state.meeting.races.findIndex(x=>x.no===r.no); if(i>=0&&(r.updatedAt||0)>(state.meeting.races[i].updatedAt||0)){ state.meeting.races[i]=r; ch=true; } }
+    if(ch){ persistLocal(); render(); } }, e=>{}); }
 
 /* ---------------- ingest ---------------- */
 function normaliseMeeting(j){
-  if(!j||typeof j!=='object') throw new Error('Not an object');
-  if(Array.isArray(j)) j={races:j};
-  if(j.runners && !j.races) j={races:[j]};
-  const races=(j.races||[]).map((r,i)=>({
-    no:num(r.no)||num(r.race)||i+1, name:r.name||'', distance:num(r.distance), class:r.class||r.grade||'', time:r.time||'', prizemoney:r.prizemoney||null,
-    result: r.result && r.result.positions ? r.result : null,
-    runners:(r.runners||[]).map((h,k)=>({
-      no:num(h.no)||num(h.number)||k+1, name:h.name||('Runner '+(k+1)), barrier:num(h.barrier), weight:num(h.weight), jockey:h.jockey||'', trainer:h.trainer||'',
-      age:h.age||null, sex:h.sex||'', career:rec(h.career), track:rec(h.track), distance:rec(h.distance),
-      good:rec(h.good)||(h.condition&&rec(h.condition.good))||null, soft:rec(h.soft)||(h.condition&&rec(h.condition.soft))||null, heavy:rec(h.heavy)||(h.condition&&rec(h.condition.heavy))||null,
-      form:h.form||'', last: h.last ? {pos:num(h.last.pos), field:num(h.last.field), margin:num(h.last.margin), days:num(h.last.days), race:h.last.race||'', classChange:num(h.last.classChange)||0} : null,
-      jockeyPct:num(h.jockeyPct), trainerPct:num(h.trainerPct), jockeyRating:num(h.jockeyRating), trainerRating:num(h.trainerRating), odds:num(h.odds),
-      scratched:!!h.scratched, gear:h.gear||'', comment:h.comment||'', adj:num(h.adj)||0, note:h.note||''
-    }))
-  })).filter(r=>r.runners.length);
+  if(!j||typeof j!=='object') throw new Error('Not an object'); if(Array.isArray(j)) j={races:j}; if(j.runners&&!j.races) j={races:[j]};
+  const races=(j.races||[]).map((r,i)=>({ no:num(r.no)||num(r.race)||i+1, name:r.name||'', distance:num(r.distance), class:r.class||r.grade||'', time:r.time||'', result:(r.result&&r.result.positions)?r.result:null,
+    runners:(r.runners||[]).map((h,k)=>({ no:num(h.no)||num(h.number)||k+1, name:h.name||('Runner '+(k+1)), barrier:num(h.barrier), weight:num(h.weight), jockey:h.jockey||'', trainer:h.trainer||'', age:h.age||null, sex:h.sex||'',
+      career:rec(h.career), track:rec(h.track), distance:rec(h.distance), good:rec(h.good)||(h.condition&&rec(h.condition.good))||null, soft:rec(h.soft)||(h.condition&&rec(h.condition.soft))||null, heavy:rec(h.heavy)||(h.condition&&rec(h.condition.heavy))||null,
+      form:h.form||'', last:h.last?{pos:num(h.last.pos),field:num(h.last.field),margin:num(h.last.margin),days:num(h.last.days),race:h.last.race||'',classChange:num(h.last.classChange)||0}:null,
+      jockeyPct:num(h.jockeyPct), trainerPct:num(h.trainerPct), jockeyRating:num(h.jockeyRating), trainerRating:num(h.trainerRating), odds:num(h.odds), scratched:!!h.scratched, gear:h.gear||'', comment:h.comment||'' })) })).filter(r=>r.runners.length);
   if(!races.length) throw new Error('No races with runners found');
-  return { id:(j.id||slug((j.meeting||'meeting')+'-'+(j.date||''))), meeting:j.meeting||j.track||'Meeting', date:j.date||'', condition:j.condition||'Good 4', rail:j.rail||'', weather:j.weather||'', example:!!j.example, races, log:j.log||[] };
+  return { id:slug((j.meeting||'meeting')+'-'+(j.date||Date.now())), meeting:j.meeting||j.track||'Meeting', date:j.date||'', condition:j.condition||'Good 4', rail:j.rail||'', example:!!j.example, races, log:j.log||[], updatedAt:Date.now() };
 }
-function slug(s){ return String(s).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')||'meeting'; }
-function parseCSV(text){
-  const lines=text.split(/\r?\n/).filter(l=>l.trim()); if(lines.length<2) throw new Error('CSV needs a header row and at least one runner');
+function parseCSV(text){ const lines=text.split(/\r?\n/).filter(l=>l.trim()); if(lines.length<2) throw new Error('CSV needs a header row and at least one runner');
   const split=l=>{ const out=[];let cur='',q=false; for(const ch of l){ if(ch==='"'){q=!q;continue;} if(ch===','&&!q){out.push(cur);cur='';continue;} cur+=ch;} out.push(cur); return out.map(s=>s.trim()); };
-  const H=split(lines[0]).map(h=>h.toLowerCase().replace(/\s+/g,'_'));
-  const races={};
-  for(const l of lines.slice(1)){ const c=split(l); const g=k=>{const i=H.indexOf(k); return i>=0?c[i]:'';};
-    const rno=num(g('race'))||1; races[rno]=races[rno]||{no:rno,name:g('race_name'),distance:num(g('race_distance')),class:g('race_class'),time:g('race_time'),runners:[]};
-    if(!races[rno].distance&&g('race_distance')) races[rno].distance=num(g('race_distance'));
-    races[rno].runners.push({no:num(g('no')),name:g('name'),barrier:num(g('barrier')),weight:num(g('weight')),jockey:g('jockey'),trainer:g('trainer'),
-      career:g('career'),track:g('track'),distance:g('distance'),good:g('good'),soft:g('soft'),heavy:g('heavy'),form:g('form'),
-      last:{pos:num(g('last_pos')),field:num(g('last_field')),margin:num(g('last_margin')),days:num(g('days')),race:g('last_race'),classChange:num(g('class_change'))},
-      jockeyPct:num(g('jockey_pct')),trainerPct:num(g('trainer_pct')),odds:num(g('odds')),scratched:/^(y|true|1)/i.test(g('scratched'))});
-  }
-  return {races:Object.values(races)};
-}
-function loadText(text, metaOverride){
-  text=text.trim(); let j;
-  if(text.startsWith('{')||text.startsWith('[')){ j=JSON.parse(text); } else { j=parseCSV(text); }
-  if(metaOverride) Object.assign(j, metaOverride);
-  const m=normaliseMeeting(j);
-  // keep results if the same race numbers already have them and the user asked to keep
-  state.meeting=m; state.ui.raceNo=m.races[0].no; state.ui.tab='races'; save();
-  const nr=m.races.reduce((a,r)=>a+r.runners.length,0); toast(`Loaded ${m.races.length} race${m.races.length===1?'':'s'}, ${nr} runner${nr===1?'':'s'}`);
-}
-function mergeRace(text){ // add or replace one race in the current meeting
-  const j=JSON.parse(text.trim()); const one=normaliseMeeting(j.races?j:{races:[j]}); if(!state.meeting){ state.meeting=one; }
-  else { for(const r of one.races){ const i=state.meeting.races.findIndex(x=>x.no===r.no); if(i>=0) state.meeting.races[i]=r; else state.meeting.races.push(r); } state.meeting.races.sort((a,b)=>a.no-b.no); }
-  save(); toast('Race merged');
-}
+  const H=split(lines[0]).map(h=>h.toLowerCase().replace(/\s+/g,'_')); const races={};
+  for(const l of lines.slice(1)){ const c=split(l); const g=k=>{const i=H.indexOf(k); return i>=0?c[i]:'';}; const rno=num(g('race'))||1;
+    races[rno]=races[rno]||{no:rno,name:g('race_name'),distance:num(g('race_distance')),class:g('race_class'),time:g('race_time'),runners:[]}; if(!races[rno].distance&&g('race_distance')) races[rno].distance=num(g('race_distance'));
+    races[rno].runners.push({no:num(g('no')),name:g('name'),barrier:num(g('barrier')),weight:num(g('weight')),jockey:g('jockey'),trainer:g('trainer'),career:g('career'),track:g('track'),distance:g('distance'),good:g('good'),soft:g('soft'),heavy:g('heavy'),form:g('form'),
+      last:{pos:num(g('last_pos')),field:num(g('last_field')),margin:num(g('last_margin')),days:num(g('days')),race:g('last_race'),classChange:num(g('class_change'))},jockeyPct:num(g('jockey_pct')),trainerPct:num(g('trainer_pct')),odds:num(g('odds')),scratched:/^(y|true|1)/i.test(g('scratched'))}); }
+  return {races:Object.values(races)}; }
+function loadText(text){ text=text.trim(); const j=(text.startsWith('{')||text.startsWith('[')) ? JSON.parse(text) : parseCSV(text); const m=normaliseMeeting(j);
+  state.meeting=m; for(const p of Object.values(state.punters)){ p.picks={}; p.adj={}; } state.ui.raceNo=m.races[0].no; state.ui.tab='races'; racesWatched=null; save('all'); if(db) for(const p of Object.values(state.punters)) db.doc('punters/'+p.id).set(p).catch(()=>{}); watchRaces();
+  const nr=m.races.reduce((a,r)=>a+r.runners.length,0); toast(`Loaded ${m.races.length} race${m.races.length===1?'':'s'}, ${nr} runner${nr===1?'':'s'}. Tips and calls reset.`); }
+function mergeRace(text){ const j=JSON.parse(text.trim()); const one=normaliseMeeting(j.races?j:{races:[j]}); if(!state.meeting){ state.meeting=one; } else { for(const r of one.races){ const i=state.meeting.races.findIndex(x=>x.no===r.no); if(i>=0) state.meeting.races[i]=r; else state.meeting.races.push(r); } state.meeting.races.sort((a,b)=>a.no-b.no); } state.meeting.updatedAt=Date.now(); save('meeting'); toast('Race merged'); }
 
 const SCHEMA_DOC = `{
   "meeting": "Randwick", "date": "2026-09-12", "condition": "Good 4", "rail": "True",
@@ -490,158 +408,146 @@ function exampleMeeting(){
   const J=[['A Example',19],['B Sample',24],['C Placeholder',16],['D Fictive',15],['E Stand-in',12],['F Notional',13],['G Invented',11],['H Dummy',10],['I Mock',9],['J Specimen',17],['K Token',8],['L Nominal',14]];
   const T=[['Stable One',22],['Stable Two',18],['Stable Three',12],['Stable Four',16],['Stable Five',15],['Stable Six',13],['Stable Seven',11],['Stable Eight',10],['Stable Nine',14],['Stable Ten',8]];
   const names=['Copper Ledger','Sunday Verdict','Iron Tally','Quiet Counsel','Salt Meridian','Northern Clause','Velvet Ordinance','Brass Interval','Halcyon Draft','Tidal Motion','Granite Recital','Amber Statute','Silver Tenure','Midnight Caveat','Paper Lantern','Long Division','Cobalt Archive','Winter Proxy','Steady Cadence','Open Ledger','Lucky Indenture','Marble Testament','Broken Compass','Fair Quorum','Deep Charter','Rising Tenor','Old Harbour','Swift Recital','Golden Minute','Last Amendment','Coastal Deed','Nine Bells','Hidden Ballot','Summer Clause','Harbour Light','Bold Precedent','Second Reading','Quick Consent','Evening Motion','Silent Partner','Royal Assent','Distant Tally','Rare Tenancy','Loyal Draft','First Witness','Strong Covenant','Blue Indemnity','Fine Print'];
-  let seed=7; const rnd=()=>{ seed=(seed*9301+49297)%233280; return seed/233280; };
-  const ri=(a,b)=>a+Math.floor(rnd()*(b-a+1));
+  let seed=7; const rnd=()=>{ seed=(seed*9301+49297)%233280; return seed/233280; }; const ri=(a,b)=>a+Math.floor(rnd()*(b-a+1));
   const races=[]; let ni=0; const dists=[1100,1200,1400,1600,1200,2000,1400,1800]; const cls=['BM78','3YO F&M BM72','Open Hcp','G3 Hcp','Listed','BM88','2YO Plate','Open Hcp'];
   const lastRaces=['2026-08-22 Rosehill R4','2026-08-22 Rosehill R7','2026-08-29 Randwick R3','2026-08-29 Randwick R6','2026-08-15 Warwick Farm R5','2026-08-29 Randwick R8','2026-08-22 Rosehill R2'];
   for(let r=1;r<=8;r++){ const n=ri(9,13); const runners=[]; const bars=[...Array(n).keys()].map(i=>i+1).sort(()=>rnd()-.5);
-    for(let k=1;k<=n;k++){ const name=names[ni++%names.length]; const cs=ri(4,28), cw=ri(0,Math.max(1,Math.floor(cs*0.35))), cp=ri(0,Math.max(1,Math.floor((cs-cw)*0.4)));
-      const ts=ri(0,6), ds=ri(0,8), gs=ri(2,cs); const j=J[ri(0,J.length-1)], t=T[ri(0,T.length-1)];
-      const lp=ri(1,10), lm=lp===1?0:+(0.2+rnd()*6).toFixed(1);
-      const form=['1','2','3','4','5','6','7','8','0','x'].sort(()=>rnd()-.5).slice(0,ri(3,5)).join('')+lp;
-      const odds=+(2.2+Math.pow(rnd(),2)*38).toFixed(1);
-      runners.push({no:k,name,barrier:bars[k-1],weight:+(53+rnd()*7).toFixed(1),jockey:j[0],trainer:t[0],age:ri(3,7),sex:['G','M','H'][ri(0,2)],
-        career:[cs,cw,cp],track:[ts,ri(0,Math.min(ts,2)),ri(0,Math.min(ts,2))],distance:[ds,ri(0,Math.min(ds,3)),ri(0,Math.min(ds,3))],
-        good:[gs,ri(0,Math.min(gs,cw)),ri(0,Math.min(gs,cp))],soft:[ri(0,5),ri(0,1),ri(0,2)],heavy:[ri(0,3),ri(0,1),ri(0,1)],form,
-        last:{pos:lp,field:ri(Math.max(lp,8),14),margin:lm,days:ri(7,60),race:lastRaces[ri(0,lastRaces.length-1)],classChange:ri(-1,1)},
-        jockeyPct:j[1],trainerPct:t[1],odds,scratched:rnd()<0.06,gear:rnd()<0.15?'Blinkers first time':'',comment:''});
-    }
-    races.push({no:r,name:['Opening Sprint','Fillies and Mares','Spring Handicap','Mile Stakes','Sprint Stakes','Staying Handicap','Juvenile Plate','Closing Handicap'][r-1],distance:dists[r-1],class:cls[r-1],time:`${11+Math.floor((r+1)/2)}:${(r%2)?'40':'15'}`,runners});
-  }
-  return {id:'example-fictional', meeting:'Example meeting (fictional)', date:'', condition:'Good 4', rail:'True', example:true, races, log:[]};
+    for(let k=1;k<=n;k++){ const name=names[ni++%names.length]; const cs=ri(4,28), cw=ri(0,Math.max(1,Math.floor(cs*0.35))), cp=ri(0,Math.max(1,Math.floor((cs-cw)*0.4))); const ts=ri(0,6), ds=ri(0,8), gs=ri(2,cs); const j=J[ri(0,J.length-1)], t=T[ri(0,T.length-1)];
+      const lp=ri(1,10), lm=lp===1?0:+(0.2+rnd()*6).toFixed(1); const form=['1','2','3','4','5','6','7','8','0','x'].sort(()=>rnd()-.5).slice(0,ri(3,5)).join('')+lp; const odds=+(2.2+Math.pow(rnd(),2)*38).toFixed(1);
+      runners.push({no:k,name,barrier:bars[k-1],weight:+(53+rnd()*7).toFixed(1),jockey:j[0],trainer:t[0],age:ri(3,7),sex:['G','M','H'][ri(0,2)],career:[cs,cw,cp],track:[ts,ri(0,Math.min(ts,2)),ri(0,Math.min(ts,2))],distance:[ds,ri(0,Math.min(ds,3)),ri(0,Math.min(ds,3))],
+        good:[gs,ri(0,Math.min(gs,cw)),ri(0,Math.min(gs,cp))],soft:[ri(0,5),ri(0,1),ri(0,2)],heavy:[ri(0,3),ri(0,1),ri(0,1)],form,last:{pos:lp,field:ri(Math.max(lp,8),14),margin:lm,days:ri(7,60),race:lastRaces[ri(0,lastRaces.length-1)],classChange:ri(-1,1)},jockeyPct:j[1],trainerPct:t[1],odds,scratched:rnd()<0.06,gear:rnd()<0.15?'Blinkers first time':'',comment:''}); }
+    races.push({no:r,name:['Opening Sprint','Fillies and Mares','Spring Handicap','Mile Stakes','Sprint Stakes','Staying Handicap','Juvenile Plate','Closing Handicap'][r-1],distance:dists[r-1],class:cls[r-1],time:`${11+Math.floor((r+1)/2)}:${(r%2)?'40':'15'}`,runners}); }
+  return {id:'example-fictional', meeting:'Example meeting (fictional)', date:'', condition:'Good 4', rail:'True', example:true, races, log:[], updatedAt:Date.now()};
 }
 
 /* ---------------- rendering ---------------- */
 function render(){
   const m=state.meeting; document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===state.ui.tab));
-  $('#hMeeting').textContent = m ? m.meeting : 'Saturday Form';
-  $('#hSub').textContent = m ? [m.date, m.condition, m.rail?('Rail '+m.rail):''].filter(Boolean).join(' / ') : 'No meeting loaded';
+  $('#hMeeting').textContent = m ? m.meeting : 'Kai Ying Winning';
+  $('#hSub').textContent = m ? [m.date, m.condition, m.rail?('Rail '+m.rail):''].filter(Boolean).join(' / ') : 'No form loaded yet';
   const main=$('#main'); const tab=state.ui.tab;
+  if(!state.me){ main.innerHTML=''; showWho(); return; }
   if(!m && tab!=='load'){ main.innerHTML=emptyState(); bind(main); return; }
-  if(tab==='races') main.innerHTML=viewRaces();
-  else if(tab==='race') main.innerHTML=viewRace();
-  else if(tab==='weights') main.innerHTML=viewWeights();
-  else if(tab==='review') main.innerHTML=viewReview();
-  else main.innerHTML=viewLoad();
+  main.innerHTML = tab==='races'?viewRaces() : tab==='race'?viewRace() : tab==='weights'?viewWeights() : tab==='flock'?viewFlock() : viewLoad();
   bind(main);
 }
-function emptyState(){ return `<div class="banner"><div class="tick"></div><h2>No form loaded</h2><p>Load the finalised form on the Load tab, or open the fictional example meeting to see how the ratings and live adjustment behave.</p></div>
-  <div class="actions"><button class="pill dark" data-act="tab" data-tab="load">Load form</button><button class="pill acc" data-act="example">Open example</button></div>`; }
+function showWho(){ const sh=$('#sheet'); const others=Object.values(state.punters);
+  sh.innerHTML=`<div class="sheet"><div class="card"><div class="eyebrow">Roll call</div><h2>Which Pelican are you?</h2><p class="note">Your weights, calls and tips are kept under your name. The form and the results are shared with the flock.</p>
+    <div class="who">${others.map(p=>`<button class="btn" data-who="${esc(p.id)}"><span class="pel"><i style="background:${p.colour}"></i>${esc(p.name)}</span></button>`).join('')}</div>
+    <label class="field">Or a new name<input id="whoIn" placeholder="First name or nickname" autocomplete="off"></label>
+    <div class="actions"><button class="btn primary" id="whoGo">That's me</button></div></div></div>`;
+  sh.hidden=false;
+  sh.querySelectorAll('[data-who]').forEach(b=>b.addEventListener('click',()=>{ state.me=b.dataset.who; sh.hidden=true; save('punter'); }));
+  $('#whoGo').addEventListener('click',()=>{ const v=$('#whoIn').value.trim(); if(!v){ toast('A name, please'); return; } const p=newPunter(v); if(state.punters[p.id]){ state.me=p.id; } else { state.punters[p.id]=p; state.me=p.id; } sh.hidden=true; save('punter'); });
+}
+function emptyState(){ return `<div class="banner"><div class="eyebrow" style="color:var(--panel-ink);opacity:.7">Card</div><h2>No form loaded</h2><p>Load the finalised form on the Load tab, or open the fictional example meeting to see how the ratings and the live adjustment behave.</p></div>
+  <div class="actions"><button class="btn primary" data-act="tab" data-tab="load">Load form</button><button class="btn" data-act="example">Open example</button></div>`; }
 
 function viewRaces(){
-  const m=state.meeting; const dyn=computeDynamics(m,state.weights,state.settings); const done=m.races.filter(r=>r.result).length;
-  let html='';
-  if(m.example) html+=`<div class="banner"><div class="tick"></div><h2>Example meeting</h2><p>Every horse, jockey record and result here is fictional and exists to show the mechanics. Load the real form on the Load tab when it is finalised.</p></div>`;
+  const m=state.meeting; const run=runDay(me(),m); const done=m.races.filter(r=>r.result).length; let html='';
+  if(m.example) html+=`<div class="banner"><div class="eyebrow" style="color:var(--panel-ink);opacity:.7">Practice card</div><h2>Example meeting</h2><p>Every horse, rider and result here is fictional. It exists to show the mechanics. Load the real form on the Load tab when it is finalised.</p></div>`;
   html+=`<div class="hdr-edit">
     <label class="field">Meeting<input data-meta="meeting" value="${esc(m.meeting)}"></label>
     <label class="field">Date<input data-meta="date" value="${esc(m.date)}" placeholder="2026-09-12"></label>
     <label class="field">Track condition<select data-meta="condition">${['Good 3','Good 4','Soft 5','Soft 6','Soft 7','Heavy 8','Heavy 9','Heavy 10','Synthetic'].map(c=>`<option ${c===m.condition?'selected':''}>${c}</option>`).join('')}</select></label>
-    <label class="field">Rail<input data-meta="rail" value="${esc(m.rail)}" placeholder="True, +3m etc"></label>
-  </div>`;
-  const fin=dyn.final;
+    <label class="field">Rail<input data-meta="rail" value="${esc(m.rail)}" placeholder="True, +3m"></label></div>`;
+  const fin=run.final;
   html+=`<div class="eyebrow">Day so far<span class="sl">/</span>${done} of ${m.races.length} results in</div>
-  <div class="bias">${Math.abs(fin.barrierBias)>0?`<span>Barrier bias <b>${fin.barrierBias>0?'inside':'outside'} (${fin.barrierBias.toFixed(2)})</b></span>`:`<span>Barrier bias <b>none read yet</b></span>`}
-  ${Object.keys(fin.jockeyWins).length?`<span>Winning riders <b>${Object.entries(fin.jockeyWins).map(([j,w])=>titleCase(j)+(w>1?' x'+w:'')).join(', ')}</b></span>`:''}</div>`;
+  <div class="bias"><span>Barrier bias <b>${Math.abs(fin.barrierBias)>0?(fin.barrierBias>0?'inside':'outside')+' ('+fin.barrierBias.toFixed(2)+')':'none read yet'}</b></span>
+  ${Object.keys(fin.jockeyWins).length?`<span>Riders on the board <b>${Object.entries(fin.jockeyWins).map(([j,w])=>titleCase(j)+(w>1?' x'+w:'')).join(', ')}</b></span>`:''}</div>`;
   html+=`<section class="block" style="margin-top:14px"><div class="rows">`;
-  for(const race of m.races){
-    const scored=scoreRace(race,m,state.weights,state.settings,dyn[race.no]); const top=scored[0]; const res=race.result;
-    let right;
-    if(res){ const w=race.runners.find(r=>r.no===res.positions[0]); const pr=res.predicted&&res.predicted.find(p=>p.no===res.positions[0]); right=`<span class="tag ${pr&&pr.rank<=state.settings.marginRank?'acc':'warn'}">${pr?ordinal(pr.rank)+' pick':'result'}</span><b>${esc(w?w.name:res.positions[0])}</b>`; }
-    else right= top?`<span>Top pick ${pct(top.prob)}</span><b>${esc(top.r.name)}</b>`:'<b>no runners</b>';
-    html+=`<button class="row" data-act="openrace" data-no="${race.no}"><span class="idx num">${race.no}</span><span><span class="t">${esc(race.name||'Race '+race.no)}</span><br><span class="s">${race.distance?race.distance+'m':''} ${esc(race.class||'')} ${race.time?'at '+esc(race.time):''} ${active(race).length} runners</span></span><span class="r">${right}</span></button>`;
-  }
-  html+=`</div></section>`;
-  return html;
+  for(const race of m.races){ const p=run.pred[race.no]||[]; const top=p.find(x=>x.rank===1); const topR=top&&race.runners.find(r=>r.no===top.no); const res=race.result; const myPick=me().picks[race.no]&&me().picks[race.no].win; let right;
+    if(res){ const w=race.runners.find(r=>r.no===res.positions[0]); const pr=p.find(x=>x.no===res.positions[0]); const hit=myPick===res.positions[0]; right=`<span class="tag ${hit?'good':(pr&&pr.rank<=me().settings.marginRank?'acc':'warn')}">${hit?'You tipped it':(pr?ordinal(pr.rank)+' pick':'result')}</span><b>${esc(w?w.name:res.positions[0])}</b>`; }
+    else right= top?`<span>${myPick?'Your tip '+myPick+' / ':''}Model ${pct(top.prob)}</span><b>${esc(topR?topR.name:'')}</b>`:'<b>no runners</b>';
+    html+=`<button class="row" data-act="openrace" data-no="${race.no}"><span class="idx num">${race.no}</span><span><span class="t">${esc(race.name||'Race '+race.no)}</span><br><span class="s">${race.distance?race.distance+'m':''} ${esc(race.class||'')} ${race.time?'at '+esc(race.time):''} ${active(race).length} runners</span></span><span class="r">${right}</span></button>`; }
+  return html+`</div></section>`;
 }
-function titleCase(s){ return s.replace(/\b\w/g,c=>c.toUpperCase()); }
 
 function viewRace(){
   const m=state.meeting; const race=m.races.find(r=>r.no===state.ui.raceNo)||m.races[0]; if(!race) return emptyState(); state.ui.raceNo=race.no;
-  const dyn=computeDynamics(m,state.weights,state.settings); const scored=scoreRace(race,m,state.weights,state.settings,dyn[race.no]);
-  const idx=m.races.indexOf(race); const prev=m.races[idx-1], next=m.races[idx+1];
+  const my=me(); const run=runDay(my,m); const scored=scoreRace(race,m,run.weights,{...DEFAULT_SETTINGS,...my.settings},run.dyn[race.no],my.adj);
+  const idx=m.races.indexOf(race); const prev=m.races[idx-1], next=m.races[idx+1]; const res=race.result; const picks=my.picks[race.no]||{win:null,place:[]};
+  // flock: other punters' tips and consensus
+  const others=Object.values(state.punters); const flockProb={}; const tips={};
+  for(const p of others){ const r=p.id===my.id?run:runDay(p,m); for(const x of (r.pred[race.no]||[])) flockProb[x.no]=(flockProb[x.no]||0)+x.prob/others.length; const pk=p.picks&&p.picks[race.no]; if(pk&&pk.win){ (tips[pk.win]=tips[pk.win]||[]).push(p); } }
   let html=`<div class="racehead"><div><button class="back" data-act="tab" data-tab="races">All races</button><h2>Race ${race.no} ${esc(race.name||'')}</h2><div class="s">${race.distance?race.distance+'m':''} ${esc(race.class||'')} ${race.time?'at '+esc(race.time):''} on ${esc(m.condition)}. ${active(race).length} runners.</div></div>
     <div class="actions" style="margin:0"><button class="btn" data-act="openrace" data-no="${prev?prev.no:race.no}" ${prev?'':'disabled'}>Prev</button><button class="btn" data-act="openrace" data-no="${next?next.no:race.no}" ${next?'':'disabled'}>Next</button></div></div>`;
-  // result block
-  const res=race.result;
-  html+=`<section class="block"><div class="eyebrow">Result<span class="sl">/</span>${res?'entered':'not yet run'}</div>
+  const pr=res&&(run.pred[race.no]||[]).find(x=>x.no===res.positions[0]);
+  html+=`<section class="block"><div class="eyebrow">Result<span class="sl">/</span>${res?'in':'not yet run'}</div>
   <div class="result-entry" style="margin-top:8px"><label class="field">Finishing order, saddlecloth numbers<input id="resIn" placeholder="e.g. 7 2 11 4" value="${res?esc(res.positions.join(' ')):''}" inputmode="numeric"></label>
   <button class="btn primary" data-act="result">${res?'Update result':'Enter result'}</button>${res?`<button class="btn danger" data-act="clearresult">Clear</button>`:''}</div>
-  ${res?`<p class="note">Top pick was ${esc((()=>{const p=res.predicted.find(x=>x.rank===1);const r=p&&race.runners.find(h=>h.no===p.no);return r?r.name:'';})())}. Winner was rated ${ordinal((res.predicted.find(p=>p.no===res.positions[0])||{rank:0}).rank)} at ${pct((res.predicted.find(p=>p.no===res.positions[0])||{prob:0}).prob)}.</p>`:`<p class="note">Enter at least the first four home. Weights only move when the winner was rated worse than ${ordinal(state.settings.marginRank)} or under ${pct(state.settings.marginProb)}.</p>`}</section>`;
-  // runners
-  html+=`<section class="block"><div class="eyebrow">Ratings<span class="sl">/</span>tap a runner for the breakdown</div><div class="rows" style="margin-top:8px">`;
+  ${res?`<p class="note">Your model had the winner ${pr?ordinal(pr.rank)+' at '+pct(pr.prob):'unrated'}. ${picks.win?(picks.win===res.positions[0]?'You tipped it.':(res.positions.slice(1,3).includes(picks.win)?'Your tip ran a place.':'Your tip missed.')):'You had no tip in.'}${res.by?' Entered by '+esc(res.by)+'.':''}</p>`:`<p class="note">Enter at least the first four home. It goes to every Pelican's model. Your weights move only when the winner was rated worse than ${ordinal(my.settings.marginRank)} or under ${pct(my.settings.marginProb)}.</p>`}</section>`;
+  html+=`<section class="block"><div class="eyebrow">Ratings<span class="sl">/</span>tap a runner to open it</div><div class="rows" style="margin-top:8px">`;
   const maxR=Math.max(...scored.map(s=>s.rating)), minR=Math.min(...scored.map(s=>s.rating)); const span=(maxR-minR)||1;
-  for(const s of scored){ const r=s.r; const open=state.ui.open===runnerKey(race,r); const dynv=s.contrib.formline+s.contrib.manual;
+  for(const s of scored){ const r=s.r; const k=runnerKey(race,r); const open=state.ui.open===k; const dynv=s.contrib.formline+s.contrib.manual; const a=my.adj[k]||{adj:0,note:''};
     const chips=[]; if(r.barrier!=null) chips.push(`Bar ${r.barrier}`); if(r.weight!=null) chips.push(`${r.weight}kg`); if(r.form) chips.push(`Form ${esc(r.form)}`);
     if(r.last&&r.last.pos!=null) chips.push(`Last ${r.last.pos}${r.last.field?'/'+r.last.field:''}${r.last.margin!=null&&r.last.pos>1?' '+r.last.margin+'L':''}`); if(r.last&&r.last.days!=null) chips.push(`${r.last.days}d`); if(r.odds) chips.push(`$${r.odds}`);
     if(s.z.formline>0.05) chips.push(`<span class="chip up">Form line +${s.z.formline.toFixed(2)}</span>`); if(s.z.formline<-0.05) chips.push(`<span class="chip dn">Form line ${s.z.formline.toFixed(2)}</span>`);
-    if(r.adj) chips.push(`<span class="chip ${r.adj>0?'up':'dn'}">You ${r.adj>0?'+':''}${r.adj}</span>`); if(s.missing>=3) chips.push(`<span class="chip">thin data</span>`);
-    const resPos=res?res.positions.indexOf(r.no):-1;
-    html+=`<div class="runner ${r.scratched?'scr':''}"><button class="head" data-act="toggle" data-key="${runnerKey(race,r)}">
-      <span class="no num">${r.no}</span>
-      <span><span class="nm">${esc(r.name)}</span>${resPos>=0?` <span class="tag acc">${ordinal(resPos+1)}</span>`:''}<div class="meta">${esc(r.jockey)}${r.trainer?' for '+esc(r.trainer):''}</div>
+    if(a.adj) chips.push(`<span class="chip ${a.adj>0?'up':'dn'}">Your call ${a.adj>0?'+':''}${a.adj}</span>`); if(s.missing>=3) chips.push(`<span class="chip">thin data</span>`);
+    if(others.length>1&&flockProb[r.no]!=null) chips.push(`<span class="chip">Flock ${pct(flockProb[r.no])}</span>`);
+    const resPos=res?res.positions.indexOf(r.no):-1; const isWin=picks.win===r.no, isPl=(picks.place||[]).includes(r.no);
+    html+=`<div class="runner ${r.scratched?'scr':''}"><button class="head" data-act="toggle" data-key="${k}">${cloth(r.no)}
+      <span><span class="nm">${esc(r.name)}</span>${resPos>=0?` <span class="tag good">${ordinal(resPos+1)}</span>`:''}${isWin?` <span class="tag acc">Your tip</span>`:isPl?` <span class="tag">Place</span>`:''}<div class="meta">${esc(r.jockey)}${r.trainer?' for '+esc(r.trainer):''}</div>
         <div class="bar"><i style="width:${((s.rating-minR)/span*100).toFixed(1)}%"></i>${dynv>0?`<i class="dyn" style="left:${((s.rating-dynv-minR)/span*100).toFixed(1)}%;width:${(dynv/span*100).toFixed(1)}%"></i>`:''}</div>
-        <div class="chips">${chips.map(c=>c.startsWith('<span')?c:`<span class="chip">${c}</span>`).join('')}</div></span>
+        <div class="chips">${chips.map(c=>c.startsWith('<span')?c:`<span class="chip">${c}</span>`).join('')}</div>
+        ${tips[r.no]?`<div class="flock">${tips[r.no].map(p=>`<span class="pel"><i style="background:${p.colour}"></i>${esc(p.name)}</span>`).join('')}</div>`:''}</span>
       <span class="prob"><b class="num">${pct(s.prob)}</b><span>${fmtOdds(s.prob)} fair</span></span></button>`;
-    if(open){ html+=`<div class="detail"><div class="metrics">`;
-      for(const met of METRICS){ const z=s.z[met.key]; const c=s.contrib[met.key]; const w=Math.min(50,Math.abs(z)/2.5*50);
-        html+=`<span>${met.label}<span class="small"> x${(state.weights[met.key]||0).toFixed(2)}</span></span><span class="z num">${c>=0?'+':''}${(c*100).toFixed(1)}</span><span class="zbar"><i class="${z<0?'neg':''}" style="left:${z<0?50-w:50}%;width:${w}%"></i></span>`; }
-      html+=`</div><div class="adj"><span class="small">Your assessment</span><input type="range" min="-3" max="3" step="1" value="${r.adj||0}" data-act="adj" data-no="${r.no}"><b class="num">${r.adj>0?'+':''}${r.adj||0}</b></div>
-      <label class="field" style="margin-top:8px">Note<input data-act="note" data-no="${r.no}" value="${esc(r.note)}" placeholder="Why you moved it"></label>
-      <div class="actions"><button class="btn ${r.scratched?'primary':''}" data-act="scratch" data-no="${r.no}">${r.scratched?'Reinstate':'Scratch'}</button>${r.gear?`<span class="tag">${esc(r.gear)}</span>`:''}${r.comment?`<span class="note">${esc(r.comment)}</span>`:''}</div>
-      <p class="small" style="margin:8px 0 0">Career ${recStr(r.career)}. Track ${recStr(r.track)}. Distance ${recStr(r.distance)}. ${titleCase(condCategory(m.condition))} ${recStr(r[condCategory(m.condition)])}.${r.last&&r.last.race?' Last start: '+esc(r.last.race)+'.':''}</p></div>`; }
-    html+=`</div>`;
-  }
-  html+=`</div></section>`;
-  return html;
+    if(open){ html+=`<div class="detail"><div class="tipbtns"><button class="btn ${isWin?'on':''}" data-act="tipwin" data-no="${r.no}" ${res?'disabled':''}>${isWin?'Tipped to win':'Tip to win'}</button><button class="btn ${isPl?'on':''}" data-act="tipplace" data-no="${r.no}" ${res?'disabled':''}>${isPl?'Place tip on':'Tip for a place'}</button><button class="btn ${r.scratched?'primary':''}" data-act="scratch" data-no="${r.no}">${r.scratched?'Reinstate':'Scratch'}</button></div>
+      <div class="adj"><span class="small">Your call</span><input type="range" min="-3" max="3" step="1" value="${a.adj||0}" data-act="adj" data-key="${k}"><b class="num">${a.adj>0?'+':''}${a.adj||0}</b></div>
+      <label class="field" style="margin-top:8px">Note to self<input data-act="note" data-key="${k}" value="${esc(a.note)}" placeholder="Why you moved it"></label>
+      <div class="metrics" style="margin-top:12px">`;
+      for(const met of METRICS){ const z=s.z[met.key]; const c=s.contrib[met.key]; const w=Math.min(50,Math.abs(z)/2.5*50); html+=`<span>${met.label}<span class="small"> x${(run.weights[met.key]||0).toFixed(2)}</span></span><span class="z num">${c>=0?'+':''}${(c*100).toFixed(1)}</span><span class="zbar"><i class="${z<0?'neg':''}" style="left:${z<0?50-w:50}%;width:${w}%"></i></span>`; }
+      html+=`</div><p class="small" style="margin:10px 0 0">Career ${recStr(r.career)}. Track ${recStr(r.track)}. Distance ${recStr(r.distance)}. ${titleCase(condCategory(m.condition))} ${recStr(r[condCategory(m.condition)])}.${r.last&&r.last.race?' Last start: '+esc(r.last.race)+'.':''}${r.gear?' '+esc(r.gear)+'.':''}${r.comment?' '+esc(r.comment):''}</p></div>`; }
+    html+=`</div>`; }
+  return html+`</div></section>`;
 }
 function recStr(v){ const r=rec(v); return r? `${r.s}:${r.w}-${r.p}` : 'n/a'; }
 
 function viewWeights(){
-  const s=state.settings; let html=`<div class="eyebrow">Weights<span class="sl">/</span>drag to reweight, ratings update everywhere</div><div class="rows" style="margin-top:8px">`;
-  for(const met of METRICS){ const w=state.weights[met.key]; const d=w-met.base;
-    html+=`<div class="wrow"><div class="l"><b>${met.label}</b><span class="num">${w.toFixed(2)}</span></div><div class="d">${met.desc}</div>
-    <input type="range" min="0" max="${(met.base*2.5).toFixed(2)}" step="0.05" value="${w}" data-act="weight" data-key="${met.key}"><div class="delta">${Math.abs(d)>0.01?`${d>0?'+':''}${d.toFixed(2)} against the default ${met.base.toFixed(2)}`:'at default'}</div></div>`; }
-  html+=`</div><div class="actions"><button class="btn" data-act="resetweights">Reset weights to defaults</button><button class="btn" data-act="undoweights">Undo last automatic change</button></div>`;
-  html+=`<section class="block" style="margin-top:26px"><div class="eyebrow">Adaptation<span class="sl">/</span>how far a result is allowed to move the model</div><div class="rows" style="margin-top:8px">
-    <div class="wrow"><div class="l"><b>Adjust weights automatically from results</b><span><input type="checkbox" data-act="setting" data-key="autoAdapt" ${s.autoAdapt?'checked':''}></span></div><div class="d">Off means results are recorded and form lines still move, but the metric weights stay where you set them.</div></div>
+  const my=me(); const s={...DEFAULT_SETTINGS,...my.settings}; const run=state.meeting?runDay(my,state.meeting):{weights:my.weights,changes:[]};
+  let html=`<div class="eyebrow">${esc(my.name)}'s model<span class="sl">/</span>drag to reweight</div><p class="note" style="margin:6px 0 8px">The slider is your starting weight. The second number is where the day's results have taken it. Only your model moves; every Pelican runs their own.</p><div class="rows">`;
+  for(const met of METRICS){ const w=my.weights[met.key]; const adapted=run.weights[met.key]; const d=adapted-w;
+    html+=`<div class="wrow"><div class="l"><b>${met.label}</b><span class="num">${w.toFixed(2)}${Math.abs(d)>0.005?` <span style="color:var(--accent)">${adapted.toFixed(2)}</span>`:''}</span></div><div class="d">${met.desc}</div>
+    <input type="range" min="0" max="${(met.base*2.5).toFixed(2)}" step="0.05" value="${w}" data-act="weight" data-key="${met.key}"><div class="delta">${Math.abs(w-met.base)>0.01?`${w-met.base>0?'+':''}${(w-met.base).toFixed(2)} against the default ${met.base.toFixed(2)}`:'at default'}${Math.abs(d)>0.005?`, results moved it ${d>0?'+':''}${d.toFixed(2)}`:''}</div></div>`; }
+  html+=`</div><div class="actions"><button class="btn" data-act="resetweights">Reset my weights to defaults</button></div>`;
+  html+=`<section class="block" style="margin-top:26px"><div class="eyebrow">Adaptation<span class="sl">/</span>how far a result may move your model</div><div class="rows" style="margin-top:8px">
+    <div class="wrow"><div class="l"><b>Adapt weights from results</b><span><input type="checkbox" data-act="setting" data-key="autoAdapt" ${s.autoAdapt?'checked':''}></span></div><div class="d">Off means results still move form lines and the bias reading, but your weights stay where you set them.</div></div>
     <div class="wrow"><div class="l"><b>Margin of error: rated position</b><span class="num">${s.marginRank}</span></div><div class="d">A winner rated this position or better is inside the margin and triggers no weight change.</div><input type="range" min="1" max="8" step="1" value="${s.marginRank}" data-act="setting" data-key="marginRank"></div>
     <div class="wrow"><div class="l"><b>Margin of error: rated chance</b><span class="num">${pct(s.marginProb)}</span></div><div class="d">A winner rated under this chance is outside the margin even if it was placed high.</div><input type="range" min="0.02" max="0.3" step="0.01" value="${s.marginProb}" data-act="setting" data-key="marginProb"></div>
     <div class="wrow"><div class="l"><b>Learning rate</b><span class="num">${s.lr.toFixed(2)}</span></div><div class="d">How far each surprising result moves the weights toward the metrics that would have picked it.</div><input type="range" min="0.02" max="0.5" step="0.01" value="${s.lr}" data-act="setting" data-key="lr"></div>
     <div class="wrow"><div class="l"><b>Form line gain</b><span class="num">${s.formlineGain.toFixed(2)}</span></div><div class="d">How strongly a horse's run today carries to horses out of the same last-start race.</div><input type="range" min="0" max="1.5" step="0.05" value="${s.formlineGain}" data-act="setting" data-key="formlineGain"></div>
-    <div class="wrow"><div class="l"><b>Sharpness</b><span class="num">${s.beta.toFixed(2)}</span></div><div class="d">Higher concentrates the percentages on the top few; lower spreads them.</div><input type="range" min="0.8" max="4" step="0.1" value="${s.beta}" data-act="setting" data-key="beta"></div>
-  </div></section>`;
+    <div class="wrow"><div class="l"><b>Sharpness</b><span class="num">${s.beta.toFixed(2)}</span></div><div class="d">Higher concentrates the percentages on the top few; lower spreads them.</div><input type="range" min="0.8" max="4" step="0.1" value="${s.beta}" data-act="setting" data-key="beta"></div></div></section>`;
+  if(run.changes&&run.changes.length){ html+=`<section class="block"><div class="eyebrow">What the results did to your model</div>`; for(const e of [...run.changes].reverse()){ html+=`<div class="logrow"><div class="when">Race ${e.race}</div>${esc(e.text)}${e.items.length?`<ul>${e.items.map(i=>`<li>${esc(i)}</li>`).join('')}</ul>`:''}</div>`; } html+=`</section>`; }
   return html;
 }
 
-function viewReview(){
-  const m=state.meeting; const done=m.races.filter(r=>r.result&&r.result.predicted);
-  const winnersTop=done.filter(r=>{const p=r.result.predicted.find(x=>x.no===r.result.positions[0]);return p&&p.rank===1;}).length;
-  const winnersTop3=done.filter(r=>{const p=r.result.predicted.find(x=>x.no===r.result.positions[0]);return p&&p.rank<=3;}).length;
-  const placedTop=done.filter(r=>{const p=r.result.predicted.find(x=>x.rank===1);return p&&r.result.positions.slice(0,3).includes(p.no);}).length;
-  let html=`<div class="eyebrow">Scorecard<span class="sl">/</span>${done.length} results</div><div class="kpis" style="margin-top:8px">
-    <div class="kpi"><b class="num">${done.length?winnersTop+'/'+done.length:'0'}</b><span>Top pick won</span></div>
-    <div class="kpi"><b class="num">${done.length?winnersTop3+'/'+done.length:'0'}</b><span>Winner in top 3</span></div>
-    <div class="kpi"><b class="num">${done.length?placedTop+'/'+done.length:'0'}</b><span>Top pick placed</span></div></div>`;
-  const log=[...(m.log||[])].reverse();
-  html+=`<section class="block" style="margin-top:22px"><div class="eyebrow">Adjustment log<span class="sl">/</span>newest first</div>`;
-  if(!log.length) html+=`<p class="note">Nothing yet. Each result you enter is recorded here with what it changed.</p>`;
-  for(const e of log){ html+=`<div class="logrow"><div class="when">${new Date(e.ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})} race ${e.race}</div>${esc(e.text)}${e.items&&e.items.length?`<ul>${e.items.map(i=>`<li>${esc(i)}</li>`).join('')}</ul>`:''}</div>`; }
-  html+=`</section>`;
+function viewFlock(){
+  const m=state.meeting; const ps=Object.values(state.punters);
+  const rows=ps.map(p=>({p, tips:tipPoints(p,m), model:modelScore(runDay(p,m),m)})).sort((a,b)=>b.tips.pts-a.tips.pts||b.model.top-a.model.top);
+  let html=`<div class="eyebrow">The flock<span class="sl">/</span>${ps.length} Pelican${ps.length===1?'':'s'} on the card</div><p class="note" style="margin:6px 0 10px">Three points for tipping the winner, one for a tip that runs a place. Model column is how many winners each Pelican's model had on top.</p><div class="board">`;
+  rows.forEach((r,i)=>{ html+=`<div class="brow"><span class="pos num">${i+1}</span><span><span class="pel"><i style="background:${r.p.colour}"></i><b>${esc(r.p.name)}</b></span>${r.p.id===state.me?' <span class="tag acc">you</span>':''}<div class="sub">${r.tips.tipped} tips in, ${r.tips.wins} winner${r.tips.wins===1?'':'s'}, ${r.tips.places} placed</div></span><span class="sub num">model ${r.model.top}/${r.model.done}</span><span class="pts num">${r.tips.pts}</span></div>`; });
+  html+=`</div>`;
+  const done=m.races.filter(r=>r.result).sort((a,b)=>b.no-a.no);
+  html+=`<section class="block" style="margin-top:22px"><div class="eyebrow">Results<span class="sl">/</span>newest first</div>`;
+  if(!done.length) html+=`<p class="note">Nothing in yet.</p>`;
+  for(const r of done){ const w=r.runners.find(h=>h.no===r.result.positions[0]); const tippers=ps.filter(p=>p.picks&&p.picks[r.no]&&p.picks[r.no].win===r.result.positions[0]);
+    html+=`<div class="logrow"><div class="when">Race ${r.no}${r.result.by?' entered by '+esc(r.result.by):''}</div>${cloth(r.result.positions[0])} <b>${esc(w?w.name:'')}</b> from ${r.result.positions.slice(1).join(', ')}.${tippers.length?`<div class="flock" style="margin-top:6px">${tippers.map(p=>`<span class="pel"><i style="background:${p.colour}"></i>${esc(p.name)} tipped it</span>`).join('')}</div>`:''}</div>`; }
+  html+=`</section><div class="actions"><button class="btn" data-act="switch">Switch Pelican</button></div>`;
   return html;
 }
 
 function viewLoad(){
   const m=state.meeting;
   return `<div class="eyebrow">Load form<span class="sl">/</span>JSON or CSV</div>
-  <p class="note" style="margin:8px 0 12px">Paste the finalised form as JSON in the schema below, or as CSV with the column names listed. Loading replaces the current meeting. ${m?`Current meeting: ${esc(m.meeting)} (${m.races.length} races).`:''}</p>
+  <p class="note" style="margin:8px 0 12px">Paste the finalised form as JSON in the schema below, or as CSV with the listed columns. Loading replaces the current meeting for every Pelican and clears tips and calls. ${m?`Current meeting: ${esc(m.meeting)} (${m.races.length} races).`:''}</p>
   <label class="field">Form data<textarea id="loadIn" placeholder="Paste JSON or CSV here"></textarea></label>
   <div class="actions"><button class="btn primary" data-act="load">Load as new meeting</button><button class="btn" data-act="mergerace">Add or replace one race</button><button class="btn" id="convertBtn" data-act="convert" hidden>Convert raw form text with Claude</button></div>
-  <p class="small" id="convertNote" hidden>Converting sends the pasted text to Claude from this page and asks for JSON in the schema. It can take a minute for a full meeting. Check the runner counts after it loads.</p>
+  <p class="small" id="convertNote" hidden>Converting sends the pasted text to Claude from this page and asks for JSON in the schema. A full meeting can take a minute. Check the runner counts after it loads.</p>
   <section class="block" style="margin-top:22px"><div class="eyebrow">Other ways in</div>
   <div class="actions"><button class="btn" data-act="copyprompt">Copy conversion prompt for Claude</button><button class="btn" data-act="copyjson" ${m?'':'disabled'}>Copy current meeting as JSON</button><button class="btn" data-act="example">Load fictional example</button><button class="btn danger" data-act="clear" ${m?'':'disabled'}>Clear meeting</button></div>
   <p class="small">The conversion prompt carries the schema and the rules. Paste it into Claude with the form guide text or PDF, then paste the JSON it returns here.</p></section>
   <section class="block"><div class="eyebrow">JSON schema</div><pre class="schema">${esc(SCHEMA_DOC)}</pre>
-  <p class="small">Records are [starts, wins, placings]. Form reads oldest to newest with the most recent run last. Omit or null anything not in the form; the metric is then treated as neutral for that runner.</p></section>
+  <p class="small">Records are [starts, wins, placings]. Form reads oldest to newest with the most recent run last. Omit or null anything not in the form; that metric is then neutral for the runner.</p></section>
   <section class="block"><div class="eyebrow">CSV columns</div><pre class="schema">race, race_name, race_distance, race_class, race_time, no, name, barrier, weight, jockey, trainer,
 career, track, distance, good, soft, heavy   (each as 20-4-7 for starts-wins-placings)
 form, last_pos, last_field, last_margin, days, last_race, class_change, jockey_pct, trainer_pct, odds, scratched</pre></section>`;
@@ -649,54 +555,52 @@ form, last_pos, last_field, last_margin, days, last_race, class_change, jockey_p
 
 /* ---------------- events ---------------- */
 function bind(root){
-  root.querySelectorAll('[data-meta]').forEach(el=>el.addEventListener('change',()=>{ state.meeting[el.dataset.meta]=el.value; save(); }));
-  root.querySelectorAll('[data-act="weight"]').forEach(el=>{ el.addEventListener('input',()=>{ state.weights[el.dataset.key]=+el.value; el.closest('.wrow').querySelector('.l span').textContent=(+el.value).toFixed(2); }); el.addEventListener('change',()=>save()); });
-  root.querySelectorAll('[data-act="setting"]').forEach(el=>{ const h=()=>{ const k=el.dataset.key; state.settings[k]= el.type==='checkbox'? el.checked : +el.value; }; el.addEventListener('input',()=>{h(); const sp=el.closest('.wrow').querySelector('.l span'); if(sp&&el.type!=='checkbox') sp.textContent = el.dataset.key==='marginProb'?pct(+el.value):(el.dataset.key==='marginRank'?el.value:(+el.value).toFixed(2)); }); el.addEventListener('change',()=>{h(); save();}); });
-  root.querySelectorAll('[data-act="adj"]').forEach(el=>{ el.addEventListener('input',()=>{ el.nextElementSibling.textContent=(+el.value>0?'+':'')+el.value; }); el.addEventListener('change',()=>{ runnerByNo(el.dataset.no).adj=+el.value; save(); }); });
-  root.querySelectorAll('[data-act="note"]').forEach(el=>el.addEventListener('change',()=>{ runnerByNo(el.dataset.no).note=el.value; save(); }));
+  root.querySelectorAll('[data-meta]').forEach(el=>el.addEventListener('change',()=>{ state.meeting[el.dataset.meta]=el.value; state.meeting.updatedAt=Date.now(); save('meeting'); }));
+  root.querySelectorAll('[data-act="weight"]').forEach(el=>{ el.addEventListener('input',()=>{ me().weights[el.dataset.key]=+el.value; el.closest('.wrow').querySelector('.l span').textContent=(+el.value).toFixed(2); }); el.addEventListener('change',()=>save('punter')); });
+  root.querySelectorAll('[data-act="setting"]').forEach(el=>{ const h=()=>{ me().settings[el.dataset.key]= el.type==='checkbox'?el.checked:+el.value; }; el.addEventListener('input',()=>{ h(); const sp=el.closest('.wrow').querySelector('.l span'); if(sp&&el.type!=='checkbox') sp.textContent= el.dataset.key==='marginProb'?pct(+el.value):(el.dataset.key==='marginRank'?el.value:(+el.value).toFixed(2)); }); el.addEventListener('change',()=>{ h(); save('punter'); }); });
+  root.querySelectorAll('[data-act="adj"]').forEach(el=>{ el.addEventListener('input',()=>{ el.nextElementSibling.textContent=(+el.value>0?'+':'')+el.value; }); el.addEventListener('change',()=>{ const a=me().adj[el.dataset.key]||(me().adj[el.dataset.key]={adj:0,note:''}); a.adj=+el.value; save('punter'); }); });
+  root.querySelectorAll('[data-act="note"]').forEach(el=>el.addEventListener('change',()=>{ const a=me().adj[el.dataset.key]||(me().adj[el.dataset.key]={adj:0,note:''}); a.note=el.value; save('punter'); }));
   const conv=$('#convertBtn'); if(conv&&sampleFn){ conv.hidden=false; $('#convertNote').hidden=false; }
 }
-function runnerByNo(no){ const race=state.meeting.races.find(r=>r.no===state.ui.raceNo); return race.runners.find(r=>r.no===+no); }
+function currentRace(){ return state.meeting.races.find(r=>r.no===state.ui.raceNo); }
 document.addEventListener('click', async e=>{
   const b=e.target.closest('[data-act]'); if(!b) return; const act=b.dataset.act;
   if(act==='tab'){ state.ui.tab=b.dataset.tab; render(); }
   else if(act==='openrace'){ state.ui.raceNo=+b.dataset.no; state.ui.tab='race'; state.ui.open=null; render(); window.scrollTo(0,0); }
-  else if(act==='toggle'){ state.ui.open = state.ui.open===b.dataset.key ? null : b.dataset.key; render(); }
-  else if(act==='scratch'){ const r=runnerByNo(b.dataset.no); r.scratched=!r.scratched; save(); }
-  else if(act==='result'){ const v=$('#resIn').value.trim(); const pos=v.split(/[^0-9]+/).filter(Boolean).map(Number); if(pos.length<1){ toast('Enter the finishing order first'); return; }
-    if(new Set(pos).size!==pos.length){ toast('A number is repeated'); return; } enterResult(state.ui.raceNo,pos); save(); toast('Result recorded and ratings updated'); }
-  else if(act==='clearresult'){ const race=state.meeting.races.find(r=>r.no===state.ui.raceNo); race.result=null; state.meeting.log.push({ts:Date.now(),race:race.no,type:'note',text:`Race ${race.no} result cleared. Weight changes it made are kept; use Undo on the Weights tab to revert them.`,items:[]}); save(); }
-  else if(act==='resetweights'){ state.weights=Object.fromEntries(METRICS.map(m=>[m.key,m.base])); if(state.meeting) state.meeting.log.push({ts:Date.now(),race:'',type:'note',text:'Weights reset to defaults.',items:[]}); save(); }
-  else if(act==='undoweights'){ if(undoLastWeights()){ save(); toast('Last automatic weight change reverted'); } else toast('No automatic weight change to undo'); }
+  else if(act==='toggle'){ state.ui.open= state.ui.open===b.dataset.key?null:b.dataset.key; render(); }
+  else if(act==='scratch'){ const r=currentRace().runners.find(x=>x.no===+b.dataset.no); r.scratched=!r.scratched; currentRace().updatedAt=Date.now(); save('meeting'); }
+  else if(act==='tipwin'){ const race=currentRace(); const pk=me().picks[race.no]||(me().picks[race.no]={win:null,place:[]}); pk.win= pk.win===+b.dataset.no?null:+b.dataset.no; pk.place=(pk.place||[]).filter(n=>n!==pk.win); save('punter'); }
+  else if(act==='tipplace'){ const race=currentRace(); const pk=me().picks[race.no]||(me().picks[race.no]={win:null,place:[]}); const no=+b.dataset.no; pk.place=pk.place||[]; if(pk.place.includes(no)) pk.place=pk.place.filter(n=>n!==no); else { if(pk.place.length>=2){ toast('Two place tips per race'); return; } if(pk.win===no) pk.win=null; pk.place.push(no); } save('punter'); }
+  else if(act==='result'){ const v=$('#resIn').value.trim(); const pos=v.split(/[^0-9]+/).filter(Boolean).map(Number); if(!pos.length){ toast('Enter the finishing order first'); return; } if(new Set(pos).size!==pos.length){ toast('A number is repeated'); return; }
+    const race=currentRace(); const known=new Set(active(race).map(r=>r.no)); const bad=pos.filter(n=>!known.has(n)); if(bad.length){ toast('Not in this field: '+bad.join(', ')); return; }
+    race.result={positions:pos, enteredAt:Date.now(), by:me().name}; race.updatedAt=Date.now(); state.meeting.updatedAt=Date.now(); save('meeting'); toast('Result in. Every model on the card has been updated.'); }
+  else if(act==='clearresult'){ const race=currentRace(); race.result=null; race.updatedAt=Date.now(); state.meeting.updatedAt=Date.now(); save('meeting'); }
+  else if(act==='resetweights'){ me().weights=Object.fromEntries(METRICS.map(m=>[m.key,m.base])); save('punter'); }
   else if(act==='load'){ try{ loadText($('#loadIn').value); }catch(err){ toast('Could not read that: '+err.message); } }
   else if(act==='mergerace'){ try{ mergeRace($('#loadIn').value); }catch(err){ toast('Could not read that: '+err.message); } }
-  else if(act==='example'){ state.meeting=exampleMeeting(); state.ui.raceNo=1; state.ui.tab='races'; save(); }
-  else if(act==='clear'){ if(!confirm('Clear the current meeting, results and log?')) return; state.meeting=null; save(); }
+  else if(act==='example'){ state.meeting=exampleMeeting(); for(const p of Object.values(state.punters)){ p.picks={}; p.adj={}; } state.ui.raceNo=1; state.ui.tab='races'; racesWatched=null; save('all'); watchRaces(); }
+  else if(act==='clear'){ if(!confirm('Clear the current meeting and results for every Pelican?')) return; state.meeting=null; save('meeting'); }
   else if(act==='copyprompt'){ await copy(CONVERT_RULES+SCHEMA_DOC); toast('Conversion prompt copied'); }
   else if(act==='copyjson'){ await copy(JSON.stringify(state.meeting,null,1)); toast('Meeting JSON copied'); }
   else if(act==='convert'){ await convertWithClaude(); }
+  else if(act==='switch'){ state.me=null; persistLocal(); render(); }
 });
 document.getElementById('tabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; state.ui.tab=b.dataset.tab; render(); window.scrollTo(0,0); });
 async function copy(text){ try{ await navigator.clipboard.writeText(text); }catch(e){ const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); } }
 
 /* ---------------- Claude conversion (sample capability) ---------------- */
-let sampleFn=null;
 async function convertWithClaude(){
-  const raw=$('#loadIn').value.trim(); if(!raw){ toast('Paste the raw form text first'); return; }
-  if(!sampleFn){ toast('Conversion is not available in this view'); return; }
+  const raw=$('#loadIn').value.trim(); if(!raw){ toast('Paste the raw form text first'); return; } if(!sampleFn){ toast('Conversion is not available in this view'); return; }
   const btn=$('#convertBtn'); btn.disabled=true; btn.textContent='Converting...';
-  try{
-    const out=await sampleFn.json(CONVERT_RULES+SCHEMA_DOC+'\n\nForm guide text:\n'+raw, {modelTier:'complex'});
-    $('#loadIn').value=JSON.stringify(out,null,1); toast('Converted. Review the JSON, then load it.');
-  }catch(err){ toast('Conversion failed: '+(err&&err.message||err.code||'unknown')); }
+  try{ const out=await sampleFn.json(CONVERT_RULES+SCHEMA_DOC+'\n\nForm guide text:\n'+raw,{modelTier:'complex'}); $('#loadIn').value=JSON.stringify(out,null,1); toast('Converted. Check it over, then load it.'); }
+  catch(err){ toast('Conversion failed: '+(err&&err.message||err.code||'unknown')); }
   finally{ btn.disabled=false; btn.textContent='Convert raw form text with Claude'; }
 }
 
 /* ---------------- boot ---------------- */
 (function boot(){
-  if(!loadLocal()){ state.meeting=exampleMeeting(); }
-  render();
-  initDb();
+  loadLocal(); if(!state.meeting&&!Object.keys(state.punters).length) state.meeting=exampleMeeting();
+  render(); initDb();
   if(window.claude&&window.claude.use){ window.claude.use('sample').then(s=>{ sampleFn=s; if(s&&state.ui.tab==='load') render(); }).catch(()=>{}); }
 })();
 </script>
