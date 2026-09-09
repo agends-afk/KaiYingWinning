@@ -80,7 +80,19 @@ nav.tabs button:focus-visible,.row:focus-visible,.btn:focus-visible,.cloth:focus
 /* saddlecloth */
 .cloth{display:inline-flex;align-items:center;justify-content:center;width:38px;height:34px;font-family:var(--display);font-weight:900;font-size:22px;border-radius:5px 5px 9px 9px;box-shadow:inset 0 -3px 0 rgba(0,0,0,.18);flex:none;letter-spacing:0}
 .runner{border-bottom:1px solid var(--rule);padding:12px 0}
-.runner .head{display:grid;grid-template-columns:38px 1fr auto;gap:12px;align-items:start;background:none;border:0;padding:0;width:100%;text-align:left;color:inherit}
+.runner .top{display:grid;grid-template-columns:1fr 56px;gap:10px;align-items:start}
+.runner .head{display:grid;grid-template-columns:38px 1fr auto;gap:12px;align-items:start;background:none;border:0;padding:0;width:100%;text-align:left;color:inherit;min-width:0}
+.tipbtn{height:56px;border:2px solid var(--rule);background:var(--surface);border-radius:8px;font-family:var(--display);font-weight:800;font-size:15px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:0;line-height:1.05}
+.tipbtn.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.tipbtn.pl{background:var(--ink);border-color:var(--ink);color:var(--ground)}
+.tipbtn:disabled{opacity:.4}
+.tipsboard{overflow-x:auto}
+.tipsboard table{border-collapse:collapse;width:100%;font-size:13px}
+.tipsboard th,.tipsboard td{padding:6px 6px;border-bottom:1px solid var(--rule);text-align:center;white-space:nowrap}
+.tipsboard th{font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted2)}
+.tipsboard td:first-child{font-family:var(--display);font-weight:800;font-size:18px;color:var(--accent);text-align:left}
+.tipsboard .hit{outline:2px solid var(--good);outline-offset:-2px}
+.tipsboard .cloth{width:30px;height:26px;font-size:16px}
 .runner.scr .nm{text-decoration:line-through;color:var(--muted2)}
 .runner.scr .cloth{opacity:.35}
 .runner .nm{font-weight:700;font-size:16.5px}
@@ -559,13 +571,15 @@ function viewRaces(){
     <label class="field">Track condition<select data-meta="condition">${['Good 3','Good 4','Soft 5','Soft 6','Soft 7','Heavy 8','Heavy 9','Heavy 10','Synthetic'].map(c=>`<option ${c===m.condition?'selected':''}>${c}</option>`).join('')}</select></label>
     <label class="field">Rail<input data-meta="rail" value="${esc(m.rail)}" placeholder="True, +3m"></label></div>`;
   const fin=run.final;
-  html+=`<div class="eyebrow">Day so far<span class="sl">/</span>${done} of ${m.races.length} results in</div>
+  const tipped=m.races.filter(r=>me().picks[r.no]&&me().picks[r.no].win).length; const open=m.races.filter(r=>!r.result).length;
+  html+=`<div class="eyebrow">Your tips<span class="sl">/</span>${tipped} of ${m.races.length} in${open&&tipped<m.races.length?', '+(m.races.filter(r=>!r.result&&!(me().picks[r.no]&&me().picks[r.no].win)).length)+' still to do':''}</div>
+  <div class="eyebrow" style="margin-top:6px">Day so far<span class="sl">/</span>${done} of ${m.races.length} results in</div>
   <div class="bias"><span>Barrier bias <b>${Math.abs(fin.barrierBias)>0?(fin.barrierBias>0?'inside':'outside')+' ('+fin.barrierBias.toFixed(2)+')':'none read yet'}</b></span>
   ${Object.keys(fin.jockeyWins).length?`<span>Riders on the board <b>${Object.entries(fin.jockeyWins).map(([j,w])=>titleCase(j)+(w>1?' x'+w:'')).join(', ')}</b></span>`:''}</div>`;
   html+=`<section class="block" style="margin-top:14px"><div class="rows">`;
   for(const race of m.races){ const p=run.pred[race.no]||[]; const top=p.find(x=>x.rank===1); const topR=top&&race.runners.find(r=>r.no===top.no); const res=race.result; const myPick=me().picks[race.no]&&me().picks[race.no].win; let right;
     if(res){ const w=race.runners.find(r=>r.no===res.positions[0]); const pr=p.find(x=>x.no===res.positions[0]); const hit=myPick===res.positions[0]; right=`<span class="tag ${hit?'good':(pr&&pr.rank<=me().settings.marginRank?'acc':'warn')}">${hit?'You tipped it':(pr?ordinal(pr.rank)+' pick':'result')}</span><b>${esc(w?w.name:res.positions[0])}</b>`; }
-    else right= top?`<span>${myPick?'Your tip '+myPick+' / ':''}Model ${pct(top.prob)}</span><b>${esc(topR?topR.name:'')}</b>`:'<b>no runners</b>';
+    else { const mp=myPick&&race.runners.find(r=>r.no===myPick); right= mp?`<span class="tag acc">Your tip</span><b>${esc(mp.name)}</b>`:(top?`<span class="tag warn">No tip yet</span><b style="color:var(--muted)">Model: ${esc(topR?topR.name:'')} ${pct(top.prob)}</b>`:'<b>no runners</b>'); }
     html+=`<button class="row" data-act="openrace" data-no="${race.no}"><span class="idx num">${race.no}</span><span><span class="t">${esc(race.name||'Race '+race.no)}</span><br><span class="s">${race.distance?race.distance+'m':''} ${esc(race.class||'')} ${race.time?'at '+esc(race.time):''} ${active(race).length} runners</span></span><span class="r">${right}</span></button>`; }
   return html+`</div></section>`;
 }
@@ -584,7 +598,7 @@ function viewRace(){
   <div class="result-entry" style="margin-top:8px"><label class="field">Finishing order, saddlecloth numbers<input id="resIn" placeholder="e.g. 7 2 11 4" value="${res?esc(res.positions.join(' ')):''}" inputmode="numeric"></label>
   <button class="btn primary" data-act="result">${res?'Update result':'Enter result'}</button>${res?`<button class="btn danger" data-act="clearresult">Clear</button>`:''}</div>
   ${res?`<p class="note">Your model had the winner ${pr?ordinal(pr.rank)+' at '+pct(pr.prob):'unrated'}. ${picks.win?(picks.win===res.positions[0]?'You tipped it.':(res.positions.slice(1,3).includes(picks.win)?'Your tip ran a place.':'Your tip missed.')):'You had no tip in.'}${res.by?' Entered by '+esc(res.by)+'.':''}</p>`:`<p class="note">Enter at least the first four home. It goes to every Pelican's model. Your weights move only when the winner was rated worse than ${ordinal(my.settings.marginRank)} or under ${pct(my.settings.marginProb)}.</p>`}</section>`;
-  html+=`<section class="block"><div class="eyebrow">Ratings<span class="sl">/</span>tap a runner to open it</div><div class="rows" style="margin-top:8px">`;
+  html+=`<section class="block"><div class="eyebrow">Pick your tip<span class="sl">/</span>tap a name for the model's reasons, tap Tip to lock it in</div><div class="rows" style="margin-top:8px">`;
   const maxR=Math.max(...scored.map(s=>s.rating)), minR=Math.min(...scored.map(s=>s.rating)); const span=(maxR-minR)||1;
   for(const s of scored){ const r=s.r; const k=runnerKey(race,r); const open=state.ui.open===k; const dynv=s.contrib.formline+s.contrib.manual; const a=my.adj[k]||{adj:0,note:''};
     const chips=[]; if(r.barrier!=null) chips.push(`Bar ${r.barrier}`); if(r.weight!=null) chips.push(`${r.weight}kg`); if(r.form) chips.push(`Form ${esc(r.form)}`);
@@ -593,13 +607,15 @@ function viewRace(){
     if(a.adj) chips.push(`<span class="chip ${a.adj>0?'up':'dn'}">Your call ${a.adj>0?'+':''}${a.adj}</span>`); if(s.missing>=3) chips.push(`<span class="chip">thin data</span>`);
     if(others.length>1&&flockProb[r.no]!=null) chips.push(`<span class="chip">Flock ${pct(flockProb[r.no])}</span>`);
     const resPos=res?res.positions.indexOf(r.no):-1; const isWin=picks.win===r.no, isPl=(picks.place||[]).includes(r.no);
-    html+=`<div class="runner ${r.scratched?'scr':''}"><button class="head" data-act="toggle" data-key="${k}">${cloth(r.no)}
+    const tipLabel = isWin?'Your<br>tip':isPl?'Place<br>tip':'Tip';
+    html+=`<div class="runner ${r.scratched?'scr':''}"><div class="top"><button class="head" data-act="toggle" data-key="${k}">${cloth(r.no)}
       <span><span class="nm">${esc(r.name)}</span>${resPos>=0?` <span class="tag good">${ordinal(resPos+1)}</span>`:''}${isWin?` <span class="tag acc">Your tip</span>`:isPl?` <span class="tag">Place</span>`:''}<div class="meta">${esc(r.jockey)}${r.trainer?' for '+esc(r.trainer):''}</div>
         <div class="bar"><i style="width:${((s.rating-minR)/span*100).toFixed(1)}%"></i>${dynv>0?`<i class="dyn" style="left:${((s.rating-dynv-minR)/span*100).toFixed(1)}%;width:${(dynv/span*100).toFixed(1)}%"></i>`:''}</div>
         <div class="chips">${chips.map(c=>c.startsWith('<span')?c:`<span class="chip">${c}</span>`).join('')}</div>
         ${tips[r.no]?`<div class="flock">${tips[r.no].map(p=>pelChip(p)).join('')}</div>`:''}
         ${clubOn(r.no,race.no).length?`<div class="club">${clubOn(r.no,race.no).map(b=>`<span class="chip acc">${esc(b.by)} ${fmtMoney(b.stake)} ${b.type==='ew'?'e/w':b.type}${b.odds?' @ '+b.odds:''}</span>`).join('')}</div>`:''}</span>
-      <span class="prob"><b class="num">${pct(s.prob)}</b><span>${fmtOdds(s.prob)} fair</span></span></button>`;
+      <span class="prob"><b class="num">${pct(s.prob)}</b><span>${fmtOdds(s.prob)} fair</span></span></button>
+      <button class="tipbtn ${isWin?'on':isPl?'pl':''}" data-act="tipwin" data-no="${r.no}" ${res||r.scratched?'disabled':''} aria-label="Tip ${esc(r.name)} to win">${tipLabel}</button></div>`;
     if(open){ html+=`<div class="detail"><div class="tipbtns"><button class="btn ${isWin?'on':''}" data-act="tipwin" data-no="${r.no}" ${res?'disabled':''}>${isWin?'Tipped to win':'Tip to win'}</button><button class="btn ${isPl?'on':''}" data-act="tipplace" data-no="${r.no}" ${res?'disabled':''}>${isPl?'Place tip on':'Tip for a place'}</button><button class="btn ${r.scratched?'primary':''}" data-act="scratch" data-no="${r.no}">${r.scratched?'Reinstate':'Scratch'}</button></div>
       ${betForm(race,r)}
       <div class="adj"><span class="small">Your call</span><input type="range" min="-3" max="3" step="1" value="${a.adj||0}" data-act="adj" data-key="${k}"><b class="num">${a.adj>0?'+':''}${a.adj||0}</b></div>
@@ -651,6 +667,9 @@ function viewFlock(){
   let html=`<div class="eyebrow">The flock<span class="sl">/</span>${ps.length} Pelican${ps.length===1?'':'s'} on the card</div><p class="note" style="margin:6px 0 10px">Three points for tipping the winner, one for a tip that runs a place. Model column is how many winners each Pelican's model had on top.</p><div class="board">`;
   rows.forEach((r,i)=>{ html+=`<div class="brow"><span class="pos num">${i+1}</span><span>${pelChip(r.p)}${r.p.id===state.me?' <span class="tag acc">you</span>':''}<div class="sub">${r.tips.tipped} tips in, ${r.tips.wins} winner${r.tips.wins===1?'':'s'}, ${r.tips.places} placed</div></span><span class="sub num">model ${r.model.top}/${r.model.done}</span><span class="pts num">${r.tips.pts}</span></div>`; });
   html+=`</div>`;
+  html+=`<section class="block" style="margin-top:22px"><div class="eyebrow">Tips board<span class="sl">/</span>win tips by race</div><div class="tipsboard" style="margin-top:8px"><table><thead><tr><th style="text-align:left">Race</th>${ps.map(p=>`<th>${avatarSVG(p.avatar||'plain',p.colour,'sm')}<br>${esc(p.name)}</th>`).join('')}<th>Result</th></tr></thead><tbody>`;
+  for(const r of m.races){ const win=r.result&&r.result.positions[0]; html+=`<tr><td>${r.no}</td>${ps.map(p=>{const t=p.picks&&p.picks[r.no]&&p.picks[r.no].win; return `<td>${t?`<span class="${win===t?'hit':''}" style="display:inline-block;border-radius:6px">${cloth(t)}</span>`:'<span class="small">-</span>'}</td>`;}).join('')}<td>${win?cloth(win):'<span class="small">-</span>'}</td></tr>`; }
+  html+=`</tbody></table></div></section>`;
   const done=m.races.filter(r=>r.result).sort((a,b)=>b.no-a.no);
   html+=`<section class="block" style="margin-top:22px"><div class="eyebrow">Results<span class="sl">/</span>newest first</div>`;
   if(!done.length) html+=`<p class="note">Nothing in yet.</p>`;
