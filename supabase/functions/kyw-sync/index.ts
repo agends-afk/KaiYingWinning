@@ -169,6 +169,14 @@ async function backtest(meetId: string) {
   return { meetId, name: m.venueName, races: out.length, withResults: out.filter(x => x.result).length };
 }
 
+async function backtestDate(date: string) {
+  const data = await gql(`{ m: GetMeetingByDate(date:"${date}"){ id venueName state isTab isTrial isJumpOut } }`);
+  const out: any[] = []; const seen = new Set<string>();
+  for (const m of data.m ?? []) { if (m.isTab !== 1 || m.isTrial || m.isJumpOut) continue; const slug = String(m.venueName ?? "").toLowerCase(); const hit = METRO.find(([re]) => re.test(slug)); if (!hit || seen.has(hit[2])) continue; seen.add(hit[2]);
+    try { out.push(await backtest(String(m.id))); } catch (e) { out.push({ meetId: m.id, error: String(e).slice(0, 200) }); } }
+  return { date, meetings: out };
+}
+
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "content-type, x-flock-code, authorization, apikey", "Access-Control-Allow-Methods": "GET, POST, OPTIONS" };
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
@@ -177,7 +185,8 @@ Deno.serve(async (req) => {
   if (code !== FLOCK) return new Response(JSON.stringify({ error: "not the flock" }), { status: 401, headers: { "Content-Type": "application/json", ...CORS } });
   const force = url.searchParams.get("force") === "1";
   const only = url.searchParams.get("meet");
-  const bt = url.searchParams.get("backtest");
+  const bt = url.searchParams.get("backtest"); const btd = url.searchParams.get("backtestdate");
+  if (btd) { try { const r = await backtestDate(btd); return new Response(JSON.stringify(r), { headers: { "Content-Type": "application/json", ...CORS } }); } catch (e) { return new Response(JSON.stringify({ error: String(e).slice(0, 400) }), { status: 500, headers: { "Content-Type": "application/json", ...CORS } }); } }
   if (bt) { try { const r = await backtest(bt); return new Response(JSON.stringify(r), { headers: { "Content-Type": "application/json", ...CORS } }); } catch (e) { return new Response(JSON.stringify({ error: String(e).slice(0, 400) }), { status: 500, headers: { "Content-Type": "application/json", ...CORS } }); } }
   let rolled: string | null = null; try { rolled = await rollFeed(); } catch (e) { console.error("rollFeed", e); }
   const { data: feeds, error } = await sb.from("kyw_feed").select("*").eq("active", true).order("sort");
