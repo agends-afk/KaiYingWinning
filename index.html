@@ -1,5 +1,6 @@
 <title>Kai Ying Winning</title>
 <meta name="description" content="The Pelicans' form model for the Saturday metros">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Barlow:wght@400;500;600;700&display=swap">
 <style>
@@ -143,7 +144,24 @@ pre.schema{font-size:11px;line-height:1.45;background:var(--surface);border:1.5p
 .sheet .card{background:var(--ground);color:var(--ink);width:100%;max-width:560px;padding:20px 18px calc(24px + env(safe-area-inset-bottom));border-radius:16px 16px 0 0;border-top:5px solid var(--accent)}
 .sheet .who{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
 .tipbtns{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
-@media (max-width:420px){h1{font-size:34px}}
+.avatar{width:40px;height:40px;display:inline-block;vertical-align:middle;flex:none}
+.avatar.sm{width:22px;height:22px}
+.pel .avatar.sm{margin-left:-2px}
+.who .btn{display:flex;align-items:center;gap:8px;padding:8px 12px}
+.comment{padding:8px 0;border-bottom:1px solid var(--rule);font-size:13.5px;display:grid;grid-template-columns:26px 1fr auto;gap:8px;align-items:start}
+.comment .by{font-weight:700}
+.comment .t{color:var(--muted2);font-size:11px}
+.comment button{background:none;border:0;color:var(--muted2);font-size:12px;padding:0}
+.cform{display:flex;gap:8px;margin-top:8px}
+.cform input{flex:1}
+.betform{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px}
+.betform .field{font-size:12px}
+.betrow{display:grid;grid-template-columns:26px 1fr auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--rule);font-size:13.5px}
+.betrow .amt{font-family:var(--display);font-size:20px;font-weight:800;text-align:right;white-space:nowrap}
+.betrow .amt.pos{color:var(--good)} .betrow .amt.neg{color:var(--bad)}
+.betrow .s{font-size:12.5px;color:var(--muted)}
+.club{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+@media (max-width:420px){h1{font-size:34px}.betform{grid-template-columns:1fr 1fr}}
 @media (prefers-reduced-motion:no-preference){.bar i{transition:width .35s cubic-bezier(.16,1,.3,1)}}
 </style>
 
@@ -159,7 +177,7 @@ pre.schema{font-size:11px;line-height:1.45;background:var(--surface);border:1.5p
       <path d="M22 40 Q30 36 38 42" stroke="#DCD5C6" stroke-width="2" fill="none"/>
     </svg>
     <div>
-      <div class="eyebrow">The Pelicans<span class="sl">/</span>Rams v 49ers weekend</div>
+      <div class="eyebrow">The Pelicans<span class="sl">/</span>Rams v 49ers weekend<span id="hMe"></span></div>
       <h1 id="hMeeting">Kai Ying Winning</h1>
       <div class="sub"><span id="hSub"></span><span class="sync" id="sync">local only</span></div>
     </div>
@@ -202,11 +220,33 @@ const METRICS = [
 ];
 const DEFAULT_SETTINGS = { marginRank:3, marginProb:0.12, lr:0.18, formlineGain:0.6, beta:2.2, autoAdapt:true };
 const PUNTER_COLOURS = ['#E8801A','#2F8F5B','#3B6FD4','#C43C2F','#8E5BC6','#D4A72C','#1BA5A5','#D45FA0','#6B7F2E','#8C5A2B'];
+// Web-hosted backend. Filled in once the Supabase project is chosen. Empty url = no shared backend.
+const SUPABASE = { url:'', key:'', flockCode:'pelicans' };
+// The roster. Anyone else can still add a name on the roll call.
+const ROSTER = [
+  {id:'campbell', name:'Campbell', colour:'#E8801A', avatar:'bowtie'},
+  {id:'mick',     name:'Mick',     colour:'#3B6FD4', avatar:'cap'},
+  {id:'wilco',    name:'Wilco',    colour:'#2F8F5B', avatar:'shades'},
+  {id:'big-dog',  name:'Big Dog',  colour:'#8E5BC6', avatar:'crown'},
+  {id:'shirty',   name:'Shirty',   colour:'#C43C2F', avatar:'shirty'}
+];
+function avatarSVG(kind, colour, cls){ // a pelican head with an accessory per Pelican
+  const base=`<circle cx="32" cy="32" r="30" fill="${colour}"/><circle cx="28" cy="30" r="14" fill="#F4EFE4"/><path d="M40 27 L62 34 L58 39 L40 34 Z" fill="#E8801A"/><path d="M40 34 L58 39 L46 46 Q40 45 38 38 Z" fill="#F4B36B"/><circle cx="31" cy="26" r="2.4" fill="#141A22"/>`;
+  const acc={
+    bowtie:`<path d="M22 50 L30 54 L22 58 Z M38 50 L30 54 L38 58 Z" fill="#141A22"/><circle cx="30" cy="54" r="2" fill="#F4EFE4"/>`,
+    cap:`<path d="M12 22 Q28 4 44 20 L44 24 L12 24 Z" fill="#141A22"/><path d="M8 22 L20 22 L20 26 L6 27 Z" fill="#141A22"/>`,
+    shades:`<rect x="20" y="22" width="12" height="8" rx="3" fill="#141A22"/><rect x="34" y="23" width="9" height="7" rx="3" fill="#141A22"/><path d="M32 26 L34 26" stroke="#141A22" stroke-width="2"/>`,
+    crown:`<path d="M16 20 L21 8 L28 16 L34 6 L40 16 L46 10 L44 22 Z" fill="#F5C518" stroke="#141A22" stroke-width="1.5"/>`,
+    shirty:`<path d="M18 46 L28 54 L38 46 L34 44 L28 50 L22 44 Z" fill="#F4EFE4" stroke="#141A22" stroke-width="1.5"/><path d="M28 54 L26 62 L30 62 Z" fill="#C43C2F"/><path d="M24 20 L30 23 M38 21 L34 23" stroke="#141A22" stroke-width="2.4" stroke-linecap="round"/>`,
+    plain:``
+  };
+  return `<svg class="avatar ${cls||''}" viewBox="0 0 64 64" aria-hidden="true">${base}${acc[kind]||''}</svg>`;
+}
 // Standard saddlecloth colours (approximate; cosmetic only)
 const CLOTH = {1:['#D7263D','#fff'],2:['#F7F5EF','#141A22'],3:['#1F4FCC','#fff'],4:['#F5C518','#141A22'],5:['#1E8B4B','#fff'],6:['#141A22','#F5C518'],7:['#F07A1A','#141A22'],8:['#F48FB1','#141A22'],9:['#3CC7C0','#141A22'],10:['#6A2C91','#fff'],11:['#9AA0A6','#B00020'],12:['#B6E51D','#141A22'],13:['#6D4322','#fff'],14:['#7B1F2B','#F5C518'],15:['#8B8455','#141A22'],16:['#B87333','#141A22'],17:['#0F2B46','#fff'],18:['#0F5132','#F5C518'],19:['#C9D6D2','#141A22'],20:['#D91E8B','#F5C518'],21:['#FF7F6E','#141A22'],22:['#E9E9E9','#141A22'],23:['#0F2B46','#F4EFE4'],24:['#D4AF37','#141A22']};
 
-let state = { meeting:null, punters:{}, me:null, ui:{tab:'races', raceNo:1, open:null}, updatedAt:0 };
-let db=null, saveTimer=null, sampleFn=null;
+let state = { meeting:null, punters:{}, me:null, comments:[], bets:[], ui:{tab:'races', raceNo:1, open:null, betOn:null}, updatedAt:0 };
+let db=null, sb=null, saveTimer=null, sampleFn=null;
 
 /* ---------------- helpers ---------------- */
 const $ = s => document.querySelector(s);
@@ -228,8 +268,11 @@ function slug(s){ return String(s).toLowerCase().replace(/[^a-z0-9]+/g,'-').repl
 function titleCase(s){ return s.replace(/\b\w/g,c=>c.toUpperCase()); }
 function cloth(no){ const c=CLOTH[no]||['#DCD5C6','#141A22']; return `<span class="cloth num" style="background:${c[0]};color:${c[1]}">${no}</span>`; }
 function me(){ return state.punters[state.me]; }
-function newPunter(name){ const used=Object.values(state.punters).map(p=>p.colour); const colour=PUNTER_COLOURS.find(c=>!used.includes(c))||PUNTER_COLOURS[Object.keys(state.punters).length%PUNTER_COLOURS.length];
-  return {id:slug(name), name:name.trim(), colour, weights:Object.fromEntries(METRICS.map(m=>[m.key,m.base])), settings:{...DEFAULT_SETTINGS}, adj:{}, picks:{}, updatedAt:Date.now()}; }
+function newPunter(name){ const r=ROSTER.find(x=>x.id===slug(name)); const used=Object.values(state.punters).map(p=>p.colour); const colour=r?r.colour:(PUNTER_COLOURS.find(c=>!used.includes(c))||PUNTER_COLOURS[Object.keys(state.punters).length%PUNTER_COLOURS.length]);
+  return {id:slug(name), name:r?r.name:name.trim(), colour, avatar:r?r.avatar:'plain', weights:Object.fromEntries(METRICS.map(m=>[m.key,m.base])), settings:{...DEFAULT_SETTINGS}, adj:{}, picks:{}, updatedAt:Date.now()}; }
+function ensureRoster(){ for(const r of ROSTER){ if(!state.punters[r.id]) state.punters[r.id]=newPunter(r.name); } }
+function pelChip(p){ return `<span class="pel">${avatarSVG(p.avatar||'plain',p.colour,'sm')}${esc(p.name)}</span>`; }
+function punterByName(n){ return Object.values(state.punters).find(p=>p.name===n)||{name:n,colour:'#7E8794',avatar:'plain'}; }
 
 /* ---------------- scoring ---------------- */
 function rate(w,s,prior,k){ return (w + prior*k)/(s + k); }
@@ -311,10 +354,65 @@ function modelScore(run, meeting){ const done=meeting.races.filter(r=>r.result);
   for(const r of done){ const p=run.pred[r.no]||[]; const wp=p.find(x=>x.no===r.result.positions[0]); if(wp&&wp.rank===1) top++; if(wp&&wp.rank<=3) top3++; const t=p.find(x=>x.rank===1); if(t&&r.result.positions.slice(0,3).includes(t.no)) placed++; }
   return {done:done.length,top,top3,placed}; }
 
+/* ---------------- punters club ---------------- */
+function placeOdds(b){ const po=num(b.placeOdds); if(po&&po>1) return po; const o=num(b.odds)||1; return +(1+(o-1)/4).toFixed(2); } // estimate where no place price entered
+function settleBet(b, meeting){ const race=meeting.races.find(r=>r.no===b.raceNo); if(!race||!race.result) return {status:'open', ret:null};
+  const pos=race.result.positions.map(Number); const won=pos[0]===b.runnerNo; const placed=pos.slice(0,3).includes(b.runnerNo); const st=num(b.stake)||0; let ret=0;
+  if(b.type==='win') ret= won? st*(num(b.odds)||1) : 0;
+  else if(b.type==='place') ret= placed? st*placeOdds(b) : 0;
+  else { const half=st/2; ret=(won?half*(num(b.odds)||1):0)+(placed?half*placeOdds(b):0); }
+  return {status: ret>0?'won':'lost', ret:+ret.toFixed(2)}; }
+function clubBook(meeting){ let staked=0, ret=0, open=0; const rows=state.bets.map(b=>{ const s=settleBet(b,meeting); staked+=num(b.stake)||0; if(s.status==='open') open+=num(b.stake)||0; else ret+=s.ret; return {...b, ...s}; });
+  return {rows, staked, ret, open, pl:+(ret-(staked-open)).toFixed(2)}; }
+function fmtMoney(v){ return (v<0?'-':'')+'$'+Math.abs(v).toFixed(Math.abs(v)%1?2:0); }
+
 /* ---------------- persistence ---------------- */
-function persistLocal(){ try{ localStorage.setItem('kyw', JSON.stringify({meeting:state.meeting,punters:state.punters,me:state.me,updatedAt:state.updatedAt})); }catch(e){} }
-function loadLocal(){ try{ const j=JSON.parse(localStorage.getItem('kyw')||'null'); if(j){ state.meeting=j.meeting||null; state.punters=j.punters||{}; state.me=j.me||null; state.updatedAt=j.updatedAt||0; return true; } }catch(e){} return false; }
-function save(what){ state.updatedAt=Date.now(); if(me()) me().updatedAt=state.updatedAt; persistLocal(); render(); if(db){ clearTimeout(saveTimer); saveTimer=setTimeout(()=>pushDb(what||'all'),350); } }
+function persistLocal(){ try{ localStorage.setItem('kyw', JSON.stringify({meeting:state.meeting,punters:state.punters,me:state.me,comments:state.comments,bets:state.bets,updatedAt:state.updatedAt})); }catch(e){} }
+function loadLocal(){ try{ const j=JSON.parse(localStorage.getItem('kyw')||'null'); if(j){ state.meeting=j.meeting||null; state.punters=j.punters||{}; state.me=j.me||null; state.comments=j.comments||[]; state.bets=j.bets||[]; state.updatedAt=j.updatedAt||0; return true; } }catch(e){} return false; }
+function setSync(cls,txt){ const s=$('#sync'); s.className='sync '+cls; s.textContent=txt; }
+// what = 'meeting' | 'punter' | 'result:<no>' | 'all'
+function save(what){ state.updatedAt=Date.now(); if(me()) me().updatedAt=state.updatedAt; persistLocal(); render(); const w=what||'all';
+  if(sb) sbPush(w); else if(db){ clearTimeout(saveTimer); saveTimer=setTimeout(()=>pushDb(w==='all'?'all':(w.startsWith('result')?'meeting':w)),350); } }
+
+/* ---- Supabase backend (web hosted) ---- */
+async function sbInit(){
+  if(!SUPABASE.url||!SUPABASE.key||!window.supabase) return false;
+  sb=window.supabase.createClient(SUPABASE.url,SUPABASE.key,{global:{headers:{'x-flock-code':SUPABASE.flockCode}}});
+  setSync('on','connecting');
+  try{ await sbPullAll(true); setSync('on','live');
+    sb.channel('kyw').on('postgres_changes',{event:'*',schema:'public',table:'kyw_meeting'},()=>sbPullMeeting().then(ch=>{ if(ch){ persistLocal(); render(); toast('Form updated'); } }))
+      .on('postgres_changes',{event:'*',schema:'public',table:'kyw_results'},()=>sbPullResults().then(ch=>{ if(ch){ persistLocal(); render(); toast('Result in'); } }))
+      .on('postgres_changes',{event:'*',schema:'public',table:'kyw_punters'},()=>sbPullPunters().then(ch=>{ if(ch){ persistLocal(); render(); } }))
+      .on('postgres_changes',{event:'*',schema:'public',table:'kyw_comments'},()=>sbPullComments().then(()=>{ persistLocal(); render(); }))
+      .on('postgres_changes',{event:'*',schema:'public',table:'kyw_bets'},()=>sbPullBets().then(()=>{ persistLocal(); render(); }))
+      .subscribe(status=>{ if(status==='SUBSCRIBED') setSync('on','live'); else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT') setSync('err','live off, refresh to catch up'); });
+    return true; }catch(e){ console.error(e); setSync('err','backend unreachable'); return false; }
+}
+async function sbPullMeeting(){ const {data,error}=await sb.from('kyw_meeting').select('*').eq('id','current').maybeSingle(); if(error) throw error;
+  if(!data){ if(state.meeting&&!state.meeting.example){ state.meeting=null; return true; } return false; }
+  const m=data.data; if(state.meeting&&(m.updatedAt||0)<=(state.meeting.updatedAt||0)&&state.meeting.id===m.id) return false;
+  const results=state.meeting?Object.fromEntries(state.meeting.races.filter(r=>r.result).map(r=>[r.no,r.result])):{}; state.meeting=m; for(const r of m.races){ if(results[r.no]&&!r.result) r.result=results[r.no]; } return true; }
+async function sbPullResults(){ if(!state.meeting) return false; const {data,error}=await sb.from('kyw_results').select('*').eq('meeting_id',state.meeting.id); if(error) throw error; let ch=false;
+  for(const race of state.meeting.races){ const row=(data||[]).find(x=>x.race_no===race.no); const cur=race.result; if(row){ const res={positions:row.positions,by:row.entered_by,enteredAt:new Date(row.entered_at).getTime()}; if(!cur||JSON.stringify(cur.positions)!==JSON.stringify(res.positions)||cur.by!==res.by){ race.result=res; ch=true; } } else if(cur){ race.result=null; ch=true; } } return ch; }
+async function sbPullPunters(){ const {data,error}=await sb.from('kyw_punters').select('*'); if(error) throw error; let ch=false; for(const row of (data||[])){ const p=row.data; if(p.id===state.me&&state.punters[p.id]&&(state.punters[p.id].updatedAt||0)>=(p.updatedAt||0)) continue; if(!state.punters[p.id]||(p.updatedAt||0)>(state.punters[p.id].updatedAt||0)){ state.punters[p.id]=p; ch=true; } } return ch; }
+async function sbPullComments(){ const {data,error}=await sb.from('kyw_comments').select('*').order('created_at'); if(error) throw error; state.comments=(data||[]).map(r=>({id:r.id,raceNo:r.race_no,by:r.by,text:r.text,ts:new Date(r.created_at).getTime(),meetingId:r.meeting_id})); }
+async function sbPullBets(){ const {data,error}=await sb.from('kyw_bets').select('*').order('created_at'); if(error) throw error; state.bets=(data||[]).map(r=>({id:r.id,raceNo:r.race_no,runnerNo:r.runner_no,type:r.type,stake:+r.stake,odds:r.odds==null?null:+r.odds,placeOdds:r.place_odds==null?null:+r.place_odds,by:r.by,note:r.note||'',ts:new Date(r.created_at).getTime(),meetingId:r.meeting_id})); }
+async function sbPullAll(first){ await sbPullMeeting(); await sbPullResults(); await sbPullPunters(); await sbPullComments(); await sbPullBets(); ensureRoster(); persistLocal(); render(); if(first&&me()) sbPush('punter'); }
+async function sbPush(what){ try{ setSync('on','saving');
+    if(what==='all'||what==='meeting'){ if(state.meeting&&!state.meeting.example){ const m={...state.meeting, races:state.meeting.races.map(r=>({...r,result:undefined}))}; const {error}=await sb.from('kyw_meeting').upsert({id:'current',data:m,updated_at:new Date().toISOString()}); if(error) throw error; }
+      else if(!state.meeting){ await sb.from('kyw_meeting').delete().eq('id','current'); } }
+    if(what.startsWith('result:')){ const no=+what.split(':')[1]; const race=state.meeting.races.find(r=>r.no===no);
+      if(race.result){ const {error}=await sb.from('kyw_results').upsert({meeting_id:state.meeting.id,race_no:no,positions:race.result.positions,entered_by:race.result.by,entered_at:new Date().toISOString()}); if(error) throw error; }
+      else { const {error}=await sb.from('kyw_results').delete().eq('meeting_id',state.meeting.id).eq('race_no',no); if(error) throw error; } }
+    if(what==='all'||what==='punter'){ if(me()){ const {error}=await sb.from('kyw_punters').upsert({id:state.me,data:me(),updated_at:new Date().toISOString()}); if(error) throw error; } }
+    setSync('on','live'); }catch(e){ console.error(e); setSync('err','save failed, check signal'); toast('Could not save to the flock. It is kept on this phone.'); } }
+async function sbAddComment(c){ const {error}=await sb.from('kyw_comments').insert({meeting_id:state.meeting.id,race_no:c.raceNo,by:c.by,text:c.text}); if(error){ toast('Comment not saved'); throw error; } }
+async function sbDeleteComment(id){ await sb.from('kyw_comments').delete().eq('id',id); }
+async function sbAddBet(b){ const {error}=await sb.from('kyw_bets').insert({meeting_id:state.meeting.id,race_no:b.raceNo,runner_no:b.runnerNo,type:b.type,stake:b.stake,odds:b.odds,place_odds:b.placeOdds,by:b.by,note:b.note}); if(error){ toast('Bet not saved'); throw error; } }
+async function sbDeleteBet(id){ await sb.from('kyw_bets').delete().eq('id',id); }
+async function sbClearMeetingData(){ await sb.from('kyw_results').delete().neq('race_no',-1); await sb.from('kyw_comments').delete().neq('race_no',-1); await sb.from('kyw_bets').delete().neq('race_no',-1); for(const p of Object.values(state.punters)) await sb.from('kyw_punters').upsert({id:p.id,data:p,updated_at:new Date().toISOString()}); }
+
+/* ---- Artifact db backend (Claude hosted) ---- */
 async function pushDb(what){
   if(!db) return; try{ setSync('on','saving');
     if((what==='all'||what==='meeting')&&state.meeting){ const m=state.meeting; const id=m.id||'current'; const meta={...m}; delete meta.races; meta.updatedAt=state.updatedAt;
@@ -323,23 +421,25 @@ async function pushDb(what){
       await db.doc('settings/main').set({meetingId:id, updatedAt:state.updatedAt}); }
     if((what==='all'||what==='meeting')&&!state.meeting){ await db.doc('settings/main').set({meetingId:null, updatedAt:state.updatedAt}); }
     if((what==='all'||what==='punter')&&me()) await db.doc('punters/'+state.me).set(me());
+    if(what==='all'||what==='meeting'){ await db.doc('shared/comments').set({items:state.comments}); await db.doc('shared/bets').set({items:state.bets}); }
     setSync('on','synced'); }catch(e){ console.error(e); setSync('err','sync failed'); } }
 async function pullMeeting(){ const s=await db.doc('settings/main').get(); if(!s.exists) return false; const sd=s.data(); if(!sd.meetingId){ if(state.meeting&&(sd.updatedAt||0)>state.updatedAt){ state.meeting=null; return true; } return false; }
   const md=await db.doc('meetings/'+sd.meetingId).get(); if(!md.exists) return false; const meta=md.data(); if(state.meeting&&(meta.updatedAt||0)<=(state.meeting.updatedAt||0)) return false;
-  const races=(await db.collection('meetings/'+sd.meetingId+'/races').get()).docs.map(d=>d.data()).sort((a,b)=>a.no-b.no); state.meeting={...meta,races}; return true; }
-function setSync(cls,txt){ const s=$('#sync'); s.className='sync '+cls; s.textContent=txt; }
+  const races=(await db.collection('meetings/'+sd.meetingId+'/races').get()).docs.map(d=>d.data()).sort((a,b)=>a.no-b.no); state.meeting={...meta,races};
+  const c=await db.doc('shared/comments').get(); if(c.exists) state.comments=c.data().items||[]; const b=await db.doc('shared/bets').get(); if(b.exists) state.bets=b.data().items||[]; return true; }
 async function initDb(){
   if(!window.claude||!window.claude.use) return; try{ db=await window.claude.use('db'); }catch(e){ db=null; }
   if(!db){ setSync('','this phone only'); return; } setSync('on','connecting');
   try{
     const changed=await pullMeeting();
     const ps=await db.collection('punters').get(); for(const d of ps.docs){ const p=d.data(); if(!state.punters[p.id]||(p.updatedAt||0)>(state.punters[p.id].updatedAt||0)) state.punters[p.id]=p; }
-    if(changed||ps.size) { persistLocal(); render(); }
+    ensureRoster(); persistLocal(); render();
     if(state.meeting&&!changed) pushDb('meeting'); if(me()) pushDb('punter');
     setSync('on','synced');
     db.doc('settings/main').onSnapshot(async snap=>{ if(!snap.exists||snap.metadata.hasPendingWrites) return; const c=await pullMeeting(); if(c){ persistLocal(); render(); toast('Form or results updated by another Pelican'); } }, e=>setSync('err','live sync off'));
     db.collection('punters').onSnapshot(snap=>{ let ch=false; for(const d of snap.docs){ const p=d.data(); if(p.id===state.me) continue; if(!state.punters[p.id]||(p.updatedAt||0)>(state.punters[p.id].updatedAt||0)){ state.punters[p.id]=p; ch=true; } } if(ch){ persistLocal(); render(); } }, e=>{});
-    // races change (results) without settings/main changing: watch the races collection of the current meeting
+    db.doc('shared/comments').onSnapshot(snap=>{ if(snap.exists&&!snap.metadata.hasPendingWrites){ state.comments=snap.data().items||[]; persistLocal(); render(); } }, e=>{});
+    db.doc('shared/bets').onSnapshot(snap=>{ if(snap.exists&&!snap.metadata.hasPendingWrites){ state.bets=snap.data().items||[]; persistLocal(); render(); } }, e=>{});
     watchRaces();
   }catch(e){ console.error(e); setSync('err','sync failed'); }
 }
@@ -348,6 +448,13 @@ function watchRaces(){ if(!db||!state.meeting) return; const id=state.meeting.id
   racesUnsub=db.collection('meetings/'+id+'/races').onSnapshot(snap=>{ if(snap.metadata.hasPendingWrites||!state.meeting||state.meeting.id!==id) return; let ch=false;
     for(const d of snap.docs){ const r=d.data(); const i=state.meeting.races.findIndex(x=>x.no===r.no); if(i>=0&&(r.updatedAt||0)>(state.meeting.races[i].updatedAt||0)){ state.meeting.races[i]=r; ch=true; } }
     if(ch){ persistLocal(); render(); } }, e=>{}); }
+
+// shared comment and bet actions, routed to whichever backend is live
+async function addComment(raceNo,text){ const c={id:'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),raceNo,by:me().name,text,ts:Date.now(),meetingId:state.meeting.id}; if(sb){ await sbAddComment(c); await sbPullComments(); persistLocal(); render(); } else { state.comments.push(c); save('meeting'); } }
+async function deleteComment(id){ if(sb){ await sbDeleteComment(id); await sbPullComments(); persistLocal(); render(); } else { state.comments=state.comments.filter(c=>c.id!==id); save('meeting'); } }
+async function addBet(b){ b.id='b'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); b.by=me().name; b.ts=Date.now(); b.meetingId=state.meeting.id; if(sb){ await sbAddBet(b); await sbPullBets(); persistLocal(); render(); } else { state.bets.push(b); save('meeting'); } }
+async function deleteBet(id){ if(sb){ await sbDeleteBet(id); await sbPullBets(); persistLocal(); render(); } else { state.bets=state.bets.filter(b=>b.id!==id); save('meeting'); } }
+function resetSharedForNewMeeting(){ state.comments=[]; state.bets=[]; for(const p of Object.values(state.punters)){ p.picks={}; p.adj={}; p.updatedAt=Date.now(); } if(sb) sbClearMeetingData().catch(()=>{}); if(db) for(const p of Object.values(state.punters)) db.doc('punters/'+p.id).set(p).catch(()=>{}); }
 
 /* ---------------- ingest ---------------- */
 function normaliseMeeting(j){
@@ -369,7 +476,7 @@ function parseCSV(text){ const lines=text.split(/\r?\n/).filter(l=>l.trim()); if
       last:{pos:num(g('last_pos')),field:num(g('last_field')),margin:num(g('last_margin')),days:num(g('days')),race:g('last_race'),classChange:num(g('class_change'))},jockeyPct:num(g('jockey_pct')),trainerPct:num(g('trainer_pct')),odds:num(g('odds')),scratched:/^(y|true|1)/i.test(g('scratched'))}); }
   return {races:Object.values(races)}; }
 function loadText(text){ text=text.trim(); const j=(text.startsWith('{')||text.startsWith('[')) ? JSON.parse(text) : parseCSV(text); const m=normaliseMeeting(j);
-  state.meeting=m; for(const p of Object.values(state.punters)){ p.picks={}; p.adj={}; } state.ui.raceNo=m.races[0].no; state.ui.tab='races'; racesWatched=null; save('all'); if(db) for(const p of Object.values(state.punters)) db.doc('punters/'+p.id).set(p).catch(()=>{}); watchRaces();
+  state.meeting=m; resetSharedForNewMeeting(); state.ui.raceNo=m.races[0].no; state.ui.tab='races'; racesWatched=null; save('all'); watchRaces();
   const nr=m.races.reduce((a,r)=>a+r.runners.length,0); toast(`Loaded ${m.races.length} race${m.races.length===1?'':'s'}, ${nr} runner${nr===1?'':'s'}. Tips and calls reset.`); }
 function mergeRace(text){ const j=JSON.parse(text.trim()); const one=normaliseMeeting(j.races?j:{races:[j]}); if(!state.meeting){ state.meeting=one; } else { for(const r of one.races){ const i=state.meeting.races.findIndex(x=>x.no===r.no); if(i>=0) state.meeting.races[i]=r; else state.meeting.races.push(r); } state.meeting.races.sort((a,b)=>a.no-b.no); } state.meeting.updatedAt=Date.now(); save('meeting'); toast('Race merged'); }
 
@@ -424,6 +531,7 @@ function exampleMeeting(){
 function render(){
   const m=state.meeting; document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===state.ui.tab));
   $('#hMeeting').textContent = m ? m.meeting : 'Kai Ying Winning';
+  $('#hMe').innerHTML = me() ? `<span class="sl">/</span>${esc(me().name)}` : '';
   $('#hSub').textContent = m ? [m.date, m.condition, m.rail?('Rail '+m.rail):''].filter(Boolean).join(' / ') : 'No form loaded yet';
   const main=$('#main'); const tab=state.ui.tab;
   if(!state.me){ main.innerHTML=''; showWho(); return; }
@@ -431,9 +539,9 @@ function render(){
   main.innerHTML = tab==='races'?viewRaces() : tab==='race'?viewRace() : tab==='weights'?viewWeights() : tab==='flock'?viewFlock() : viewLoad();
   bind(main);
 }
-function showWho(){ const sh=$('#sheet'); const others=Object.values(state.punters);
+function showWho(){ ensureRoster(); const sh=$('#sheet'); const others=Object.values(state.punters);
   sh.innerHTML=`<div class="sheet"><div class="card"><div class="eyebrow">Roll call</div><h2>Which Pelican are you?</h2><p class="note">Your weights, calls and tips are kept under your name. The form and the results are shared with the flock.</p>
-    <div class="who">${others.map(p=>`<button class="btn" data-who="${esc(p.id)}"><span class="pel"><i style="background:${p.colour}"></i>${esc(p.name)}</span></button>`).join('')}</div>
+    <div class="who">${others.map(p=>`<button class="btn" data-who="${esc(p.id)}">${avatarSVG(p.avatar||'plain',p.colour)}<b>${esc(p.name)}</b></button>`).join('')}</div>
     <label class="field">Or a new name<input id="whoIn" placeholder="First name or nickname" autocomplete="off"></label>
     <div class="actions"><button class="btn primary" id="whoGo">That's me</button></div></div></div>`;
   sh.hidden=false;
@@ -490,17 +598,34 @@ function viewRace(){
       <span><span class="nm">${esc(r.name)}</span>${resPos>=0?` <span class="tag good">${ordinal(resPos+1)}</span>`:''}${isWin?` <span class="tag acc">Your tip</span>`:isPl?` <span class="tag">Place</span>`:''}<div class="meta">${esc(r.jockey)}${r.trainer?' for '+esc(r.trainer):''}</div>
         <div class="bar"><i style="width:${((s.rating-minR)/span*100).toFixed(1)}%"></i>${dynv>0?`<i class="dyn" style="left:${((s.rating-dynv-minR)/span*100).toFixed(1)}%;width:${(dynv/span*100).toFixed(1)}%"></i>`:''}</div>
         <div class="chips">${chips.map(c=>c.startsWith('<span')?c:`<span class="chip">${c}</span>`).join('')}</div>
-        ${tips[r.no]?`<div class="flock">${tips[r.no].map(p=>`<span class="pel"><i style="background:${p.colour}"></i>${esc(p.name)}</span>`).join('')}</div>`:''}</span>
+        ${tips[r.no]?`<div class="flock">${tips[r.no].map(p=>pelChip(p)).join('')}</div>`:''}
+        ${clubOn(r.no,race.no).length?`<div class="club">${clubOn(r.no,race.no).map(b=>`<span class="chip acc">${esc(b.by)} ${fmtMoney(b.stake)} ${b.type==='ew'?'e/w':b.type}${b.odds?' @ '+b.odds:''}</span>`).join('')}</div>`:''}</span>
       <span class="prob"><b class="num">${pct(s.prob)}</b><span>${fmtOdds(s.prob)} fair</span></span></button>`;
     if(open){ html+=`<div class="detail"><div class="tipbtns"><button class="btn ${isWin?'on':''}" data-act="tipwin" data-no="${r.no}" ${res?'disabled':''}>${isWin?'Tipped to win':'Tip to win'}</button><button class="btn ${isPl?'on':''}" data-act="tipplace" data-no="${r.no}" ${res?'disabled':''}>${isPl?'Place tip on':'Tip for a place'}</button><button class="btn ${r.scratched?'primary':''}" data-act="scratch" data-no="${r.no}">${r.scratched?'Reinstate':'Scratch'}</button></div>
+      ${betForm(race,r)}
       <div class="adj"><span class="small">Your call</span><input type="range" min="-3" max="3" step="1" value="${a.adj||0}" data-act="adj" data-key="${k}"><b class="num">${a.adj>0?'+':''}${a.adj||0}</b></div>
       <label class="field" style="margin-top:8px">Note to self<input data-act="note" data-key="${k}" value="${esc(a.note)}" placeholder="Why you moved it"></label>
       <div class="metrics" style="margin-top:12px">`;
       for(const met of METRICS){ const z=s.z[met.key]; const c=s.contrib[met.key]; const w=Math.min(50,Math.abs(z)/2.5*50); html+=`<span>${met.label}<span class="small"> x${(run.weights[met.key]||0).toFixed(2)}</span></span><span class="z num">${c>=0?'+':''}${(c*100).toFixed(1)}</span><span class="zbar"><i class="${z<0?'neg':''}" style="left:${z<0?50-w:50}%;width:${w}%"></i></span>`; }
       html+=`</div><p class="small" style="margin:10px 0 0">Career ${recStr(r.career)}. Track ${recStr(r.track)}. Distance ${recStr(r.distance)}. ${titleCase(condCategory(m.condition))} ${recStr(r[condCategory(m.condition)])}.${r.last&&r.last.race?' Last start: '+esc(r.last.race)+'.':''}${r.gear?' '+esc(r.gear)+'.':''}${r.comment?' '+esc(r.comment):''}</p></div>`; }
     html+=`</div>`; }
-  return html+`</div></section>`;
+  html+=`</div></section>`;
+  // race comments
+  const cs=state.comments.filter(c=>c.raceNo===race.no);
+  html+=`<section class="block"><div class="eyebrow">Flock talk<span class="sl">/</span>race ${race.no}</div>`;
+  for(const c of cs){ const p=punterByName(c.by); html+=`<div class="comment">${avatarSVG(p.avatar||'plain',p.colour,'sm')}<span><span class="by">${esc(c.by)}</span> <span class="t">${new Date(c.ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span><br>${esc(c.text)}</span>${c.by===my.name?`<button data-act="delcomment" data-id="${esc(c.id)}">remove</button>`:'<span></span>'}</div>`; }
+  if(!cs.length) html+=`<p class="note">Nothing said yet.</p>`;
+  html+=`<div class="cform"><input id="commentIn" class="field" style="border:1.5px solid var(--rule);background:var(--surface);padding:9px 10px;border-radius:6px" placeholder="Track bias, a plunge, a hunch" maxlength="240"><button class="btn" data-act="comment">Post</button></div></section>`;
+  return html;
 }
+function clubOn(runnerNo,raceNo){ return state.bets.filter(b=>b.raceNo===raceNo&&b.runnerNo===runnerNo); }
+function betForm(race,r){ const open=state.ui.betOn===runnerKey(race,r); const existing=clubOn(r.no,race.no);
+  if(!open) return `<div class="actions" style="margin-top:10px"><button class="btn" data-act="betopen" data-key="${runnerKey(race,r)}" ${race.result?'disabled':''}>Club bet on ${r.no}</button>${existing.length?`<span class="small">${existing.length} already on</span>`:''}</div>`;
+  return `<div class="betform"><label class="field">Type<select id="betType"><option value="win">Win</option><option value="place">Place</option><option value="ew">Each way</option></select></label>
+    <label class="field">Stake $<input id="betStake" inputmode="decimal" placeholder="20"></label><label class="field">Win odds<input id="betOdds" inputmode="decimal" placeholder="${r.odds||''}" value="${r.odds||''}"></label>
+    <label class="field">Place odds<input id="betPlace" inputmode="decimal" placeholder="optional"></label><label class="field" style="grid-column:span 2">Note<input id="betNote" placeholder="Bookie, who is holding the ticket"></label></div>
+    <div class="actions"><button class="btn primary" data-act="betsave" data-no="${r.no}">Record bet</button><button class="btn" data-act="betopen" data-key="">Cancel</button></div>
+    ${existing.length?`<p class="small">Already on this runner: ${existing.map(b=>`${esc(b.by)} ${fmtMoney(b.stake)} ${b.type==='ew'?'each way':b.type}`).join(', ')}.</p>`:''}`; }
 function recStr(v){ const r=rec(v); return r? `${r.s}:${r.w}-${r.p}` : 'n/a'; }
 
 function viewWeights(){
@@ -525,14 +650,27 @@ function viewFlock(){
   const m=state.meeting; const ps=Object.values(state.punters);
   const rows=ps.map(p=>({p, tips:tipPoints(p,m), model:modelScore(runDay(p,m),m)})).sort((a,b)=>b.tips.pts-a.tips.pts||b.model.top-a.model.top);
   let html=`<div class="eyebrow">The flock<span class="sl">/</span>${ps.length} Pelican${ps.length===1?'':'s'} on the card</div><p class="note" style="margin:6px 0 10px">Three points for tipping the winner, one for a tip that runs a place. Model column is how many winners each Pelican's model had on top.</p><div class="board">`;
-  rows.forEach((r,i)=>{ html+=`<div class="brow"><span class="pos num">${i+1}</span><span><span class="pel"><i style="background:${r.p.colour}"></i><b>${esc(r.p.name)}</b></span>${r.p.id===state.me?' <span class="tag acc">you</span>':''}<div class="sub">${r.tips.tipped} tips in, ${r.tips.wins} winner${r.tips.wins===1?'':'s'}, ${r.tips.places} placed</div></span><span class="sub num">model ${r.model.top}/${r.model.done}</span><span class="pts num">${r.tips.pts}</span></div>`; });
+  rows.forEach((r,i)=>{ html+=`<div class="brow"><span class="pos num">${i+1}</span><span>${pelChip(r.p)}${r.p.id===state.me?' <span class="tag acc">you</span>':''}<div class="sub">${r.tips.tipped} tips in, ${r.tips.wins} winner${r.tips.wins===1?'':'s'}, ${r.tips.places} placed</div></span><span class="sub num">model ${r.model.top}/${r.model.done}</span><span class="pts num">${r.tips.pts}</span></div>`; });
   html+=`</div>`;
   const done=m.races.filter(r=>r.result).sort((a,b)=>b.no-a.no);
   html+=`<section class="block" style="margin-top:22px"><div class="eyebrow">Results<span class="sl">/</span>newest first</div>`;
   if(!done.length) html+=`<p class="note">Nothing in yet.</p>`;
   for(const r of done){ const w=r.runners.find(h=>h.no===r.result.positions[0]); const tippers=ps.filter(p=>p.picks&&p.picks[r.no]&&p.picks[r.no].win===r.result.positions[0]);
-    html+=`<div class="logrow"><div class="when">Race ${r.no}${r.result.by?' entered by '+esc(r.result.by):''}</div>${cloth(r.result.positions[0])} <b>${esc(w?w.name:'')}</b> from ${r.result.positions.slice(1).join(', ')}.${tippers.length?`<div class="flock" style="margin-top:6px">${tippers.map(p=>`<span class="pel"><i style="background:${p.colour}"></i>${esc(p.name)} tipped it</span>`).join('')}</div>`:''}</div>`; }
-  html+=`</section><div class="actions"><button class="btn" data-act="switch">Switch Pelican</button></div>`;
+    html+=`<div class="logrow"><div class="when">Race ${r.no}${r.result.by?' entered by '+esc(r.result.by):''}</div>${cloth(r.result.positions[0])} <b>${esc(w?w.name:'')}</b> from ${r.result.positions.slice(1).join(', ')}.${tippers.length?`<div class="flock" style="margin-top:6px">${tippers.map(p=>pelChip(p)).join('')} <span class="small">tipped it</span></div>`:''}</div>`; }
+  html+=`</section>`;
+  const book=clubBook(m);
+  html+=`<section class="block"><div class="eyebrow">Punters club<span class="sl">/</span>${book.rows.length} bet${book.rows.length===1?'':'s'}</div>
+  <div class="kpis" style="margin-top:8px"><div class="kpi"><b class="num">${fmtMoney(book.staked)}</b><span>Staked</span></div><div class="kpi"><b class="num">${fmtMoney(book.ret)}</b><span>Returned</span></div><div class="kpi"><b class="num" style="color:${book.pl>0?'var(--good)':book.pl<0?'var(--bad)':'inherit'}">${fmtMoney(book.pl)}</b><span>Settled P&amp;L</span></div></div>`;
+  if(book.open>0) html+=`<p class="small" style="margin-top:6px">${fmtMoney(book.open)} still running.</p>`;
+  const byP={}; for(const b of book.rows){ byP[b.by]=(byP[b.by]||0)+(num(b.stake)||0); } const contrib=Object.entries(byP); const silent=ps.filter(p=>!byP[p.name]);
+  if(contrib.length) html+=`<div class="flock" style="margin:8px 0">${contrib.map(([n,v])=>{const p=punterByName(n);return `<span class="pel">${avatarSVG(p.avatar||'plain',p.colour,'sm')}${esc(n)} ${fmtMoney(v)}</span>`;}).join('')}</div>`;
+  if(silent.length&&book.rows.length) html+=`<p class="small">Yet to put anything on: ${silent.map(p=>esc(p.name)).join(', ')}.</p>`;
+  for(const b of [...book.rows].reverse()){ const race=m.races.find(r=>r.no===b.raceNo); const h=race&&race.runners.find(x=>x.no===b.runnerNo); const p=punterByName(b.by);
+    const amt= b.status==='open'? fmtMoney(b.stake) : (b.ret>0? '+'+fmtMoney(b.ret-b.stake) : '-'+fmtMoney(b.stake));
+    html+=`<div class="betrow">${avatarSVG(p.avatar||'plain',p.colour,'sm')}<span><b>R${b.raceNo}</b> ${cloth(b.runnerNo)} ${esc(h?h.name:'')} <span class="s">${b.type==='ew'?'each way':b.type} ${fmtMoney(b.stake)}${b.odds?' @ '+b.odds:''}${b.type!=='win'?' (place '+placeOdds(b)+(b.placeOdds?'':' est.')+')':''} by ${esc(b.by)}${b.note?', '+esc(b.note):''}</span></span><span class="amt num ${b.status==='won'?'pos':b.status==='lost'?'neg':''}">${amt}${b.status==='open'&&b.by===me().name?` <button class="btn" style="padding:2px 8px;font-size:11px" data-act="delbet" data-id="${esc(b.id)}">x</button>`:''}</span></div>`; }
+  if(!book.rows.length) html+=`<p class="note">No club bets recorded. Open a runner on the race screen to put one on the book.</p>`;
+  html+=`<p class="small" style="margin-top:8px">Place returns use the place price you enter, or a quarter of the win odds where none is given, so treat those as estimates.</p></section>`;
+  html+=`<div class="actions"><button class="btn" data-act="switch">Switch Pelican</button></div>`;
   return html;
 }
 
@@ -573,17 +711,25 @@ document.addEventListener('click', async e=>{
   else if(act==='tipplace'){ const race=currentRace(); const pk=me().picks[race.no]||(me().picks[race.no]={win:null,place:[]}); const no=+b.dataset.no; pk.place=pk.place||[]; if(pk.place.includes(no)) pk.place=pk.place.filter(n=>n!==no); else { if(pk.place.length>=2){ toast('Two place tips per race'); return; } if(pk.win===no) pk.win=null; pk.place.push(no); } save('punter'); }
   else if(act==='result'){ const v=$('#resIn').value.trim(); const pos=v.split(/[^0-9]+/).filter(Boolean).map(Number); if(!pos.length){ toast('Enter the finishing order first'); return; } if(new Set(pos).size!==pos.length){ toast('A number is repeated'); return; }
     const race=currentRace(); const known=new Set(active(race).map(r=>r.no)); const bad=pos.filter(n=>!known.has(n)); if(bad.length){ toast('Not in this field: '+bad.join(', ')); return; }
-    race.result={positions:pos, enteredAt:Date.now(), by:me().name}; race.updatedAt=Date.now(); state.meeting.updatedAt=Date.now(); save('meeting'); toast('Result in. Every model on the card has been updated.'); }
-  else if(act==='clearresult'){ const race=currentRace(); race.result=null; race.updatedAt=Date.now(); state.meeting.updatedAt=Date.now(); save('meeting'); }
+    race.result={positions:pos, enteredAt:Date.now(), by:me().name}; race.updatedAt=Date.now(); state.meeting.updatedAt=Date.now(); save('result:'+race.no); toast('Result in. Every model on the card has been updated.'); }
+  else if(act==='clearresult'){ const race=currentRace(); race.result=null; race.updatedAt=Date.now(); state.meeting.updatedAt=Date.now(); save('result:'+race.no); }
   else if(act==='resetweights'){ me().weights=Object.fromEntries(METRICS.map(m=>[m.key,m.base])); save('punter'); }
   else if(act==='load'){ try{ loadText($('#loadIn').value); }catch(err){ toast('Could not read that: '+err.message); } }
   else if(act==='mergerace'){ try{ mergeRace($('#loadIn').value); }catch(err){ toast('Could not read that: '+err.message); } }
-  else if(act==='example'){ state.meeting=exampleMeeting(); for(const p of Object.values(state.punters)){ p.picks={}; p.adj={}; } state.ui.raceNo=1; state.ui.tab='races'; racesWatched=null; save('all'); watchRaces(); }
-  else if(act==='clear'){ if(!confirm('Clear the current meeting and results for every Pelican?')) return; state.meeting=null; save('meeting'); }
+  else if(act==='example'){ state.meeting=exampleMeeting(); resetSharedForNewMeeting(); state.ui.raceNo=1; state.ui.tab='races'; racesWatched=null; save('all'); watchRaces(); }
+  else if(act==='clear'){ if(!confirm('Clear the current meeting, results, comments and club bets for every Pelican?')) return; state.meeting=null; resetSharedForNewMeeting(); save('meeting'); }
   else if(act==='copyprompt'){ await copy(CONVERT_RULES+SCHEMA_DOC); toast('Conversion prompt copied'); }
   else if(act==='copyjson'){ await copy(JSON.stringify(state.meeting,null,1)); toast('Meeting JSON copied'); }
   else if(act==='convert'){ await convertWithClaude(); }
   else if(act==='switch'){ state.me=null; persistLocal(); render(); }
+  else if(act==='comment'){ const t=$('#commentIn').value.trim(); if(!t) return; try{ await addComment(state.ui.raceNo,t); }catch(e){} }
+  else if(act==='delcomment'){ await deleteComment(b.dataset.id); }
+  else if(act==='betopen'){ state.ui.betOn=b.dataset.key||null; render(); }
+  else if(act==='betsave'){ const race=currentRace(); const runnerNo=+b.dataset.no; const type=$('#betType').value; const stake=num($('#betStake').value); const odds=num($('#betOdds').value); const placeOddsV=num($('#betPlace').value); const note=$('#betNote').value.trim();
+    if(!stake||stake<=0){ toast('Stake first'); return; } if(type!=='place'&&(!odds||odds<=1)){ toast('Win odds needed for a win or each way bet'); return; }
+    const dup=clubOn(runnerNo,race.no).filter(x=>x.type===type); if(dup.length&&!confirm(`${dup.map(d=>d.by+' has '+fmtMoney(d.stake)).join(', ')} already ${type==='ew'?'each way':type} on this runner. Record another?`)) return;
+    try{ await addBet({raceNo:race.no,runnerNo,type,stake,odds,placeOdds:placeOddsV,note}); state.ui.betOn=null; render(); toast('On the book'); }catch(e){} }
+  else if(act==='delbet'){ if(!confirm('Take this bet off the book?')) return; await deleteBet(b.dataset.id); }
 });
 document.getElementById('tabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; state.ui.tab=b.dataset.tab; render(); window.scrollTo(0,0); });
 async function copy(text){ try{ await navigator.clipboard.writeText(text); }catch(e){ const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); } }
@@ -598,9 +744,9 @@ async function convertWithClaude(){
 }
 
 /* ---------------- boot ---------------- */
-(function boot(){
-  loadLocal(); if(!state.meeting&&!Object.keys(state.punters).length) state.meeting=exampleMeeting();
-  render(); initDb();
+(async function boot(){
+  loadLocal(); ensureRoster(); let seen=false; try{ seen=!!localStorage.getItem('kyw_seen'); localStorage.setItem('kyw_seen','1'); }catch(e){} if(!state.meeting&&!seen) state.meeting=exampleMeeting();
+  render(); const web=await sbInit(); if(!web) initDb();
   if(window.claude&&window.claude.use){ window.claude.use('sample').then(s=>{ sampleFn=s; if(s&&state.ui.tab==='load') render(); }).catch(()=>{}); }
 })();
 </script>

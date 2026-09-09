@@ -30,9 +30,17 @@ Records are `[starts, wins, placings]`. Form strings read oldest to newest, most
 
 On first open each person picks a name. The form, scratchings and results are shared. Each Pelican keeps their own metric weights, adaptation settings, runner calls, notes and tips (one win tip and up to two place tips per race). Every result is replayed through every Pelican's model on their own margin settings, so nobody's weights depend on who entered the result. The Flock tab scores tips (three points for a winner, one for a tip that runs a place) and shows how many winners each model had on top.
 
-## Storage
+## Punters club and flock talk
 
-State is cached in the browser and, when published with the `db` capability, synced through the artifact's shared store. That store is available only to signed-in members of the publisher's Claude organisation. Sharing with people outside the organisation needs the page hosted elsewhere with its own backend; the storage code is isolated in `pushDb`, `pullMeeting` and `initDb` for that purpose.
+Each race has a comment thread. Anyone can record a club bet on a runner (win, place or each way, with stake and odds). Existing bets on the runner show before you record another and the app asks before a same-type double-up. Once the result is in, bets settle and the Flock tab shows staked, returned and P&L, who has contributed and who has not. Place returns use the place price entered or a quarter of the win odds as an estimate.
+
+## Roster
+
+Campbell, Mick, Wilco, Big Dog and Shirty are preset with their own avatar and colour. Anyone else can add a name on the roll call.
+
+## Hosting and storage
+
+Two backends. On GitHub Pages (workflow in `.github/workflows/pages.yml`) the page uses Supabase through the `SUPABASE` config block at the top of the script: tables `kyw_meeting`, `kyw_results`, `kyw_punters`, `kyw_comments` and `kyw_bets`, with realtime enabled and writes gated by an `x-flock-code` header checked in row-level security. Inside a Claude artifact the same code falls back to the artifact `db` capability. State is cached in the browser and, when published with the `db` capability, synced through the artifact's shared store. That store is available only to signed-in members of the publisher's Claude organisation. Sharing with people outside the organisation needs the page hosted elsewhere with its own backend; the storage code is isolated in `pushDb`, `pullMeeting` and `initDb` for that purpose.
 
 ## Limitations
 
