@@ -95,12 +95,13 @@ async function syncMeeting(feed: any, existing: any | null, force: boolean) {
   for (const r of races) {
     const no = r.raceNumber; const prev = storedRaces[no]; const t = r.time ? Date.parse(r.time) : null;
     const finished = !!(r.hasResults || (r.resultsString && r.resultsString.trim()));
-    const near = t != null && Math.abs(t - now) < 45 * 60 * 1000;
     const prevHasResult = !!(prev && prev.feedResult);
-    const raceDay = !!meetDate && new Date(now + 10 * 3600 * 1000).toISOString().slice(0, 10) === String(meetDate).slice(0, 10);
     const prevAge = prev?.syncedAt ? now - Date.parse(prev.syncedAt) : Infinity;
-    const stale = raceDay && !finished && !prevHasResult && prevAge > 20 * 60 * 1000;
-    const need = force || !prev || stale || (near && !prevHasResult) || (finished && !prevHasResult) || (r.raceStatus !== prev?.raceStatus);
+    const minsTo = t != null ? (t - now) / 60000 : null;
+    // Field reads: the daily forced refresh, one read about 30 minutes out, then the last six minutes through to the result.
+    const halfHour = minsTo != null && minsTo <= 32 && minsTo > 26 && prevAge > 4 * 60 * 1000;
+    const jump = minsTo != null && minsTo <= 6 && !prevHasResult && prevAge > 3 * 60 * 1000;
+    const need = force || !prev || halfHour || jump || (finished && !prevHasResult) || (r.raceStatus !== prev?.raceStatus);
     let race: any;
     if (need) {
       fetched++;
