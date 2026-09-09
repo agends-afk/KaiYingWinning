@@ -110,7 +110,7 @@ nav.tabs button:focus-visible,.row:focus-visible,.btn:focus-visible,.cloth:focus
 .runner .meta{font-size:12.5px;color:var(--muted);margin-top:1px}
 .runner .prob{text-align:right}
 .runner .prob b{font-family:var(--display);font-weight:900;font-size:26px;line-height:1;display:block;letter-spacing:.3px}
-.runner .prob span{font-size:11px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase;font-weight:600}
+.runner .prob span{display:block;font-size:11px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase;font-weight:600;white-space:nowrap}
 .bar{height:5px;background:var(--bar-track);margin-top:8px;position:relative;border-radius:3px;overflow:hidden}
 .bar i{position:absolute;left:0;top:0;bottom:0;background:var(--bar)}
 .bar i.dyn{background:var(--bar-dyn)}
@@ -137,6 +137,8 @@ input[type=range]{accent-color:var(--accent);width:100%}
 .wrow .l span{font-family:var(--display);font-size:22px;font-weight:800}
 .wrow .d{font-size:12.5px;color:var(--muted);margin:2px 0 6px}
 .wrow .delta{font-size:12.5px;color:var(--accent);font-weight:600}
+.wrow .l span small{font-family:var(--body);font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted2)}
+.wtips{margin-top:8px}.wtip{display:grid;grid-template-columns:34px 1fr 44px 52px 52px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--rule);font-size:14px}.wtip .idx{font-family:var(--display);font-weight:800;font-size:16px}.wtip .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.wtip .num{text-align:right;font-weight:700}.wtip .muted{color:var(--muted2);font-weight:500}
 .result-entry{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
 .result-entry .field{flex:1;min-width:150px}
 .logrow{padding:10px 0;border-bottom:1px solid var(--rule);font-size:13.5px}
@@ -673,7 +675,7 @@ function viewRaces(){
   for(const race of m.races){ const p=run.pred[race.no]||[]; const res=race.result; const ep=effectivePick(me(),race,run); const epR=ep.no&&race.runners.find(r=>r.no===ep.no); let right;
     const scored=scoreRace(race,m,run.weights,st,run.dyn[race.no],me().adj); const adv=modelAdvice(scored,st);
     if(res){ const w=race.runners.find(r=>r.no===res.positions[0]); const pr=p.find(x=>x.no===res.positions[0]); const hit=ep.no===res.positions[0]; right=`<span class="tag ${hit?'good':(pr&&pr.rank<=st.marginRank?'acc':'warn')}">${hit?'Tip won':(pr?'Tip ran '+ordinal(pr.rank)+' rated':'result')}</span><b>${esc(w?w.name:res.positions[0])}</b>`; }
-    else if(adv){ right=`<span class="tag ${ep.override?'acc':(adv.tier==='Strong'?'good':adv.tier==='Fair'?'':'warn')}">${ep.override?'Your override':adv.tier+' '+pct(adv.top.prob)}</span>${!ep.override&&isValue(adv.top,st)?`<span class="tag acc">Value</span>`:''}<b>${esc(epR?epR.name:'')}</b>${adv.roughie?`<span class="small">Roughie ${adv.roughie.r.no} ${esc(adv.roughie.r.name)} $${adv.roughie.r.odds}</span>`:''}`; }
+    else if(adv){ right=`<span class="tag ${ep.override?'acc':(adv.tier==='Strong'?'good':adv.tier==='Fair'?'':'warn')}">${ep.override?'Your override':adv.tier+' '+pct(adv.top.prob)}</span>${!ep.override&&isValue(adv.top,st)?`<span class="tag acc">Value</span>`:''}<b>${esc(epR?epR.name:'')}</b><span class="small">Ours ${ourPrice(adv.top.prob,st)}${adv.top.r.odds?', mkt $'+adv.top.r.odds:''}</span>${adv.roughie?`<span class="small">Roughie ${adv.roughie.r.no} ${esc(adv.roughie.r.name)} $${adv.roughie.r.odds}</span>`:''}`; }
     else right='<b>no runners</b>';
     html+=`<button class="row" data-act="openrace" data-no="${race.no}"><span class="idx num">${race.no}</span><span><span class="t">${esc(race.name||'Race '+race.no)}</span><br><span class="s">${race.distance?race.distance+'m':''} ${esc(race.class||'')} ${race.time?'at '+esc(fmtTime(race.time)):''} ${active(race).length} runners${race.raceStatus&&!res?' <span class="small">'+esc(race.raceStatus)+'</span>':''}</span></span><span class="r">${right}</span></button>`; }
   return html+`</div></section>`;
@@ -704,7 +706,7 @@ function viewRace(){
     <div class="eyebrow" style="color:var(--panel-ink);opacity:.7;margin-top:12px">Multi</div>
     <p style="margin-top:4px">${leg?`${esc(tR.name)} is a leg of the day's multi (${multi.legs.length} legs, fair $${multi.fair.toFixed(1)}).`:multi?`Not in the multi. Legs are ${multi.legs.map(l=>'R'+l.raceNo).join(', ')}.`:'No multi while fewer than two races are open.'}</p>
     ${ep.override?`<p>You have overridden this race to number ${ep.no}. Tap its Tip button again to go back to the model.</p>`:''}</div>`; }
-  html+=`<section class="block"><div class="eyebrow">Ratings<span class="sl">/</span>tap a name for the reasons, Tip to override the model</div><div class="rows" style="margin-top:8px">`;
+  html+=`<section class="block"><div class="eyebrow">Ratings<span class="sl">/</span>our price on every runner at a ${Math.round(st.book*100)}% book, market alongside</div><p class="note" style="margin:6px 0 0">Ours shorter than the market means your model likes it more than the punters do. Tap a name for the reasons, Tip to override the model.</p><div class="rows" style="margin-top:8px">`;
   const maxR=Math.max(...scored.map(s=>s.rating)), minR=Math.min(...scored.map(s=>s.rating)); const span=(maxR-minR)||1;
   for(const s of scored){ const r=s.r; const k=runnerKey(race,r); const open=state.ui.open===k; const dynv=s.contrib.formline+s.contrib.manual; const a=my.adj[k]||{adj:0,note:''};
     const chips=[]; if(r.barrier!=null) chips.push(`Bar ${r.barrier}`); if(r.weight!=null) chips.push(`${r.weight}kg`); if(r.form) chips.push(`Form ${esc(r.form)}`);
@@ -721,7 +723,7 @@ function viewRace(){
         <div class="chips">${chips.map(c=>c.startsWith('<span')?c:`<span class="chip">${c}</span>`).join('')}</div>
         ${tips[r.no]?`<div class="flock">${tips[r.no].map(p=>pelChip(p)).join('')}</div>`:''}
         ${clubOn(r.no,race.no).length?`<div class="club">${clubOn(r.no,race.no).map(b=>`<span class="chip acc">${esc(b.by)} ${fmtMoney(b.stake)} ${b.type==='ew'?'e/w':b.type}${b.odds?' @ '+b.odds:''}</span>`).join('')}</div>`:''}</span>
-      <span class="prob"><b class="num">${pct(s.prob)}</b><span>${ourPrice(s.prob,st)} ours</span></span></button>
+      <span class="prob"><b class="num">${ourPrice(s.prob,st)}</b><span>${pct(s.prob)} chance</span><span>${r.odds?`mkt $${r.odds}`:'no mkt'}</span></span></button>
       <button class="tipbtn ${isWin?'on':isModel?'pl':''}" data-act="tipwin" data-no="${r.no}" ${res||r.scratched?'disabled':''} aria-label="Tip ${esc(r.name)} to win">${tipLabel}</button></div>`;
     if(open){ html+=`<div class="detail"><div class="tipbtns"><button class="btn ${isWin?'on':''}" data-act="tipwin" data-no="${r.no}" ${res?'disabled':''}>${isWin?'Tipped to win':'Tip to win'}</button><button class="btn ${isPl?'on':''}" data-act="tipplace" data-no="${r.no}" ${res?'disabled':''}>${isPl?'Place tip on':'Tip for a place'}</button><button class="btn ${r.scratched?'primary':''}" data-act="scratch" data-no="${r.no}">${r.scratched?'Reinstate':'Scratch'}</button></div>
       ${betForm(race,r)}
@@ -750,11 +752,16 @@ function betForm(race,r){ const open=state.ui.betOn===runnerKey(race,r); const e
     ${existing.length?`<p class="small">Already on this runner: ${existing.map(b=>`${esc(b.by)} ${fmtMoney(b.stake)} ${b.type==='ew'?'each way':b.type}`).join(', ')}.</p>`:''}`; }
 function recStr(v){ const r=rec(v); return r? `${r.s}:${r.w}-${r.p}` : 'n/a'; }
 
+function weightWord(w,base){ const r=base?w/base:0; const word= w<=0?'off':r<0.6?'light':r<1.4?'default':r<2?'heavy':'max'; return `${w.toFixed(2)} <small>${word}</small>`; }
+function weightTipsHTML(){ const m=state.meeting; if(!m) return `<p class="note">Load a meeting and the tips your weights produce will show here.</p>`; const my=me(); const st={...DEFAULT_SETTINGS,...my.settings}; const run=runDay(my,m);
+  const rows=m.races.filter(r=>!r.result&&active(r).length>=2).slice(0,12).map(r=>{ const sc=scoreRace(r,m,run.weights,st,run.dyn[r.no],my.adj); const t=sc[0]; if(!t) return ''; return `<div class="wtip"><span class="idx num">R${r.no}</span><span class="nm">${cloth(t.r.no)} ${esc(t.r.name)}</span><span class="num">${pct(t.prob)}</span><span class="num">${ourPrice(t.prob,st)}</span><span class="num muted">${t.r.odds?'$'+t.r.odds:'-'}</span></div>`; }).join('');
+  return `<section class="block" style="margin:0 0 14px"><div class="eyebrow">Your tips right now<span class="sl">/</span>${esc(shortName(m))}, chance, our price, market</div><div class="wtips">${rows||'<p class="note">No open races.</p>'}</div></section>`; }
 function viewWeights(){
   const my=me(); const s={...DEFAULT_SETTINGS,...my.settings}; const run=state.meeting?runDay(my,state.meeting):{weights:my.weights,changes:[]};
-  let html=`<div class="eyebrow">${esc(my.name)}'s model<span class="sl">/</span>drag to reweight</div><p class="note" style="margin:6px 0 8px">The slider is your starting weight. The second number is where the day's results have taken it. Only your model moves; every Pelican runs their own.</p><div class="rows">`;
+  let html=`<div class="eyebrow">${esc(my.name)}'s model<span class="sl">/</span>what each factor counts for</div><p class="note" style="margin:6px 0 8px">Each slider sets how much one factor counts when your model ranks a field. Zero switches it off. The default is the setting that tested best over past Saturdays. Push a slider up and that factor counts for more against the rest. The tips and prices below move as you drag, so you can see what a change does. An orange number beside a weight is where today's results have nudged it. Only your model moves; every Pelican runs their own.</p>
+  <div id="wtips">${weightTipsHTML()}</div><div class="rows">`;
   for(const met of METRICS){ const w=my.weights[met.key]; const adapted=run.weights[met.key]; const d=adapted-w;
-    html+=`<div class="wrow"><div class="l"><b>${met.label}</b><span class="num">${w.toFixed(2)}${Math.abs(d)>0.005?` <span style="color:var(--accent)">${adapted.toFixed(2)}</span>`:''}</span></div><div class="d">${met.desc}</div>
+    html+=`<div class="wrow"><div class="l"><b>${met.label}</b><span class="num" data-base="${met.base}">${weightWord(w,met.base)}${Math.abs(d)>0.005?` <span style="color:var(--accent)">${adapted.toFixed(2)}</span>`:''}</span></div><div class="d">${met.desc}</div>
     <input type="range" min="0" max="${(met.base*2.5).toFixed(2)}" step="0.05" value="${w}" data-act="weight" data-key="${met.key}"><div class="delta">${Math.abs(w-met.base)>0.01?`${w-met.base>0?'+':''}${(w-met.base).toFixed(2)} against the default ${met.base.toFixed(2)}`:'at default'}${Math.abs(d)>0.005?`, results moved it ${d>0?'+':''}${d.toFixed(2)}`:''}</div></div>`; }
   html+=`</div><div class="actions"><button class="btn" data-act="resetweights">Reset my weights to defaults</button></div>`;
   html+=`<section class="block" style="margin-top:26px"><div class="eyebrow">Proving ground<span class="sl">/</span>your weights against real Saturdays at starting price</div>
@@ -837,7 +844,7 @@ form, last_pos, last_field, last_margin, days, last_race, class_change, jockey_p
 /* ---------------- events ---------------- */
 function bind(root){
   root.querySelectorAll('[data-meta]').forEach(el=>el.addEventListener('change',()=>{ state.meeting[el.dataset.meta]=el.value; state.meeting.updatedAt=Date.now(); save('meeting'); }));
-  root.querySelectorAll('[data-act="weight"]').forEach(el=>{ el.addEventListener('input',()=>{ me().weights[el.dataset.key]=+el.value; el.closest('.wrow').querySelector('.l span').textContent=(+el.value).toFixed(2); }); el.addEventListener('change',()=>{ state.ui.prove=null; save('punter'); }); });
+  root.querySelectorAll('[data-act="weight"]').forEach(el=>{ el.addEventListener('input',()=>{ me().weights[el.dataset.key]=+el.value; const sp=el.closest('.wrow').querySelector('.l span'); sp.innerHTML=weightWord(+el.value,+sp.dataset.base); const wt=document.getElementById('wtips'); if(wt) wt.innerHTML=weightTipsHTML(); }); el.addEventListener('change',()=>{ state.ui.prove=null; save('punter'); }); });
   root.querySelectorAll('[data-act="setting"]').forEach(el=>{ const h=()=>{ me().settings[el.dataset.key]= el.type==='checkbox'?el.checked:+el.value; }; el.addEventListener('input',()=>{ h(); const sp=el.closest('.wrow').querySelector('.l span'); if(sp&&el.type!=='checkbox'){ const k=el.dataset.key; sp.textContent= k==='marginProb'?pct(+el.value):k==='marginRank'?el.value:k==='bank'?fmtMoney(+el.value):k==='valueEdge'?(+el.value*100).toFixed(0)+' pts':k==='book'?Math.round(+el.value*100)+'%':(+el.value).toFixed(2); } }); el.addEventListener('change',()=>{ h(); save('punter'); }); });
   root.querySelectorAll('[data-act="adj"]').forEach(el=>{ el.addEventListener('input',()=>{ el.nextElementSibling.textContent=(+el.value>0?'+':'')+el.value; }); el.addEventListener('change',()=>{ const a=me().adj[el.dataset.key]||(me().adj[el.dataset.key]={adj:0,note:''}); a.adj=+el.value; save('punter'); }); });
   root.querySelectorAll('[data-act="note"]').forEach(el=>el.addEventListener('change',()=>{ const a=me().adj[el.dataset.key]||(me().adj[el.dataset.key]={adj:0,note:''}); a.note=el.value; save('punter'); }));
