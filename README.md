@@ -46,6 +46,19 @@ Mick, Wilko, Big Dog and Shirty are preset with their own avatar and colour. Any
 
 Two backends. On GitHub Pages (workflow in `.github/workflows/pages.yml`) the page uses Supabase through the `SUPABASE` config block at the top of the script: tables `kyw_meeting`, `kyw_results`, `kyw_punters`, `kyw_comments` and `kyw_bets`, with realtime enabled and writes gated by an `x-flock-code` header checked in row-level security. Inside a Claude artifact the same code falls back to the artifact `db` capability. State is cached in the browser and, when published with the `db` capability, synced through the artifact's shared store. That store is available only to signed-in members of the publisher's Claude organisation. Sharing with people outside the organisation needs the page hosted elsewhere with its own backend; the storage code is isolated in `pushDb`, `pullMeeting` and `initDb` for that purpose.
 
+## Stress test
+
+The model was run over 220 metro Saturday races (8 August to 5 September 2026) with the form as it stood that morning and settled at starting price. Records that included the day's run were unwound and ratings withheld, so the test does not see the result before it tips.
+
+| Selection | Result | Flat-stake return |
+| --- | --- | --- |
+| Model best bet | won 68 of 220 (31%) | +4% |
+| Market favourite | won 73 of 220 (33%) | -6% |
+| Value calls | won 10 of 80 | -15% |
+| Best roughie | won 10 of 169 | -37% |
+
+Log-loss on the winner was 1.99 for the model against 1.85 for the market, so the market's probabilities were better calibrated than ours. The best-bet gap to the favourite is inside noise on a sample this size. No edge has been demonstrated. The proving ground on the Model tab lets each Pelican test their own weights against the same races.
+
 ## Limitations
 
 Results are entered by hand. There is no live results feed, no sectional or in-running data, and no automatic scratchings or track condition updates. The example meeting is fictional throughout.
