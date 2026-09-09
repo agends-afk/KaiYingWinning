@@ -97,7 +97,10 @@ async function syncMeeting(feed: any, existing: any | null, force: boolean) {
     const finished = !!(r.hasResults || (r.resultsString && r.resultsString.trim()));
     const near = t != null && Math.abs(t - now) < 45 * 60 * 1000;
     const prevHasResult = !!(prev && prev.feedResult);
-    const need = force || !prev || (near && !prevHasResult) || (finished && !prevHasResult) || (r.raceStatus !== prev?.raceStatus);
+    const raceDay = !!meetDate && new Date(now + 10 * 3600 * 1000).toISOString().slice(0, 10) === String(meetDate).slice(0, 10);
+    const prevAge = prev?.syncedAt ? now - Date.parse(prev.syncedAt) : Infinity;
+    const stale = raceDay && !finished && !prevHasResult && prevAge > 20 * 60 * 1000;
+    const need = force || !prev || stale || (near && !prevHasResult) || (finished && !prevHasResult) || (r.raceStatus !== prev?.raceStatus);
     let race: any;
     if (need) {
       fetched++;
