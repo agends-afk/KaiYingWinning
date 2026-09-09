@@ -224,11 +224,10 @@ const PUNTER_COLOURS = ['#E8801A','#2F8F5B','#3B6FD4','#C43C2F','#8E5BC6','#D4A7
 const SUPABASE = { url:'https://qgomklldlpspwilyjdqx.supabase.co', key:'sb_publishable_nhOXF3eXlHAyys2B0rzxxQ_W_Kb4OZP', flockCode:'pelicans-2026' };
 // The roster. Anyone else can still add a name on the roll call.
 const ROSTER = [
-  {id:'campbell', name:'Campbell', colour:'#E8801A', avatar:'bowtie'},
   {id:'mick',     name:'Mick',     colour:'#3B6FD4', avatar:'cap'},
-  {id:'wilco',    name:'Wilco',    colour:'#2F8F5B', avatar:'shades'},
+  {id:'wilko',    name:'Wilko',    colour:'#2F8F5B', avatar:'shades'},
   {id:'big-dog',  name:'Big Dog',  colour:'#8E5BC6', avatar:'crown'},
-  {id:'shirty',   name:'Shirty',   colour:'#C43C2F', avatar:'shirty'}
+  {id:'shirty',   name:'Shirty',   colour:'#E8801A', avatar:'shirty'}
 ];
 function avatarSVG(kind, colour, cls){ // a pelican head with an accessory per Pelican
   const base=`<circle cx="32" cy="32" r="30" fill="${colour}"/><circle cx="28" cy="30" r="14" fill="#F4EFE4"/><path d="M40 27 L62 34 L58 39 L40 34 Z" fill="#E8801A"/><path d="M40 34 L58 39 L46 46 Q40 45 38 38 Z" fill="#F4B36B"/><circle cx="31" cy="26" r="2.4" fill="#141A22"/>`;
@@ -237,7 +236,7 @@ function avatarSVG(kind, colour, cls){ // a pelican head with an accessory per P
     cap:`<path d="M12 22 Q28 4 44 20 L44 24 L12 24 Z" fill="#141A22"/><path d="M8 22 L20 22 L20 26 L6 27 Z" fill="#141A22"/>`,
     shades:`<rect x="20" y="22" width="12" height="8" rx="3" fill="#141A22"/><rect x="34" y="23" width="9" height="7" rx="3" fill="#141A22"/><path d="M32 26 L34 26" stroke="#141A22" stroke-width="2"/>`,
     crown:`<path d="M16 20 L21 8 L28 16 L34 6 L40 16 L46 10 L44 22 Z" fill="#F5C518" stroke="#141A22" stroke-width="1.5"/>`,
-    shirty:`<path d="M18 46 L28 54 L38 46 L34 44 L28 50 L22 44 Z" fill="#F4EFE4" stroke="#141A22" stroke-width="1.5"/><path d="M28 54 L26 62 L30 62 Z" fill="#C43C2F"/><path d="M24 20 L30 23 M38 21 L34 23" stroke="#141A22" stroke-width="2.4" stroke-linecap="round"/>`,
+    shirty:`<path d="M18 46 L28 54 L38 46 L34 44 L28 50 L22 44 Z" fill="#F4EFE4" stroke="#141A22" stroke-width="1.5"/><path d="M28 54 L26 62 L30 62 Z" fill="#141A22"/><path d="M24 20 L30 23 M38 21 L34 23" stroke="#141A22" stroke-width="2.4" stroke-linecap="round"/>`,
     plain:``
   };
   return `<svg class="avatar ${cls||''}" viewBox="0 0 64 64" aria-hidden="true">${base}${acc[kind]||''}</svg>`;

@@ -36,7 +36,7 @@ Each race has a comment thread. Anyone can record a club bet on a runner (win, p
 
 ## Roster
 
-Campbell, Mick, Wilco, Big Dog and Shirty are preset with their own avatar and colour. Anyone else can add a name on the roll call.
+Mick, Wilko, Big Dog and Shirty are preset with their own avatar and colour. Anyone else can add a name on the roll call.
 
 ## Hosting and storage
 
