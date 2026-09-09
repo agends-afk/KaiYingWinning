@@ -230,7 +230,7 @@ const METRICS = [
   {key:'formline',  label:'Form lines today',   base:1.0, desc:'Live: horses out of the same last-start race as one that ran above or below expectation today, and riders winning on the day.'},
   {key:'manual',    label:'Your call',          base:1.0, desc:'Your own plus or minus on a runner, set on the race screen.'}
 ];
-const DEFAULT_SETTINGS = { marginRank:3, marginProb:0.12, lr:0.18, formlineGain:0.6, beta:2.2, autoAdapt:true };
+const DEFAULT_SETTINGS = { marginRank:3, marginProb:0.12, lr:0.18, formlineGain:0.6, beta:2.2, autoAdapt:true, bank:200, kelly:0.25, valueEdge:0.03 };
 const PUNTER_COLOURS = ['#E8801A','#2F8F5B','#3B6FD4','#C43C2F','#8E5BC6','#D4A72C','#1BA5A5','#D45FA0','#6B7F2E','#8C5A2B'];
 // Web-hosted backend. Filled in once the Supabase project is chosen. Empty url = no shared backend.
 const SUPABASE = { url:'https://qgomklldlpspwilyjdqx.supabase.co', key:'sb_publishable_nhOXF3eXlHAyys2B0rzxxQ_W_Kb4OZP', flockCode:'pelicans-2026' };
@@ -319,8 +319,18 @@ function scoreRace(race, meeting, weights, settings, dyn, adj){
     const missing=['last','form','track','distance','condition','career'].filter(k=>raw[k][i]==null).length;
     return {r, z:Object.fromEntries(METRICS.map(m=>[m.key,z[m.key][i]])), contrib, rating, missing}; });
   const beta=settings.beta||2.2; const ex=scored.map(s=>Math.exp(beta*s.rating)); const sum=ex.reduce((a,b)=>a+b,0)||1; scored.forEach((s,i)=>s.prob=ex[i]/sum);
-  const order=[...scored].sort((a,b)=>b.rating-a.rating); order.forEach((s,i)=>s.rank=i+1); return order;
+  const order=[...scored].sort((a,b)=>b.rating-a.rating); order.forEach((s,i)=>s.rank=i+1);
+  const imp=order.map(s=>{const o=num(s.r.odds); return o>1?1/o:null;}); const impSum=imp.reduce((a,b)=>a+(b||0),0);
+  order.forEach((s,i)=>{ s.market= imp[i]!=null&&impSum>0 ? imp[i]/impSum : null; s.edge= s.market!=null ? s.prob-s.market : null; });
+  return order;
 }
+function isValue(s,settings){ return s.edge!=null && s.market>=0.04 && s.prob>=0.08 && s.edge>=settings.valueEdge && s.prob/s.market>=1.25; }
+function tier(p){ return p>=0.30?'Strong':p>=0.20?'Fair':'Skinny'; }
+function kellyStake(s, settings){ const o=num(s.r.odds); if(!(o>1)) return 0; const b=o-1, q=1-s.prob; const f=(b*s.prob-q)/b; if(f<=0) return 0; return Math.max(0, Math.round(settings.bank*settings.kelly*f)); }
+function modelAdvice(scored, settings){ const top=scored[0]; if(!top) return null; const second=scored[1];
+  const value=[...scored].filter(s=>isValue(s,settings)).sort((a,b)=>b.edge-a.edge);
+  return {top, tier:tier(top.prob), gap:second?top.prob-second.prob:top.prob, value:value[0]||null, valueAll:value, stakeTop:kellyStake(top,settings), stakeValue:value[0]?kellyStake(value[0],settings):0}; }
+function effectivePick(punter, raceNo, run){ const o=punter.picks&&punter.picks[raceNo]&&punter.picks[raceNo].win; if(o) return {no:o, override:true}; const p=(run.pred[raceNo]||[]).find(x=>x.rank===1); return p?{no:p.no, override:false}:{no:null,override:false}; }
 
 /* ---------------- run the day for one punter ----------------
    Replays results in race order. Returns adapted weights, per-race dynamics,
@@ -356,10 +366,10 @@ function runDay(punter, meeting){
 function barrierBiasFrom(list){ if(list.length<2) return 0; const sw=list.reduce((a,b)=>a+b.w,0); const mean=list.reduce((a,b)=>a+b.rel*b.w,0)/sw; const dev=0.5-mean; if(Math.abs(dev)<0.12) return 0; return clamp(dev*1.5,-0.6,0.6); }
 
 /* ---------------- tips and leaderboard ---------------- */
-function tipPoints(punter, meeting){ let pts=0, wins=0, places=0, tipped=0;
-  for(const race of meeting.races){ const pk=punter.picks&&punter.picks[race.no]; if(!pk||!race.result) continue; const pos=race.result.positions.map(Number);
-    if(pk.win){ tipped++; if(pos[0]===pk.win){ pts+=3; wins++; } else if(pos.slice(1,3).includes(pk.win)){ pts+=1; places++; } }
-    for(const p of (pk.place||[])){ if(pos.slice(0,3).includes(p)){ pts+=1; places++; } } }
+function tipPoints(punter, meeting, run){ let pts=0, wins=0, places=0, tipped=0; run=run||runDay(punter,meeting);
+  for(const race of meeting.races){ if(!race.result) continue; const pos=race.result.positions.map(Number); const ep=effectivePick(punter,race.no,run); const pk=punter.picks&&punter.picks[race.no];
+    if(ep.no){ tipped++; if(pos[0]===ep.no){ pts+=3; wins++; } else if(pos.slice(1,3).includes(ep.no)){ pts+=1; places++; } }
+    for(const p of ((pk&&pk.place)||[])){ if(pos.slice(0,3).includes(p)){ pts+=1; places++; } } }
   return {pts,wins,places,tipped}; }
 function modelScore(run, meeting){ const done=meeting.races.filter(r=>r.result); let top=0,top3=0,placed=0;
   for(const r of done){ const p=run.pred[r.no]||[]; const wp=p.find(x=>x.no===r.result.positions[0]); if(wp&&wp.rank===1) top++; if(wp&&wp.rank<=3) top3++; const t=p.find(x=>x.rank===1); if(t&&r.result.positions.slice(0,3).includes(t.no)) placed++; }
@@ -571,15 +581,17 @@ function viewRaces(){
     <label class="field">Track condition<select data-meta="condition">${['Good 3','Good 4','Soft 5','Soft 6','Soft 7','Heavy 8','Heavy 9','Heavy 10','Synthetic'].map(c=>`<option ${c===m.condition?'selected':''}>${c}</option>`).join('')}</select></label>
     <label class="field">Rail<input data-meta="rail" value="${esc(m.rail)}" placeholder="True, +3m"></label></div>`;
   const fin=run.final;
-  const tipped=m.races.filter(r=>me().picks[r.no]&&me().picks[r.no].win).length; const open=m.races.filter(r=>!r.result).length;
-  html+=`<div class="eyebrow">Your tips<span class="sl">/</span>${tipped} of ${m.races.length} in${open&&tipped<m.races.length?', '+(m.races.filter(r=>!r.result&&!(me().picks[r.no]&&me().picks[r.no].win)).length)+' still to do':''}</div>
-  <div class="eyebrow" style="margin-top:6px">Day so far<span class="sl">/</span>${done} of ${m.races.length} results in</div>
+  const overrides=m.races.filter(r=>me().picks[r.no]&&me().picks[r.no].win).length;
+  html+=`<div class="eyebrow">Model tips<span class="sl">/</span>one per race${overrides?', '+overrides+' overridden by you':''}<span class="sl">/</span>${done} of ${m.races.length} results in</div>
   <div class="bias"><span>Barrier bias <b>${Math.abs(fin.barrierBias)>0?(fin.barrierBias>0?'inside':'outside')+' ('+fin.barrierBias.toFixed(2)+')':'none read yet'}</b></span>
   ${Object.keys(fin.jockeyWins).length?`<span>Riders on the board <b>${Object.entries(fin.jockeyWins).map(([j,w])=>titleCase(j)+(w>1?' x'+w:'')).join(', ')}</b></span>`:''}</div>`;
   html+=`<section class="block" style="margin-top:14px"><div class="rows">`;
-  for(const race of m.races){ const p=run.pred[race.no]||[]; const top=p.find(x=>x.rank===1); const topR=top&&race.runners.find(r=>r.no===top.no); const res=race.result; const myPick=me().picks[race.no]&&me().picks[race.no].win; let right;
-    if(res){ const w=race.runners.find(r=>r.no===res.positions[0]); const pr=p.find(x=>x.no===res.positions[0]); const hit=myPick===res.positions[0]; right=`<span class="tag ${hit?'good':(pr&&pr.rank<=me().settings.marginRank?'acc':'warn')}">${hit?'You tipped it':(pr?ordinal(pr.rank)+' pick':'result')}</span><b>${esc(w?w.name:res.positions[0])}</b>`; }
-    else { const mp=myPick&&race.runners.find(r=>r.no===myPick); right= mp?`<span class="tag acc">Your tip</span><b>${esc(mp.name)}</b>`:(top?`<span class="tag warn">No tip yet</span><b style="color:var(--muted)">Model: ${esc(topR?topR.name:'')} ${pct(top.prob)}</b>`:'<b>no runners</b>'); }
+  const st={...DEFAULT_SETTINGS,...me().settings};
+  for(const race of m.races){ const p=run.pred[race.no]||[]; const res=race.result; const ep=effectivePick(me(),race.no,run); const epR=ep.no&&race.runners.find(r=>r.no===ep.no); let right;
+    const scored=scoreRace(race,m,run.weights,st,run.dyn[race.no],me().adj); const adv=modelAdvice(scored,st);
+    if(res){ const w=race.runners.find(r=>r.no===res.positions[0]); const pr=p.find(x=>x.no===res.positions[0]); const hit=ep.no===res.positions[0]; right=`<span class="tag ${hit?'good':(pr&&pr.rank<=st.marginRank?'acc':'warn')}">${hit?'Tip won':(pr?'Tip ran '+ordinal(pr.rank)+' rated':'result')}</span><b>${esc(w?w.name:res.positions[0])}</b>`; }
+    else if(adv){ right=`<span class="tag ${ep.override?'acc':(adv.tier==='Strong'?'good':adv.tier==='Fair'?'':'warn')}">${ep.override?'Your override':adv.tier+' '+pct(adv.top.prob)}</span>${!ep.override&&isValue(adv.top,st)?`<span class="tag acc">Value</span>`:(adv.value&&!ep.override?`<span class="tag">Value elsewhere</span>`:'')}<b>${esc(epR?epR.name:'')}</b>`; }
+    else right='<b>no runners</b>';
     html+=`<button class="row" data-act="openrace" data-no="${race.no}"><span class="idx num">${race.no}</span><span><span class="t">${esc(race.name||'Race '+race.no)}</span><br><span class="s">${race.distance?race.distance+'m':''} ${esc(race.class||'')} ${race.time?'at '+esc(race.time):''} ${active(race).length} runners</span></span><span class="r">${right}</span></button>`; }
   return html+`</div></section>`;
 }
@@ -588,6 +600,7 @@ function viewRace(){
   const m=state.meeting; const race=m.races.find(r=>r.no===state.ui.raceNo)||m.races[0]; if(!race) return emptyState(); state.ui.raceNo=race.no;
   const my=me(); const run=runDay(my,m); const scored=scoreRace(race,m,run.weights,{...DEFAULT_SETTINGS,...my.settings},run.dyn[race.no],my.adj);
   const idx=m.races.indexOf(race); const prev=m.races[idx-1], next=m.races[idx+1]; const res=race.result; const picks=my.picks[race.no]||{win:null,place:[]};
+  const st={...DEFAULT_SETTINGS,...my.settings}; const adv=modelAdvice(scored,st); const ep=effectivePick(my,race.no,run);
   // flock: other punters' tips and consensus
   const others=Object.values(state.punters); const flockProb={}; const tips={};
   for(const p of others){ const r=p.id===my.id?run:runDay(p,m); for(const x of (r.pred[race.no]||[])) flockProb[x.no]=(flockProb[x.no]||0)+x.prob/others.length; const pk=p.picks&&p.picks[race.no]; if(pk&&pk.win){ (tips[pk.win]=tips[pk.win]||[]).push(p); } }
@@ -597,8 +610,13 @@ function viewRace(){
   html+=`<section class="block"><div class="eyebrow">Result<span class="sl">/</span>${res?'in':'not yet run'}</div>
   <div class="result-entry" style="margin-top:8px"><label class="field">Finishing order, saddlecloth numbers<input id="resIn" placeholder="e.g. 7 2 11 4" value="${res?esc(res.positions.join(' ')):''}" inputmode="numeric"></label>
   <button class="btn primary" data-act="result">${res?'Update result':'Enter result'}</button>${res?`<button class="btn danger" data-act="clearresult">Clear</button>`:''}</div>
-  ${res?`<p class="note">Your model had the winner ${pr?ordinal(pr.rank)+' at '+pct(pr.prob):'unrated'}. ${picks.win?(picks.win===res.positions[0]?'You tipped it.':(res.positions.slice(1,3).includes(picks.win)?'Your tip ran a place.':'Your tip missed.')):'You had no tip in.'}${res.by?' Entered by '+esc(res.by)+'.':''}</p>`:`<p class="note">Enter at least the first four home. It goes to every Pelican's model. Your weights move only when the winner was rated worse than ${ordinal(my.settings.marginRank)} or under ${pct(my.settings.marginProb)}.</p>`}</section>`;
-  html+=`<section class="block"><div class="eyebrow">Pick your tip<span class="sl">/</span>tap a name for the model's reasons, tap Tip to lock it in</div><div class="rows" style="margin-top:8px">`;
+  ${res?`<p class="note">Your model had the winner ${pr?ordinal(pr.rank)+' at '+pct(pr.prob):'unrated'}. ${ep.no===res.positions[0]?(ep.override?'Your override won.':'The model tip won.'):(res.positions.slice(1,3).includes(ep.no)?'The tip ran a place.':'The tip missed.')}${res.by?' Entered by '+esc(res.by)+'.':''}</p>`:`<p class="note">Enter at least the first four home. It goes to every Pelican's model. Your weights move only when the winner was rated worse than ${ordinal(my.settings.marginRank)} or under ${pct(my.settings.marginProb)}.</p>`}</section>`;
+  if(adv&&!res){ const t=adv.top; const tR=t.r; const mkt=t.r.odds?`market $${t.r.odds}`:'no market price'; 
+    html+=`<div class="banner"><div class="eyebrow" style="color:var(--panel-ink);opacity:.7">Model says<span class="sl">/</span>${adv.tier} ${pct(t.prob)}${adv.gap<0.04?', not much between the top two':''}</div>
+    <h2>${cloth(tR.no)} ${esc(tR.name)}</h2><p>Fair price ${fmtOdds(t.prob)}, ${mkt}.${t.edge!=null?(isValue(t,st)?` Value: the market has it ${pct(t.market)}, the model ${pct(t.prob)}.`:` No value at the market price.`):''}${adv.stakeTop>0?` Suggested stake ${fmtMoney(adv.stakeTop)} win from a ${fmtMoney(st.bank)} bank.`:''}</p>
+    ${adv.value&&adv.value.r.no!==tR.no?`<p><b>Value bet:</b> ${cloth(adv.value.r.no)} ${esc(adv.value.r.name)} at $${adv.value.r.odds}. Model ${pct(adv.value.prob)} against market ${pct(adv.value.market)}.${adv.stakeValue>0?' Suggested stake '+fmtMoney(adv.stakeValue)+'.':''}</p>`:''}
+    ${ep.override?`<p>You have overridden this race to number ${ep.no}. Tap its Tip button again to go back to the model.</p>`:''}</div>`; }
+  html+=`<section class="block"><div class="eyebrow">Ratings<span class="sl">/</span>tap a name for the reasons, Tip to override the model</div><div class="rows" style="margin-top:8px">`;
   const maxR=Math.max(...scored.map(s=>s.rating)), minR=Math.min(...scored.map(s=>s.rating)); const span=(maxR-minR)||1;
   for(const s of scored){ const r=s.r; const k=runnerKey(race,r); const open=state.ui.open===k; const dynv=s.contrib.formline+s.contrib.manual; const a=my.adj[k]||{adj:0,note:''};
     const chips=[]; if(r.barrier!=null) chips.push(`Bar ${r.barrier}`); if(r.weight!=null) chips.push(`${r.weight}kg`); if(r.form) chips.push(`Form ${esc(r.form)}`);
@@ -606,16 +624,17 @@ function viewRace(){
     if(s.z.formline>0.05) chips.push(`<span class="chip up">Form line +${s.z.formline.toFixed(2)}</span>`); if(s.z.formline<-0.05) chips.push(`<span class="chip dn">Form line ${s.z.formline.toFixed(2)}</span>`);
     if(a.adj) chips.push(`<span class="chip ${a.adj>0?'up':'dn'}">Your call ${a.adj>0?'+':''}${a.adj}</span>`); if(s.missing>=3) chips.push(`<span class="chip">thin data</span>`);
     if(others.length>1&&flockProb[r.no]!=null) chips.push(`<span class="chip">Flock ${pct(flockProb[r.no])}</span>`);
-    const resPos=res?res.positions.indexOf(r.no):-1; const isWin=picks.win===r.no, isPl=(picks.place||[]).includes(r.no);
-    const tipLabel = isWin?'Your<br>tip':isPl?'Place<br>tip':'Tip';
+    const resPos=res?res.positions.indexOf(r.no):-1; const isWin=picks.win===r.no, isPl=(picks.place||[]).includes(r.no); const isModel=!ep.override&&ep.no===r.no;
+    if(isValue(s,st)) chips.push(`<span class="chip acc">Value +${(s.edge*100).toFixed(0)}pts</span>`);
+    const tipLabel = isWin?'Your<br>tip':isModel?'Model<br>tip':isPl?'Place<br>tip':'Tip';
     html+=`<div class="runner ${r.scratched?'scr':''}"><div class="top"><button class="head" data-act="toggle" data-key="${k}">${cloth(r.no)}
-      <span><span class="nm">${esc(r.name)}</span>${resPos>=0?` <span class="tag good">${ordinal(resPos+1)}</span>`:''}${isWin?` <span class="tag acc">Your tip</span>`:isPl?` <span class="tag">Place</span>`:''}<div class="meta">${esc(r.jockey)}${r.trainer?' for '+esc(r.trainer):''}</div>
+      <span><span class="nm">${esc(r.name)}</span>${resPos>=0?` <span class="tag good">${ordinal(resPos+1)}</span>`:''}${isWin?` <span class="tag acc">Your tip</span>`:isModel?` <span class="tag">Model tip</span>`:isPl?` <span class="tag">Place</span>`:''}<div class="meta">${esc(r.jockey)}${r.trainer?' for '+esc(r.trainer):''}</div>
         <div class="bar"><i style="width:${((s.rating-minR)/span*100).toFixed(1)}%"></i>${dynv>0?`<i class="dyn" style="left:${((s.rating-dynv-minR)/span*100).toFixed(1)}%;width:${(dynv/span*100).toFixed(1)}%"></i>`:''}</div>
         <div class="chips">${chips.map(c=>c.startsWith('<span')?c:`<span class="chip">${c}</span>`).join('')}</div>
         ${tips[r.no]?`<div class="flock">${tips[r.no].map(p=>pelChip(p)).join('')}</div>`:''}
         ${clubOn(r.no,race.no).length?`<div class="club">${clubOn(r.no,race.no).map(b=>`<span class="chip acc">${esc(b.by)} ${fmtMoney(b.stake)} ${b.type==='ew'?'e/w':b.type}${b.odds?' @ '+b.odds:''}</span>`).join('')}</div>`:''}</span>
       <span class="prob"><b class="num">${pct(s.prob)}</b><span>${fmtOdds(s.prob)} fair</span></span></button>
-      <button class="tipbtn ${isWin?'on':isPl?'pl':''}" data-act="tipwin" data-no="${r.no}" ${res||r.scratched?'disabled':''} aria-label="Tip ${esc(r.name)} to win">${tipLabel}</button></div>`;
+      <button class="tipbtn ${isWin?'on':isModel?'pl':''}" data-act="tipwin" data-no="${r.no}" ${res||r.scratched?'disabled':''} aria-label="Tip ${esc(r.name)} to win">${tipLabel}</button></div>`;
     if(open){ html+=`<div class="detail"><div class="tipbtns"><button class="btn ${isWin?'on':''}" data-act="tipwin" data-no="${r.no}" ${res?'disabled':''}>${isWin?'Tipped to win':'Tip to win'}</button><button class="btn ${isPl?'on':''}" data-act="tipplace" data-no="${r.no}" ${res?'disabled':''}>${isPl?'Place tip on':'Tip for a place'}</button><button class="btn ${r.scratched?'primary':''}" data-act="scratch" data-no="${r.no}">${r.scratched?'Reinstate':'Scratch'}</button></div>
       ${betForm(race,r)}
       <div class="adj"><span class="small">Your call</span><input type="range" min="-3" max="3" step="1" value="${a.adj||0}" data-act="adj" data-key="${k}"><b class="num">${a.adj>0?'+':''}${a.adj||0}</b></div>
@@ -656,6 +675,9 @@ function viewWeights(){
     <div class="wrow"><div class="l"><b>Margin of error: rated chance</b><span class="num">${pct(s.marginProb)}</span></div><div class="d">A winner rated under this chance is outside the margin even if it was placed high.</div><input type="range" min="0.02" max="0.3" step="0.01" value="${s.marginProb}" data-act="setting" data-key="marginProb"></div>
     <div class="wrow"><div class="l"><b>Learning rate</b><span class="num">${s.lr.toFixed(2)}</span></div><div class="d">How far each surprising result moves the weights toward the metrics that would have picked it.</div><input type="range" min="0.02" max="0.5" step="0.01" value="${s.lr}" data-act="setting" data-key="lr"></div>
     <div class="wrow"><div class="l"><b>Form line gain</b><span class="num">${s.formlineGain.toFixed(2)}</span></div><div class="d">How strongly a horse's run today carries to horses out of the same last-start race.</div><input type="range" min="0" max="1.5" step="0.05" value="${s.formlineGain}" data-act="setting" data-key="formlineGain"></div>
+    <div class="wrow"><div class="l"><b>Bank</b><span class="num">${fmtMoney(s.bank)}</span></div><div class="d">What you are prepared to put through the day. Suggested stakes are worked off this.</div><input type="range" min="50" max="2000" step="50" value="${s.bank}" data-act="setting" data-key="bank"></div>
+    <div class="wrow"><div class="l"><b>Staking aggression</b><span class="num">${s.kelly.toFixed(2)}</span></div><div class="d">Fraction of the Kelly stake. A quarter is conservative, a half is bold, one is reckless.</div><input type="range" min="0.05" max="1" step="0.05" value="${s.kelly}" data-act="setting" data-key="kelly"></div>
+    <div class="wrow"><div class="l"><b>Value threshold</b><span class="num">${(s.valueEdge*100).toFixed(0)} pts</span></div><div class="d">How far the model's chance must beat the market's before a runner is flagged as value.</div><input type="range" min="0.01" max="0.10" step="0.01" value="${s.valueEdge}" data-act="setting" data-key="valueEdge"></div>
     <div class="wrow"><div class="l"><b>Sharpness</b><span class="num">${s.beta.toFixed(2)}</span></div><div class="d">Higher concentrates the percentages on the top few; lower spreads them.</div><input type="range" min="0.8" max="4" step="0.1" value="${s.beta}" data-act="setting" data-key="beta"></div></div></section>`;
   if(run.changes&&run.changes.length){ html+=`<section class="block"><div class="eyebrow">What the results did to your model</div>`; for(const e of [...run.changes].reverse()){ html+=`<div class="logrow"><div class="when">Race ${e.race}</div>${esc(e.text)}${e.items.length?`<ul>${e.items.map(i=>`<li>${esc(i)}</li>`).join('')}</ul>`:''}</div>`; } html+=`</section>`; }
   return html;
@@ -663,17 +685,19 @@ function viewWeights(){
 
 function viewFlock(){
   const m=state.meeting; const ps=Object.values(state.punters);
-  const rows=ps.map(p=>({p, tips:tipPoints(p,m), model:modelScore(runDay(p,m),m)})).sort((a,b)=>b.tips.pts-a.tips.pts||b.model.top-a.model.top);
-  let html=`<div class="eyebrow">The flock<span class="sl">/</span>${ps.length} Pelican${ps.length===1?'':'s'} on the card</div><p class="note" style="margin:6px 0 10px">Three points for tipping the winner, one for a tip that runs a place. Model column is how many winners each Pelican's model had on top.</p><div class="board">`;
-  rows.forEach((r,i)=>{ html+=`<div class="brow"><span class="pos num">${i+1}</span><span>${pelChip(r.p)}${r.p.id===state.me?' <span class="tag acc">you</span>':''}<div class="sub">${r.tips.tipped} tips in, ${r.tips.wins} winner${r.tips.wins===1?'':'s'}, ${r.tips.places} placed</div></span><span class="sub num">model ${r.model.top}/${r.model.done}</span><span class="pts num">${r.tips.pts}</span></div>`; });
+  const runs={}; for(const p of ps) runs[p.id]=runDay(p,m);
+  const bookAll=clubBook(m); const plBy={}; for(const b of bookAll.rows){ if(b.status==='open') continue; plBy[b.by]=(plBy[b.by]||0)+(b.ret-(num(b.stake)||0)); }
+  const rows=ps.map(p=>({p, tips:tipPoints(p,m,runs[p.id]), model:modelScore(runs[p.id],m), pl:plBy[p.name]||0})).sort((a,b)=>b.pl-a.pl||b.tips.pts-a.tips.pts);
+  let html=`<div class="eyebrow">Who won what<span class="sl">/</span>${ps.length} Pelican${ps.length===1?'':'s'}</div><p class="note" style="margin:6px 0 10px">Settled club bets by the Pelican who put them on. Tip points alongside: three for a winner, one for a place, on each Pelican's model tip or override.</p><div class="board">`;
+  rows.forEach((r,i)=>{ html+=`<div class="brow"><span class="pos num">${i+1}</span><span>${pelChip(r.p)}${r.p.id===state.me?' <span class="tag acc">you</span>':''}<div class="sub">${r.tips.wins} winner${r.tips.wins===1?'':'s'}, ${r.tips.places} placed from ${r.tips.tipped} tips, ${r.tips.pts} pts</div></span><span class="sub num">model ${r.model.top}/${r.model.done}</span><span class="pts num" style="color:${r.pl>0?'var(--good)':r.pl<0?'var(--bad)':'inherit'}">${r.pl?fmtMoney(r.pl):'-'}</span></div>`; });
   html+=`</div>`;
-  html+=`<section class="block" style="margin-top:22px"><div class="eyebrow">Tips board<span class="sl">/</span>win tips by race</div><div class="tipsboard" style="margin-top:8px"><table><thead><tr><th style="text-align:left">Race</th>${ps.map(p=>`<th>${avatarSVG(p.avatar||'plain',p.colour,'sm')}<br>${esc(p.name)}</th>`).join('')}<th>Result</th></tr></thead><tbody>`;
-  for(const r of m.races){ const win=r.result&&r.result.positions[0]; html+=`<tr><td>${r.no}</td>${ps.map(p=>{const t=p.picks&&p.picks[r.no]&&p.picks[r.no].win; return `<td>${t?`<span class="${win===t?'hit':''}" style="display:inline-block;border-radius:6px">${cloth(t)}</span>`:'<span class="small">-</span>'}</td>`;}).join('')}<td>${win?cloth(win):'<span class="small">-</span>'}</td></tr>`; }
+  html+=`<section class="block" style="margin-top:22px"><div class="eyebrow">Tips board<span class="sl">/</span>each model's tip by race, ringed orange where overridden</div><div class="tipsboard" style="margin-top:8px"><table><thead><tr><th style="text-align:left">Race</th>${ps.map(p=>`<th>${avatarSVG(p.avatar||'plain',p.colour,'sm')}<br>${esc(p.name)}</th>`).join('')}<th>Result</th></tr></thead><tbody>`;
+  for(const r of m.races){ const win=r.result&&r.result.positions[0]; html+=`<tr><td>${r.no}</td>${ps.map(p=>{const e=effectivePick(p,r.no,runs[p.id]); const t=e.no; return `<td>${t?`<span class="${win===t?'hit':''}" style="display:inline-block;border-radius:6px;${e.override?'outline:2px solid var(--accent);outline-offset:-2px':''}">${cloth(t)}</span>`:'<span class="small">-</span>'}</td>`;}).join('')}<td>${win?cloth(win):'<span class="small">-</span>'}</td></tr>`; }
   html+=`</tbody></table></div></section>`;
   const done=m.races.filter(r=>r.result).sort((a,b)=>b.no-a.no);
   html+=`<section class="block" style="margin-top:22px"><div class="eyebrow">Results<span class="sl">/</span>newest first</div>`;
   if(!done.length) html+=`<p class="note">Nothing in yet.</p>`;
-  for(const r of done){ const w=r.runners.find(h=>h.no===r.result.positions[0]); const tippers=ps.filter(p=>p.picks&&p.picks[r.no]&&p.picks[r.no].win===r.result.positions[0]);
+  for(const r of done){ const w=r.runners.find(h=>h.no===r.result.positions[0]); const tippers=ps.filter(p=>effectivePick(p,r.no,runs[p.id]).no===r.result.positions[0]);
     html+=`<div class="logrow"><div class="when">Race ${r.no}${r.result.by?' entered by '+esc(r.result.by):''}</div>${cloth(r.result.positions[0])} <b>${esc(w?w.name:'')}</b> from ${r.result.positions.slice(1).join(', ')}.${tippers.length?`<div class="flock" style="margin-top:6px">${tippers.map(p=>pelChip(p)).join('')} <span class="small">tipped it</span></div>`:''}</div>`; }
   html+=`</section>`;
   const book=clubBook(m);
@@ -713,7 +737,7 @@ form, last_pos, last_field, last_margin, days, last_race, class_change, jockey_p
 function bind(root){
   root.querySelectorAll('[data-meta]').forEach(el=>el.addEventListener('change',()=>{ state.meeting[el.dataset.meta]=el.value; state.meeting.updatedAt=Date.now(); save('meeting'); }));
   root.querySelectorAll('[data-act="weight"]').forEach(el=>{ el.addEventListener('input',()=>{ me().weights[el.dataset.key]=+el.value; el.closest('.wrow').querySelector('.l span').textContent=(+el.value).toFixed(2); }); el.addEventListener('change',()=>save('punter')); });
-  root.querySelectorAll('[data-act="setting"]').forEach(el=>{ const h=()=>{ me().settings[el.dataset.key]= el.type==='checkbox'?el.checked:+el.value; }; el.addEventListener('input',()=>{ h(); const sp=el.closest('.wrow').querySelector('.l span'); if(sp&&el.type!=='checkbox') sp.textContent= el.dataset.key==='marginProb'?pct(+el.value):(el.dataset.key==='marginRank'?el.value:(+el.value).toFixed(2)); }); el.addEventListener('change',()=>{ h(); save('punter'); }); });
+  root.querySelectorAll('[data-act="setting"]').forEach(el=>{ const h=()=>{ me().settings[el.dataset.key]= el.type==='checkbox'?el.checked:+el.value; }; el.addEventListener('input',()=>{ h(); const sp=el.closest('.wrow').querySelector('.l span'); if(sp&&el.type!=='checkbox'){ const k=el.dataset.key; sp.textContent= k==='marginProb'?pct(+el.value):k==='marginRank'?el.value:k==='bank'?fmtMoney(+el.value):k==='valueEdge'?(+el.value*100).toFixed(0)+' pts':(+el.value).toFixed(2); } }); el.addEventListener('change',()=>{ h(); save('punter'); }); });
   root.querySelectorAll('[data-act="adj"]').forEach(el=>{ el.addEventListener('input',()=>{ el.nextElementSibling.textContent=(+el.value>0?'+':'')+el.value; }); el.addEventListener('change',()=>{ const a=me().adj[el.dataset.key]||(me().adj[el.dataset.key]={adj:0,note:''}); a.adj=+el.value; save('punter'); }); });
   root.querySelectorAll('[data-act="note"]').forEach(el=>el.addEventListener('change',()=>{ const a=me().adj[el.dataset.key]||(me().adj[el.dataset.key]={adj:0,note:''}); a.note=el.value; save('punter'); }));
   const conv=$('#convertBtn'); if(conv&&sampleFn){ conv.hidden=false; $('#convertNote').hidden=false; }
@@ -725,7 +749,8 @@ document.addEventListener('click', async e=>{
   else if(act==='openrace'){ state.ui.raceNo=+b.dataset.no; state.ui.tab='race'; state.ui.open=null; render(); window.scrollTo(0,0); }
   else if(act==='toggle'){ state.ui.open= state.ui.open===b.dataset.key?null:b.dataset.key; render(); }
   else if(act==='scratch'){ const r=currentRace().runners.find(x=>x.no===+b.dataset.no); r.scratched=!r.scratched; currentRace().updatedAt=Date.now(); save('meeting'); }
-  else if(act==='tipwin'){ const race=currentRace(); const pk=me().picks[race.no]||(me().picks[race.no]={win:null,place:[]}); pk.win= pk.win===+b.dataset.no?null:+b.dataset.no; pk.place=(pk.place||[]).filter(n=>n!==pk.win); save('punter'); }
+  else if(act==='tipwin'){ const race=currentRace(); const run=runDay(me(),state.meeting); const model=effectivePick({...me(),picks:{}},race.no,run).no; const pk=me().picks[race.no]||(me().picks[race.no]={win:null,place:[]}); const no=+b.dataset.no;
+    if(pk.win===no||no===model){ pk.win=null; toast(no===model&&pk.win!==no?'That is the model tip already':'Back to the model tip'); } else { pk.win=no; toast('Override set. The model tip stands for scoring only if you clear this.'); } pk.place=(pk.place||[]).filter(n=>n!==pk.win); save('punter'); }
   else if(act==='tipplace'){ const race=currentRace(); const pk=me().picks[race.no]||(me().picks[race.no]={win:null,place:[]}); const no=+b.dataset.no; pk.place=pk.place||[]; if(pk.place.includes(no)) pk.place=pk.place.filter(n=>n!==no); else { if(pk.place.length>=2){ toast('Two place tips per race'); return; } if(pk.win===no) pk.win=null; pk.place.push(no); } save('punter'); }
   else if(act==='result'){ const v=$('#resIn').value.trim(); const pos=v.split(/[^0-9]+/).filter(Boolean).map(Number); if(!pos.length){ toast('Enter the finishing order first'); return; } if(new Set(pos).size!==pos.length){ toast('A number is repeated'); return; }
     const race=currentRace(); const known=new Set(active(race).map(r=>r.no)); const bad=pos.filter(n=>!known.has(n)); if(bad.length){ toast('Not in this field: '+bad.join(', ')); return; }
