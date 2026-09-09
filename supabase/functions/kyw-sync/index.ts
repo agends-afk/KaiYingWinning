@@ -48,6 +48,10 @@ function paceOf(form: any[] | null, meetDate: string): number | null {
   if (!form) return null; const runs = form.filter(f => !f.isTrial && !f.isJumpOut && f.date && f.date < meetDate && f.positionAt800 && f.starters > 1).sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 4);
   if (!runs.length) return null; const v = runs.reduce((a, f) => a + Math.min(1, Math.max(0, (f.positionAt800 - 1) / (f.starters - 1))), 0) / runs.length; return +v.toFixed(2);
 }
+function recentRuns(form: any[] | null, meetDate: string) {
+  if (!form) return null; const runs = form.filter(f => !f.isTrial && !f.isJumpOut && f.date && f.date < meetDate).sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 3);
+  return runs.map(l => ({ pos: l.position ?? null, field: l.starters ?? null, margin: l.position === 1 ? 0 : num(l.margin), cls: classRank(l.raceClass), date: l.date, venue: l.venue ?? "" }));
+}
 function formString(lastTen: unknown): string {
   try { const arr = JSON.parse(String(lastTen ?? "[]")); return arr.map((c: string) => (c === "-" ? "x" : c)).join("").slice(-8); } catch { return ""; }
 }
@@ -60,7 +64,7 @@ function mapEntry(e: any, meetDate: string, todayClass: string) {
     age: h.age ?? null, sex: h.sex ? String(h.sex)[0] : "",
     career: stats(h.careerStats), track: stats(e.trackStats), distance: stats(e.distanceStats), trackDistance: stats(e.trackDistanceStats), barrierRec: stats(e.atThisBarrierNumberStats), classRec: stats(e.atThisClassStats), pace: paceOf(h.horseForm, meetDate),
     good: stats(h.goodStats), soft: stats(h.softStats), heavy: stats(h.heavyStats), firstUp: stats(h.firstUpStats), secondUp: stats(h.secondUpStats),
-    form: formString(h.lastTen), last: lastStart(h.horseForm, meetDate, todayClass),
+    form: formString(h.lastTen), last: lastStart(h.horseForm, meetDate, todayClass), recent: recentRuns(h.horseForm, meetDate),
     jockeyPct: num(e.jockey?.winPercent), trainerPct: num(e.trainer?.winPercent), jockeyRecentPct: num(e.jockey?.recentWinPercent), trainerRecentPct: num(e.trainer?.recentWinPercent),
     apprentice: !!e.jockey?.apprentice, claim: num(e.jockey?.weightClaim), rating: num(h.rating ?? e.handicapRating),
     odds: odds(e.odds), scratched: !!(e.scratched || e.isLateScratching || e.finish === 109), emergency: !!e.emergency,

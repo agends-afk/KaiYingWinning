@@ -219,6 +219,7 @@ pre.schema{font-size:11px;line-height:1.45;background:var(--surface);border:1.5p
 const METRICS = [
   {key:'last',      label:'Last start',         base:1.4, desc:'Finishing position, margin and field size last start, adjusted for a rise or drop in class today.'},
   {key:'form',      label:'Recent form',        base:1.0, desc:'Last five runs, most recent counting most. Spells are skipped.'},
+  {key:'classform', label:'Class of recent runs', base:1.2, desc:'The grade of the last three races and how close the horse got. A narrow defeat in a Group 1 outranks a win in a benchmark race.'},
   {key:'track',     label:'Track record',       base:0.8, desc:'Win and place rate at this track, shrunk toward average where starts are few.'},
   {key:'distance',  label:'Distance record',    base:0.9, desc:'Win and place rate at this distance, shrunk the same way.'},
   {key:'condition', label:'Track condition',    base:0.9, desc:'Record on today\'s going, taken from the meeting condition on the Card tab.'},
@@ -308,6 +309,8 @@ function formScore(f){ if(!f) return null; const runs=String(f).replace(/[^0-9a-
 function lastScore(l){ if(!l||num(l.pos)==null) return null; const pos=num(l.pos), field=num(l.field)||12, margin=num(l.margin);
   const posS=pos<=1?1:clamp(1-(pos-1)/Math.max(field-1,1),0,1); const marS=margin==null?posS:clamp(1-margin/10,0,1);
   return clamp(0.5*posS+0.5*marS-0.1*(num(l.classChange)||0),0,1); }
+function classFormScore(r){ const runs=Array.isArray(r.recent)?r.recent.filter(x=>x&&num(x.cls)!=null):[]; if(!runs.length) return null; const ws=[0.5,0.3,0.2]; let tot=0,sw=0;
+  runs.slice(0,3).forEach((x,i)=>{ const pos=num(x.pos)||9, margin=num(x.margin)||0; const q=(num(x.cls)||60)/100 + (pos===1?0.15:pos<=3?0.06:0) - Math.min(margin,12)/40; tot+=q*ws[i]; sw+=ws[i]; }); return tot/sw; }
 function fitnessScore(l,r){ const d=l?num(l.days):null; if(d==null) return null; if(d<7) return .55; if(d<14) return .8; if(d<=28) return 1; if(d<=42) return .8; if(d<=90) return .55; const fu=r&&rec(r.firstUp); if(fu&&fu.s>=2){ const q=recScore(fu); if(q!=null) return clamp(0.3+q*0.6,0.3,0.9); } return .4; }
 function distanceFactor(dist){ const d=num(dist)||1400; if(d<=1200) return 1; if(d<=1400) return .8; if(d<=1600) return .6; if(d<=2000) return .45; return .3; }
 function barrierScore(r,race,n,bias){ const b=num(r.barrier); if(b==null||n<2) return null; const rel=clamp((b-1)/(n-1),0,1); const eff=clamp(distanceFactor(race.distance)*0.6+(bias||0),-1,1); return clamp(0.5-(rel-0.5)*eff,0,1); }
@@ -325,7 +328,7 @@ function scoreRace(race, meeting, weights, settings, dyn, adj){
   raw.condition=rs.map(r=>recScore(rec(r[cat])||rec(r.cond)||(r.condition&&rec(r.condition[cat])))); raw.career=rs.map(r=>recScore(rec(r.career)));
   raw.rating=rs.map(r=>{const v=num(r.rating); return v!=null&&v>0?v:null;});
   raw.jockey=rs.map(jockeyScore); raw.trainer=rs.map(trainerScore); raw.barrier=rs.map(r=>barrierScore(r,race,n,dyn.barrierBias));
-  raw.pace=rs.map(r=>paceScore(r,race,dyn.paceBias)); raw.trackdist=rs.map(r=>recScore(rec(r.trackDistance))); raw.barrierrec=rs.map(r=>recScore(rec(r.barrierRec)));
+  raw.pace=rs.map(r=>paceScore(r,race,dyn.paceBias)); raw.classform=rs.map(classFormScore); raw.trackdist=rs.map(r=>recScore(rec(r.trackDistance))); raw.barrierrec=rs.map(r=>recScore(rec(r.barrierRec)));
   raw.weight=rs.map(r=>{const w=num(r.weight); return (w==null||meanW==null)?null:clamp(0.5+(meanW-w)/6,0,1);}); raw.fitness=rs.map(r=>fitnessScore(r.last,r));
   raw.market=rs.map(r=>{const o=num(r.odds); return (o>1&&maxImp>0)?(1/o)/maxImp:null;});
   const z={}; for(const k of Object.keys(raw)) z[k]=zscores(raw[k]);
@@ -339,12 +342,12 @@ function scoreRace(race, meeting, weights, settings, dyn, adj){
   const exF=scored.map(s=>Math.exp(beta*s.ratingFree)); const sumF=exF.reduce((a,b)=>a+b,0)||1; scored.forEach((s,i)=>s.probFree=exF[i]/sumF);
   const order=[...scored].sort((a,b)=>b.rating-a.rating); order.forEach((s,i)=>s.rank=i+1);
   const imp=order.map(s=>{const o=num(s.r.odds); return o>1?1/o:null;}); const impSum=imp.reduce((a,b)=>a+(b||0),0);
-  order.forEach((s,i)=>{ s.market= imp[i]!=null&&impSum>0 ? imp[i]/impSum : null; s.edge= s.market!=null ? s.probFree-s.market : null; });
+  order.forEach((s,i)=>{ s.market= imp[i]!=null&&impSum>0 ? imp[i]/impSum : null; s.probValue= s.market!=null ? 0.5*s.probFree+0.5*s.market : s.probFree; s.edge= s.market!=null ? s.probValue-s.market : null; });
   return order;
 }
-function isValue(s,settings){ return s.edge!=null && s.market>=0.04 && s.probFree>=0.08 && s.edge>=settings.valueEdge && s.probFree/s.market>=1.25; }
+function isValue(s,settings){ return s.edge!=null && s.market>=0.04 && s.probValue>=0.08 && s.edge>=settings.valueEdge && s.probValue/s.market>=1.25; }
 function tier(p){ return p>=0.30?'Strong':p>=0.20?'Fair':'Skinny'; }
-function kellyStake(s, settings){ const o=num(s.r.odds); if(!(o>1)) return 0; const p=s.probFree; const b=o-1, q=1-p; const f=(b*p-q)/b; if(f<=0) return 0; return Math.max(0, Math.round(settings.bank*settings.kelly*f)); }
+function kellyStake(s, settings){ const o=num(s.r.odds); if(!(o>1)) return 0; const p=s.probValue; const b=o-1, q=1-p; const f=(b*p-q)/b; if(f<=0) return 0; return Math.max(0, Math.round(settings.bank*settings.kelly*f)); }
 function modelAdvice(scored, settings){ const top=scored[0]; if(!top) return null; const second=scored[1];
   const value=[...scored].filter(s=>isValue(s,settings)).sort((a,b)=>b.edge-a.edge);
   return {top, tier:tier(top.prob), gap:second?top.prob-second.prob:top.prob, value:value[0]||null, valueAll:value, stakeTop:kellyStake(top,settings), stakeValue:value[0]?kellyStake(value[0],settings):0, roughie:bestRoughie(scored,settings)}; }
@@ -658,8 +661,8 @@ function viewRace(){
   ${res?`<p class="note">Your model had the winner ${pr?ordinal(pr.rank)+' at '+pct(pr.prob):'unrated'}. ${ep.no===res.positions[0]?(ep.override?'Your override won.':'The model tip won.'):(res.positions.slice(1,3).includes(ep.no)?'The tip ran a place.':'The tip missed.')}${res.by?' Entered by '+esc(res.by)+'.':''}</p>`:`<p class="note">${m.source==='racing.com'?'Results arrive from the feed within a couple of minutes of being declared. Manual entry here is the fallback if the feed is late.':'Enter at least the first four home. It goes to every Pelican\'s model.'} Your weights move only when the winner was rated worse than ${ordinal(st.marginRank)} or under ${pct(st.marginProb)}.</p>`}</section>`;
   if(adv&&!res){ const t=adv.top; const tR=t.r; const mkt=t.r.odds?`market $${t.r.odds}`:'no market price'; const multi=dayMulti(run,m,st); const leg=multi&&multi.legs.find(l=>l.raceNo===race.no); const rg=adv.roughie;
     html+=`<div class="banner"><div class="eyebrow" style="color:var(--panel-ink);opacity:.7">Best bet<span class="sl">/</span>${adv.tier} ${pct(t.prob)}${adv.gap<0.04?', not much between the top two':''}</div>
-    <h2>${cloth(tR.no)} ${esc(tR.name)}</h2><p>Our price ${ourPrice(t.prob,st)} at a ${Math.round(st.book*100)}% book (fair ${fmtOdds(t.prob)}), ${mkt}.${t.edge!=null?(isValue(t,st)?` Value: market ${pct(t.market)}, form-only model ${pct(t.probFree)}.`:` No value at the market price (form-only ${pct(t.probFree)} against market ${pct(t.market)}).`):''}${adv.stakeTop>0?` Stake ${fmtMoney(adv.stakeTop)} win.`:''}</p>
-    ${adv.value&&adv.value.r.no!==tR.no?`<p><b>Value:</b> ${cloth(adv.value.r.no)} ${esc(adv.value.r.name)} at $${adv.value.r.odds}, form-only price ${ourPrice(adv.value.probFree,st)} against market ${pct(adv.value.market)}.${adv.stakeValue>0?' Stake '+fmtMoney(adv.stakeValue)+'.':''}</p>`:''}
+    <h2>${cloth(tR.no)} ${esc(tR.name)}</h2><p>Our price ${ourPrice(t.prob,st)} at a ${Math.round(st.book*100)}% book (fair ${fmtOdds(t.prob)}), ${mkt}.${t.edge!=null?(isValue(t,st)?` Value: market ${pct(t.market)}, form-only ${pct(t.probFree)}, we back it at ${pct(t.probValue)}.`:` No value at the market price (form-only ${pct(t.probFree)} against market ${pct(t.market)}).`):''}${adv.stakeTop>0?` Stake ${fmtMoney(adv.stakeTop)} win.`:''}</p>
+    ${adv.value&&adv.value.r.no!==tR.no?`<p><b>Value:</b> ${cloth(adv.value.r.no)} ${esc(adv.value.r.name)} at $${adv.value.r.odds}, form-only ${pct(adv.value.probFree)} against market ${pct(adv.value.market)}, backed at ${pct(adv.value.probValue)}.${adv.stakeValue>0?' Stake '+fmtMoney(adv.stakeValue)+'.':''}</p>`:''}
     <div class="eyebrow" style="color:var(--panel-ink);opacity:.7;margin-top:12px">Best roughie</div>
     ${rg?`<p style="margin-top:4px"><b>${cloth(rg.r.no)} ${esc(rg.r.name)}</b> at $${rg.r.odds}, form-only price ${ourPrice(rg.probFree,st)}. ${rg.probFree>=0.10?'Worth an each way.':'Small win bet or leave it.'}</p>`:`<p style="margin-top:4px">Nothing at $8 or better the model can make a case for.</p>`}
     <div class="eyebrow" style="color:var(--panel-ink);opacity:.7;margin-top:12px">Multi</div>
@@ -727,6 +730,7 @@ function viewWeights(){
     <div class="wrow"><div class="l"><b>Bank</b><span class="num">${fmtMoney(s.bank)}</span></div><div class="d">What you are prepared to put through the day. Suggested stakes are worked off this.</div><input type="range" min="50" max="2000" step="50" value="${s.bank}" data-act="setting" data-key="bank"></div>
     <div class="wrow"><div class="l"><b>Staking aggression</b><span class="num">${s.kelly.toFixed(2)}</span></div><div class="d">Fraction of the Kelly stake. A quarter is conservative, a half is bold, one is reckless.</div><input type="range" min="0.05" max="1" step="0.05" value="${s.kelly}" data-act="setting" data-key="kelly"></div>
     <div class="wrow"><div class="l"><b>Book percentage</b><span class="num">${Math.round(s.book*100)}%</span></div><div class="d">Our prices are framed as a bookmaker would frame them. 120% is a typical fixed-odds book; 100% shows fair prices.</div><input type="range" min="1" max="1.4" step="0.01" value="${s.book}" data-act="setting" data-key="book"></div>
+    <div class="wrow"><div class="l"><b>How value is judged</b><span></span></div><div class="d">The tip uses the blended rating, market included. Value and stakes use a chance set halfway between the form-only rating and the market, so an uncalibrated disagreement with the market is backed at half strength.</div></div>
     <div class="wrow"><div class="l"><b>Value threshold</b><span class="num">${(s.valueEdge*100).toFixed(0)} pts</span></div><div class="d">How far the model's chance must beat the market's before a runner is flagged as value.</div><input type="range" min="0.01" max="0.10" step="0.01" value="${s.valueEdge}" data-act="setting" data-key="valueEdge"></div>
     <div class="wrow"><div class="l"><b>Sharpness</b><span class="num">${s.beta.toFixed(2)}</span></div><div class="d">Higher concentrates the percentages on the top few; lower spreads them.</div><input type="range" min="0.8" max="4" step="0.1" value="${s.beta}" data-act="setting" data-key="beta"></div></div></section>`;
   if(run.changes&&run.changes.length){ html+=`<section class="block"><div class="eyebrow">What the results did to your model</div>`; for(const e of [...run.changes].reverse()){ html+=`<div class="logrow"><div class="when">Race ${e.race}</div>${esc(e.text)}${e.items.length?`<ul>${e.items.map(i=>`<li>${esc(i)}</li>`).join('')}</ul>`:''}</div>`; } html+=`</section>`; }
