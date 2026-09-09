@@ -1,3 +1,13 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F2B46">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kai Ying Winning">
+<meta name="color-scheme" content="light">
 <title>Kai Ying Winning</title>
 <meta name="description" content="The Pelicans' form model for the Saturday metros">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -32,6 +42,7 @@
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:15.5px;line-height:1.45;-webkit-text-size-adjust:100%}
 button,input,select,textarea{font:inherit;color:inherit}
+input:not([type=range]),select{font-size:16px}
 button{cursor:pointer}
 h1,h2,h3{font-family:var(--display);font-weight:800;text-transform:uppercase;letter-spacing:.5px;line-height:.95;margin:0;text-wrap:balance}
 h1{font-size:40px;font-weight:900} h2{font-size:28px} h3{font-size:22px}
@@ -178,7 +189,8 @@ pre.schema{font-size:11px;line-height:1.45;background:var(--surface);border:1.5p
 @media (max-width:420px){h1{font-size:34px}.betform{grid-template-columns:1fr 1fr}}
 @media (prefers-reduced-motion:no-preference){.bar i{transition:width .35s cubic-bezier(.16,1,.3,1)}}
 </style>
-
+</head>
+<body>
 <div class="app">
   <header class="top">
     <svg viewBox="0 0 64 64" aria-hidden="true">
@@ -885,3 +897,5 @@ async function convertWithClaude(){
   if(window.claude&&window.claude.use){ window.claude.use('sample').then(s=>{ sampleFn=s; if(s&&state.ui.tab==='load') render(); }).catch(()=>{}); }
 })();
 </script>
+</body>
+</html>
