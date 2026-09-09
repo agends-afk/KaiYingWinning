@@ -233,7 +233,7 @@ const METRICS = [
   {key:'barrierrec',label:'Record from this gate', base:0.3, desc:'The horse\'s own record from this barrier number, where the feed supplies it.'},
   {key:'weight',    label:'Weight carried',     base:0.4, desc:'Weight relative to the field average.'},
   {key:'fitness',   label:'Freshness',          base:0.5, desc:'Days since last run. Fourteen to twenty-eight is treated as ideal; first-up runs are marked down.'},
-  {key:'market',    label:'Market',             base:1.2, desc:'Implied chance from the odds. Used in the blended tip only; value is judged with this switched off.'},
+  {key:'market',    label:'Market',             base:1.5, desc:'Implied chance from the odds. Used in the blended tip only; value is judged with this switched off.'},
   {key:'formline',  label:'Form lines today',   base:1.0, desc:'Live: horses out of the same last-start race as one that ran above or below expectation today, and riders winning on the day.'},
   {key:'manual',    label:'Your call',          base:1.0, desc:'Your own plus or minus on a runner, set on the race screen.'}
 ];
@@ -345,7 +345,7 @@ function scoreRace(race, meeting, weights, settings, dyn, adj){
   order.forEach((s,i)=>{ s.market= imp[i]!=null&&impSum>0 ? imp[i]/impSum : null; s.probValue= s.market!=null ? 0.5*s.probFree+0.5*s.market : s.probFree; s.edge= s.market!=null ? s.probValue-s.market : null; });
   return order;
 }
-function isValue(s,settings){ return s.edge!=null && s.market>=0.04 && s.probValue>=0.08 && s.edge>=settings.valueEdge && s.probValue/s.market>=1.35; }
+function isValue(s,settings){ return s.edge!=null && s.market>=0.05 && s.probValue>=0.10 && s.edge>=settings.valueEdge && s.probValue/s.market>=1.35; }
 function tier(p){ return p>=0.30?'Strong':p>=0.20?'Fair':'Skinny'; }
 function kellyStake(s, settings){ const o=num(s.r.odds); if(!(o>1)) return 0; const p=s.probValue; const b=o-1, q=1-p; const f=(b*p-q)/b; if(f<=0) return 0; return Math.max(0, Math.round(settings.bank*settings.kelly*f)); }
 function modelAdvice(scored, settings){ const top=scored[0]; if(!top) return null; const second=scored[1];
@@ -354,7 +354,7 @@ function modelAdvice(scored, settings){ const top=scored[0]; if(!top) return nul
 function multiHTML(multi, st){ if(!multi) return ''; return `<div class="banner"><div class="eyebrow" style="color:var(--panel-ink);opacity:.7">Best multi<span class="sl">/</span>${multi.legs.length} legs, model ${pct(multi.prob)}</div>
   <h2>${multi.legs.map(l=>`R${l.raceNo} ${cloth(l.no)}`).join(' ')}</h2><p>${multi.legs.map(l=>`R${l.raceNo} ${esc(l.name)} (${pct(l.prob)})`).join(', ')}.</p>
   <p>Our price $${(1/(multi.prob*Math.pow(st.book,multi.legs.length))).toFixed(1)} (fair $${multi.fair.toFixed(1)})${multi.odds?`, market pays about $${multi.odds.toFixed(1)}${multi.odds>multi.fair*1.1?' which is value':multi.odds<multi.fair*0.9?' which is under the odds':''}`:''}. Suggested stake ${fmtMoney(multi.stake)}.</p></div>`; }
-function bestRoughie(scored, settings){ const cands=scored.filter(s=>num(s.r.odds)>=8&&num(s.r.odds)<=30&&s.probFree>=0.05&&s.rank>1); if(!cands.length) return null;
+function bestRoughie(scored, settings){ const cands=scored.filter(s=>num(s.r.odds)>=8&&num(s.r.odds)<=30&&s.probValue>=0.07&&s.rank<=4&&s.rank>1); if(!cands.length) return null;
   const byEdge=[...cands].filter(s=>s.edge!=null).sort((a,b)=>b.edge-a.edge); return byEdge[0]||[...cands].sort((a,b)=>b.probFree-a.probFree)[0]; }
 function dayMulti(run, meeting, settings){ const legs=[]; for(const race of meeting.races){ if(race.result) continue; const top=(run.pred[race.no]||[])[0]&&(run.pred[race.no]||[]).find(x=>x.rank===1); if(!top) continue; const r=race.runners.find(h=>h.no===top.no); legs.push({raceNo:race.no,no:top.no,name:r?r.name:'',prob:top.prob,odds:num(r&&r.odds)}); }
   if(legs.length<2) return null; let pick=legs.filter(l=>l.prob>=0.28).sort((a,b)=>b.prob-a.prob).slice(0,4); if(pick.length<2) pick=[...legs].sort((a,b)=>b.prob-a.prob).slice(0,2);
@@ -406,6 +406,30 @@ function modelScore(runs){ let done=0,top=0,top3=0,placed=0;
   for(const meeting of meetingsList()){ const run=runs[meeting.id]; if(!run) continue; for(const r of meeting.races.filter(r=>r.result)){ done++; const p=run.pred[r.no]||[]; const wp=p.find(x=>x.no===r.result.positions[0]); if(wp&&wp.rank===1) top++; if(wp&&wp.rank<=3) top3++; const t=p.find(x=>x.rank===1); if(t&&r.result.positions.slice(0,3).includes(t.no)) placed++; } }
   return {done,top,top3,placed}; }
 function runsFor(punter){ const out={}; for(const m of meetingsList()) out[m.id]=runDay(punter,m); return out; }
+
+/* ---------------- proving ground: a punter's model against real past Saturdays ---------------- */
+let PAST=null;
+function evaluatePunter(punter, past){
+  const st={...DEFAULT_SETTINGS,...punter.settings}; let races=0,topW=0,topPl=0,topRet=0,favW=0,favRet=0,adW=0,adRet=0,valN=0,valW=0,valRet=0,rgN=0,rgW=0,rgRet=0,ll=0,llM=0,n=0;
+  for(const m of past){ const meeting={...m, condition:m.condition||'Good 4', races:m.races.map(r=>({...r, meetingId:m.id, condition:r.condition||m.condition||'Good 4', runners:r.runners.map(x=>({...x, scratched:!!x.scratched}))}))};
+    const run=runDay({...punter, adj:{}, picks:{}}, meeting);
+    for(const r of meeting.races){ if(!r.result||active(r).length<5) continue; const win=r.result.positions[0]; const placed=r.result.positions.slice(0,3);
+      const sc=scoreRace(r,meeting,punter.weights,st,{formline:{},barrierBias:0,paceBias:0},{}); const scA=scoreRace(r,meeting,run.weights,st,run.dyn[r.no],{});
+      races++; const top=sc[0]; const fav=[...sc].sort((a,b)=>(b.market||0)-(a.market||0))[0];
+      if(top.r.no===win){ topW++; topRet+=top.r.odds||0; } if(placed.includes(top.r.no)) topPl++;
+      if(fav.r.no===win){ favW++; favRet+=fav.r.odds||0; }
+      if(scA[0].r.no===win){ adW++; adRet+=scA[0].r.odds||0; }
+      const wr=sc.find(x=>x.r.no===win); if(wr&&wr.prob>0&&wr.market>0){ ll+=-Math.log(wr.prob); llM+=-Math.log(wr.market); n++; }
+      const adv=modelAdvice(sc,st); for(const v of adv.valueAll){ valN++; if(v.r.no===win){ valW++; valRet+=v.r.odds; } }
+      if(adv.roughie){ rgN++; if(adv.roughie.r.no===win){ rgW++; rgRet+=adv.roughie.r.odds; } } } }
+  return {races, top:{w:topW,pl:topPl,roi:races?(topRet-races)/races:0}, adapt:{w:adW,roi:races?(adRet-races)/races:0}, fav:{w:favW,roi:races?(favRet-races)/races:0}, value:{n:valN,w:valW,roi:valN?(valRet-valN)/valN:0}, rough:{n:rgN,w:rgW,roi:rgN?(rgRet-rgN)/rgN:0}, ll:n?ll/n:null, llM:n?llM/n:null};
+}
+async function loadPast(){ if(PAST) return PAST; if(!sb) return null; const {data,error}=await sb.from('kyw_backtest').select('data').order('created_at'); if(error) throw error; PAST=(data||[]).map(r=>r.data).filter(m=>m&&m.races); return PAST; }
+function provingHTML(ev){ if(!ev) return ''; const pc=(a,b)=>b?Math.round(100*a/b)+'%':'-'; const roi=v=>(v>=0?'+':'')+Math.round(v*100)+'%';
+  return `<div class="kpis"><div class="kpi"><b class="num">${pc(ev.top.w,ev.races)}</b><span>Best bet won</span></div><div class="kpi"><b class="num" style="color:${ev.top.roi>0?'var(--good)':'var(--bad)'}">${roi(ev.top.roi)}</b><span>Best bet ROI at SP</span></div><div class="kpi"><b class="num">${pc(ev.fav.w,ev.races)}</b><span>Favourite won</span></div></div>
+  <p class="note" style="margin-top:8px">${ev.races} races. Best bet placed ${pc(ev.top.pl,ev.races)}. With the day's adaptation running, best bet won ${pc(ev.adapt.w,ev.races)} for ${roi(ev.adapt.roi)}. Favourites returned ${roi(ev.fav.roi)}.
+  Value calls: ${ev.value.n} made, ${ev.value.w} won, ${roi(ev.value.roi)}. Roughies: ${ev.rough.n} named, ${ev.rough.w} won, ${roi(ev.rough.roi)}.
+  ${ev.ll!=null?`Calibration (log-loss on the winner, lower is better): your model ${ev.ll.toFixed(2)}, the market ${ev.llM.toFixed(2)}.`:''}</p>`; }
 
 /* ---------------- punters club ---------------- */
 function placeOdds(b){ const po=num(b.placeOdds); if(po&&po>1) return po; const o=num(b.odds)||1; return +(1+(o-1)/4).toFixed(2); } // estimate where no place price entered
@@ -721,6 +745,10 @@ function viewWeights(){
     html+=`<div class="wrow"><div class="l"><b>${met.label}</b><span class="num">${w.toFixed(2)}${Math.abs(d)>0.005?` <span style="color:var(--accent)">${adapted.toFixed(2)}</span>`:''}</span></div><div class="d">${met.desc}</div>
     <input type="range" min="0" max="${(met.base*2.5).toFixed(2)}" step="0.05" value="${w}" data-act="weight" data-key="${met.key}"><div class="delta">${Math.abs(w-met.base)>0.01?`${w-met.base>0?'+':''}${(w-met.base).toFixed(2)} against the default ${met.base.toFixed(2)}`:'at default'}${Math.abs(d)>0.005?`, results moved it ${d>0?'+':''}${d.toFixed(2)}`:''}</div></div>`; }
   html+=`</div><div class="actions"><button class="btn" data-act="resetweights">Reset my weights to defaults</button></div>`;
+  html+=`<section class="block" style="margin-top:26px"><div class="eyebrow">Proving ground<span class="sl">/</span>your weights against real Saturdays at starting price</div>
+  <p class="note" style="margin:6px 0 8px">Runs your current weights and settings over past metro meetings as the form stood that morning, and settles at the actual starting prices. Change a slider, test again. Small samples swing; treat anything under a few hundred races as a hint, not proof.</p>
+  <div class="actions" style="margin:0 0 10px"><button class="btn primary" id="proveBtn" data-act="prove" ${sb?'':'disabled'}>Test these weights</button>${PAST?`<span class="small">${PAST.length} meetings, ${PAST.reduce((a,m)=>a+m.races.length,0)} races loaded</span>`:''}</div>
+  <div id="proveOut">${state.ui.prove?provingHTML(state.ui.prove):''}</div></section>`;
   html+=`<section class="block" style="margin-top:26px"><div class="eyebrow">Adaptation<span class="sl">/</span>how far a result may move your model</div><div class="rows" style="margin-top:8px">
     <div class="wrow"><div class="l"><b>Adapt weights from results</b><span><input type="checkbox" data-act="setting" data-key="autoAdapt" ${s.autoAdapt?'checked':''}></span></div><div class="d">Off means results still move form lines and the bias reading, but your weights stay where you set them.</div></div>
     <div class="wrow"><div class="l"><b>Margin of error: rated position</b><span class="num">${s.marginRank}</span></div><div class="d">A winner rated this position or better is inside the margin and triggers no weight change.</div><input type="range" min="1" max="8" step="1" value="${s.marginRank}" data-act="setting" data-key="marginRank"></div>
@@ -797,7 +825,7 @@ form, last_pos, last_field, last_margin, days, last_race, class_change, jockey_p
 /* ---------------- events ---------------- */
 function bind(root){
   root.querySelectorAll('[data-meta]').forEach(el=>el.addEventListener('change',()=>{ state.meeting[el.dataset.meta]=el.value; state.meeting.updatedAt=Date.now(); save('meeting'); }));
-  root.querySelectorAll('[data-act="weight"]').forEach(el=>{ el.addEventListener('input',()=>{ me().weights[el.dataset.key]=+el.value; el.closest('.wrow').querySelector('.l span').textContent=(+el.value).toFixed(2); }); el.addEventListener('change',()=>save('punter')); });
+  root.querySelectorAll('[data-act="weight"]').forEach(el=>{ el.addEventListener('input',()=>{ me().weights[el.dataset.key]=+el.value; el.closest('.wrow').querySelector('.l span').textContent=(+el.value).toFixed(2); }); el.addEventListener('change',()=>{ state.ui.prove=null; save('punter'); }); });
   root.querySelectorAll('[data-act="setting"]').forEach(el=>{ const h=()=>{ me().settings[el.dataset.key]= el.type==='checkbox'?el.checked:+el.value; }; el.addEventListener('input',()=>{ h(); const sp=el.closest('.wrow').querySelector('.l span'); if(sp&&el.type!=='checkbox'){ const k=el.dataset.key; sp.textContent= k==='marginProb'?pct(+el.value):k==='marginRank'?el.value:k==='bank'?fmtMoney(+el.value):k==='valueEdge'?(+el.value*100).toFixed(0)+' pts':k==='book'?Math.round(+el.value*100)+'%':(+el.value).toFixed(2); } }); el.addEventListener('change',()=>{ h(); save('punter'); }); });
   root.querySelectorAll('[data-act="adj"]').forEach(el=>{ el.addEventListener('input',()=>{ el.nextElementSibling.textContent=(+el.value>0?'+':'')+el.value; }); el.addEventListener('change',()=>{ const a=me().adj[el.dataset.key]||(me().adj[el.dataset.key]={adj:0,note:''}); a.adj=+el.value; save('punter'); }); });
   root.querySelectorAll('[data-act="note"]').forEach(el=>el.addEventListener('change',()=>{ const a=me().adj[el.dataset.key]||(me().adj[el.dataset.key]={adj:0,note:''}); a.note=el.value; save('punter'); }));
@@ -823,6 +851,7 @@ document.addEventListener('click', async e=>{
   else if(act==='example'){ const ex=exampleMeeting(); putMeeting(ex); selectMeeting(ex.id); state.ui.tab='races'; racesWatched=null; persistLocal(); render(); }
   else if(act==='meeting'){ selectMeeting(b.dataset.id); state.ui.open=null; if(b.dataset.go) state.ui.tab=b.dataset.go; persistLocal(); render(); }
   else if(act==='sync'){ await syncNow(); }
+  else if(act==='prove'){ const btn=$('#proveBtn'); if(btn){ btn.disabled=true; btn.textContent='Running...'; } try{ const past=await loadPast(); if(!past||!past.length){ toast('No past meetings stored yet'); } else { state.ui.prove=evaluatePunter(me(),past); } }catch(e){ console.error(e); toast('Could not load past meetings'); } render(); }
   else if(act==='clear'){ if(!state.meeting||!(state.meeting.manual||state.meeting.example)) return; if(!confirm('Remove this meeting, its results, comments and club bets for every Pelican?')) return; removeMeeting(state.meeting.id); persistLocal(); render(); }
   else if(act==='copyprompt'){ await copy(CONVERT_RULES+SCHEMA_DOC); toast('Conversion prompt copied'); }
   else if(act==='copyjson'){ await copy(JSON.stringify(state.meeting,null,1)); toast('Meeting JSON copied'); }
