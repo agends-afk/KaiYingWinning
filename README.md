@@ -14,9 +14,13 @@ When a result is entered, the app compares the winner's rated position and chanc
 
 Independently of the weights, each result feeds three live adjustments into races still to run: form lines (horses out of the same last-start race as a horse that ran above or below expectation), riders who have won on the day, and a barrier bias reading from where the winners and seconds have been drawn.
 
-## Loading the form
+## The feed
 
-The Load tab accepts JSON in the schema shown on that tab, or CSV with the listed columns. Form guides are not machine readable, so the intended workflow is:
+A Supabase Edge Function, `supabase/functions/kyw-sync/index.ts`, reads racing.com's public data API every two minutes for the meetings listed in the `kyw_feed` table and writes fields, form, fixed odds (median of the fixed-odds bookmakers), scratchings and results into the app's tables. Racing.com supplies raw form only; every rating in the app comes from the Pelican's own weights. Results land as `racing.com feed` and settle tips and club bets. The app carries several meetings at once with a switcher on the Card and Flock tabs.
+
+## Loading the form by hand
+
+The Load tab accepts JSON in the schema shown on that tab, or CSV with the listed columns. This is the fallback if a meeting is not on the feed.
 
 1. Copy the conversion prompt from the Load tab.
 2. Give it to Claude with the form guide text or PDF. Claude returns JSON in the schema.
