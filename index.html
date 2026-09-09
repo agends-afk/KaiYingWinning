@@ -227,13 +227,16 @@ const METRICS = [
   {key:'jockey',    label:'Jockey',             base:0.7, desc:'Jockey win percentage or rating from the form.'},
   {key:'trainer',   label:'Trainer',            base:0.5, desc:'Trainer win percentage or rating from the form.'},
   {key:'barrier',   label:'Barrier',            base:0.6, desc:'Inside draws favoured over short trips, fading with distance. The day\'s barrier bias shifts this.'},
+  {key:'pace',      label:'Run style',          base:0.5, desc:'Where the horse settles, from its last four runs. On-pace runners get a small edge over short trips; the day\'s results move this as a pattern shows.'},
+  {key:'trackdist', label:'Track and distance', base:0.7, desc:'Record at this track over this distance.'},
+  {key:'barrierrec',label:'Record from this gate', base:0.3, desc:'The horse\'s own record from this barrier number, where the feed supplies it.'},
   {key:'weight',    label:'Weight carried',     base:0.4, desc:'Weight relative to the field average.'},
   {key:'fitness',   label:'Freshness',          base:0.5, desc:'Days since last run. Fourteen to twenty-eight is treated as ideal; first-up runs are marked down.'},
-  {key:'market',    label:'Market',             base:0.8, desc:'Implied chance from the odds, where odds are in the form.'},
+  {key:'market',    label:'Market',             base:0.8, desc:'Implied chance from the odds. Used in the blended tip only; value is judged with this switched off.'},
   {key:'formline',  label:'Form lines today',   base:1.0, desc:'Live: horses out of the same last-start race as one that ran above or below expectation today, and riders winning on the day.'},
   {key:'manual',    label:'Your call',          base:1.0, desc:'Your own plus or minus on a runner, set on the race screen.'}
 ];
-const DEFAULT_SETTINGS = { marginRank:3, marginProb:0.12, lr:0.18, formlineGain:0.6, beta:2.2, autoAdapt:true, bank:200, kelly:0.25, valueEdge:0.03, book:1.20 };
+const DEFAULT_SETTINGS = { marginRank:3, marginProb:0.12, lr:0.12, formlineGain:0.6, beta:2.2, autoAdapt:true, bank:200, kelly:0.25, valueEdge:0.03, book:1.20 };
 const PUNTER_COLOURS = ['#E8801A','#2F8F5B','#3B6FD4','#C43C2F','#8E5BC6','#D4A72C','#1BA5A5','#D45FA0','#6B7F2E','#8C5A2B'];
 // Web-hosted backend. Filled in once the Supabase project is chosen. Empty url = no shared backend.
 const SUPABASE = { url:'https://qgomklldlpspwilyjdqx.supabase.co', key:'sb_publishable_nhOXF3eXlHAyys2B0rzxxQ_W_Kb4OZP', flockCode:'pelicans-2026' };
@@ -308,7 +311,8 @@ function lastScore(l){ if(!l||num(l.pos)==null) return null; const pos=num(l.pos
 function fitnessScore(l,r){ const d=l?num(l.days):null; if(d==null) return null; if(d<7) return .55; if(d<14) return .8; if(d<=28) return 1; if(d<=42) return .8; if(d<=90) return .55; const fu=r&&rec(r.firstUp); if(fu&&fu.s>=2){ const q=recScore(fu); if(q!=null) return clamp(0.3+q*0.6,0.3,0.9); } return .4; }
 function distanceFactor(dist){ const d=num(dist)||1400; if(d<=1200) return 1; if(d<=1400) return .8; if(d<=1600) return .6; if(d<=2000) return .45; return .3; }
 function barrierScore(r,race,n,bias){ const b=num(r.barrier); if(b==null||n<2) return null; const rel=clamp((b-1)/(n-1),0,1); const eff=clamp(distanceFactor(race.distance)*0.6+(bias||0),-1,1); return clamp(0.5-(rel-0.5)*eff,0,1); }
-function jockeyScore(r){ const p=num(r.jockeyPct); if(p!=null) return clamp(p/25,0,1); const g=num(r.jockeyRating); if(g!=null) return clamp(g/100,0,1); return null; }
+function jockeyScore(r){ const p=num(r.jockeyPct), rp=num(r.jockeyRecentPct); if(p!=null||rp!=null){ const a=p!=null?clamp(p/25,0,1):null, b=rp!=null?clamp(rp/25,0,1):null; return a!=null&&b!=null?0.5*a+0.5*b:(a??b); } const g=num(r.jockeyRating); if(g!=null) return clamp(g/100,0,1); return null; }
+function paceScore(r,race,bias){ const p=num(r.pace); if(p==null) return null; const eff=clamp(0.25*distanceFactor(race.distance)+(bias||0),-1,1); return clamp(0.5+(0.5-p)*eff,0,1); }
 function trainerScore(r){ const p=num(r.trainerPct); if(p!=null) return clamp(p/20,0,1); const g=num(r.trainerRating); if(g!=null) return clamp(g/100,0,1); return null; }
 function zscores(vals){ const xs=vals.filter(v=>v!=null); if(xs.length<2) return vals.map(()=>0); const m=xs.reduce((a,b)=>a+b,0)/xs.length; const sd=Math.sqrt(xs.reduce((a,b)=>a+(b-m)**2,0)/xs.length)||0; if(sd<1e-9) return vals.map(()=>0); return vals.map(v=>v==null?0:clamp((v-m)/sd,-2.5,2.5)); }
 
@@ -321,32 +325,34 @@ function scoreRace(race, meeting, weights, settings, dyn, adj){
   raw.condition=rs.map(r=>recScore(rec(r[cat])||rec(r.cond)||(r.condition&&rec(r.condition[cat])))); raw.career=rs.map(r=>recScore(rec(r.career)));
   raw.rating=rs.map(r=>{const v=num(r.rating); return v!=null&&v>0?v:null;});
   raw.jockey=rs.map(jockeyScore); raw.trainer=rs.map(trainerScore); raw.barrier=rs.map(r=>barrierScore(r,race,n,dyn.barrierBias));
+  raw.pace=rs.map(r=>paceScore(r,race,dyn.paceBias)); raw.trackdist=rs.map(r=>recScore(rec(r.trackDistance))); raw.barrierrec=rs.map(r=>recScore(rec(r.barrierRec)));
   raw.weight=rs.map(r=>{const w=num(r.weight); return (w==null||meanW==null)?null:clamp(0.5+(meanW-w)/6,0,1);}); raw.fitness=rs.map(r=>fitnessScore(r.last,r));
   raw.market=rs.map(r=>{const o=num(r.odds); return (o>1&&maxImp>0)?(1/o)/maxImp:null;});
   const z={}; for(const k of Object.keys(raw)) z[k]=zscores(raw[k]);
   z.formline=rs.map(r=>clamp(dyn.formline[runnerKey(race,r)]||0,-2,2));
   z.manual=rs.map(r=>((adj&&adj[runnerKey(race,r)]&&num(adj[runnerKey(race,r)].adj))||0)*0.5);
-  const wsum=METRICS.reduce((a,m)=>a+(weights[m.key]||0),0)||1;
-  const scored=rs.map((r,i)=>{ let rating=0; const contrib={}; for(const m of METRICS){ const c=(weights[m.key]||0)*(z[m.key][i]||0)/wsum; contrib[m.key]=c; rating+=c; }
+  const wsum=METRICS.reduce((a,m)=>a+(weights[m.key]||0),0)||1; const wsumFree=wsum-(weights.market||0)||1;
+  const scored=rs.map((r,i)=>{ let rating=0, ratingFree=0; const contrib={}; for(const m of METRICS){ const c=(weights[m.key]||0)*(z[m.key][i]||0)/wsum; contrib[m.key]=c; rating+=c; if(m.key!=='market') ratingFree+=(weights[m.key]||0)*(z[m.key][i]||0)/wsumFree; }
     const missing=['last','form','track','distance','condition','career'].filter(k=>raw[k][i]==null).length;
-    return {r, z:Object.fromEntries(METRICS.map(m=>[m.key,z[m.key][i]])), contrib, rating, missing}; });
+    return {r, z:Object.fromEntries(METRICS.map(m=>[m.key,z[m.key][i]])), contrib, rating, ratingFree, missing}; });
   const beta=settings.beta||2.2; const ex=scored.map(s=>Math.exp(beta*s.rating)); const sum=ex.reduce((a,b)=>a+b,0)||1; scored.forEach((s,i)=>s.prob=ex[i]/sum);
+  const exF=scored.map(s=>Math.exp(beta*s.ratingFree)); const sumF=exF.reduce((a,b)=>a+b,0)||1; scored.forEach((s,i)=>s.probFree=exF[i]/sumF);
   const order=[...scored].sort((a,b)=>b.rating-a.rating); order.forEach((s,i)=>s.rank=i+1);
   const imp=order.map(s=>{const o=num(s.r.odds); return o>1?1/o:null;}); const impSum=imp.reduce((a,b)=>a+(b||0),0);
-  order.forEach((s,i)=>{ s.market= imp[i]!=null&&impSum>0 ? imp[i]/impSum : null; s.edge= s.market!=null ? s.prob-s.market : null; });
+  order.forEach((s,i)=>{ s.market= imp[i]!=null&&impSum>0 ? imp[i]/impSum : null; s.edge= s.market!=null ? s.probFree-s.market : null; });
   return order;
 }
-function isValue(s,settings){ return s.edge!=null && s.market>=0.04 && s.prob>=0.08 && s.edge>=settings.valueEdge && s.prob/s.market>=1.25; }
+function isValue(s,settings){ return s.edge!=null && s.market>=0.04 && s.probFree>=0.08 && s.edge>=settings.valueEdge && s.probFree/s.market>=1.25; }
 function tier(p){ return p>=0.30?'Strong':p>=0.20?'Fair':'Skinny'; }
-function kellyStake(s, settings){ const o=num(s.r.odds); if(!(o>1)) return 0; const b=o-1, q=1-s.prob; const f=(b*s.prob-q)/b; if(f<=0) return 0; return Math.max(0, Math.round(settings.bank*settings.kelly*f)); }
+function kellyStake(s, settings){ const o=num(s.r.odds); if(!(o>1)) return 0; const p=s.probFree; const b=o-1, q=1-p; const f=(b*p-q)/b; if(f<=0) return 0; return Math.max(0, Math.round(settings.bank*settings.kelly*f)); }
 function modelAdvice(scored, settings){ const top=scored[0]; if(!top) return null; const second=scored[1];
   const value=[...scored].filter(s=>isValue(s,settings)).sort((a,b)=>b.edge-a.edge);
   return {top, tier:tier(top.prob), gap:second?top.prob-second.prob:top.prob, value:value[0]||null, valueAll:value, stakeTop:kellyStake(top,settings), stakeValue:value[0]?kellyStake(value[0],settings):0, roughie:bestRoughie(scored,settings)}; }
 function multiHTML(multi, st){ if(!multi) return ''; return `<div class="banner"><div class="eyebrow" style="color:var(--panel-ink);opacity:.7">Best multi<span class="sl">/</span>${multi.legs.length} legs, model ${pct(multi.prob)}</div>
   <h2>${multi.legs.map(l=>`R${l.raceNo} ${cloth(l.no)}`).join(' ')}</h2><p>${multi.legs.map(l=>`R${l.raceNo} ${esc(l.name)} (${pct(l.prob)})`).join(', ')}.</p>
   <p>Our price $${(1/(multi.prob*Math.pow(st.book,multi.legs.length))).toFixed(1)} (fair $${multi.fair.toFixed(1)})${multi.odds?`, market pays about $${multi.odds.toFixed(1)}${multi.odds>multi.fair*1.1?' which is value':multi.odds<multi.fair*0.9?' which is under the odds':''}`:''}. Suggested stake ${fmtMoney(multi.stake)}.</p></div>`; }
-function bestRoughie(scored, settings){ const cands=scored.filter(s=>num(s.r.odds)>=8&&num(s.r.odds)<=30&&s.prob>=0.05&&s.rank>1); if(!cands.length) return null;
-  const byEdge=[...cands].filter(s=>s.edge!=null).sort((a,b)=>b.edge-a.edge); return byEdge[0]||[...cands].sort((a,b)=>b.prob-a.prob)[0]; }
+function bestRoughie(scored, settings){ const cands=scored.filter(s=>num(s.r.odds)>=8&&num(s.r.odds)<=30&&s.probFree>=0.05&&s.rank>1); if(!cands.length) return null;
+  const byEdge=[...cands].filter(s=>s.edge!=null).sort((a,b)=>b.edge-a.edge); return byEdge[0]||[...cands].sort((a,b)=>b.probFree-a.probFree)[0]; }
 function dayMulti(run, meeting, settings){ const legs=[]; for(const race of meeting.races){ if(race.result) continue; const top=(run.pred[race.no]||[])[0]&&(run.pred[race.no]||[]).find(x=>x.rank===1); if(!top) continue; const r=race.runners.find(h=>h.no===top.no); legs.push({raceNo:race.no,no:top.no,name:r?r.name:'',prob:top.prob,odds:num(r&&r.odds)}); }
   if(legs.length<2) return null; let pick=legs.filter(l=>l.prob>=0.28).sort((a,b)=>b.prob-a.prob).slice(0,4); if(pick.length<2) pick=[...legs].sort((a,b)=>b.prob-a.prob).slice(0,2);
   pick.sort((a,b)=>a.raceNo-b.raceNo); const prob=pick.reduce((a,l)=>a*l.prob,1); const odds=pick.every(l=>l.odds>1)?pick.reduce((a,l)=>a*l.odds,1):null;
@@ -358,18 +364,18 @@ function effectivePick(punter, race, run){ const k=pk(race); const o=punter.pick
    the prediction each race carried when it was run, and the change log. */
 function runDay(punter, meeting){
   const races=[...meeting.races].sort((a,b)=>a.no-b.no); const settings={...DEFAULT_SETTINGS,...punter.settings};
-  let w={...punter.weights}; let formline={}, jockeyWins={}, barrierRel=[]; const dyn={}, pred={}, changes=[];
+  let w={...punter.weights}; let formline={}, jockeyWins={}, barrierRel=[], paceRel=[]; const dyn={}, pred={}, changes=[];
   for(const race of races){
     const fl={...formline}; for(const r of active(race)){ const jw=jockeyWins[normKey(r.jockey)]||0; if(jw>0){ const k=runnerKey(race,r); fl[k]=(fl[k]||0)+Math.min(0.4,0.2*jw); } }
-    dyn[race.no]={formline:fl, barrierBias:barrierBiasFrom(barrierRel)};
+    dyn[race.no]={formline:fl, barrierBias:barrierBiasFrom(barrierRel), paceBias:barrierBiasFrom(paceRel)};
     const scored=scoreRace(race,meeting,w,settings,dyn[race.no],punter.adj);
     pred[race.no]=scored.map(s=>({no:s.r.no,rank:s.rank,prob:s.prob}));
     const res=race.result; if(!res||!res.positions||!res.positions.length) continue;
     const pos=res.positions.map(Number); const n=scored.length; const win=scored.find(s=>s.r.no===pos[0]);
     // form lines, riders and barrier bias for later races
     for(const s of scored){ const idx=pos.indexOf(s.r.no); const actual=idx>=0?idx+1:(pos.length+1+n)/2; let resid=clamp((s.rank-actual)/Math.max(n/2,1),-1,1); if(idx===0) resid=Math.max(resid,0.15);
-      const b=num(s.r.barrier); if(idx===0){ const j=normKey(s.r.jockey); if(j) jockeyWins[j]=(jockeyWins[j]||0)+1; if(b!=null&&n>1) barrierRel.push({rel:(b-1)/(n-1),w:1}); }
-      if(idx===1&&b!=null&&n>1) barrierRel.push({rel:(b-1)/(n-1),w:0.5});
+      const b=num(s.r.barrier); const pc=num(s.r.pace); if(idx===0){ const j=normKey(s.r.jockey); if(j) jockeyWins[j]=(jockeyWins[j]||0)+1; if(b!=null&&n>1) barrierRel.push({rel:(b-1)/(n-1),w:1}); if(pc!=null) paceRel.push({rel:pc,w:1}); }
+      if(idx===1){ if(b!=null&&n>1) barrierRel.push({rel:(b-1)/(n-1),w:0.5}); if(pc!=null) paceRel.push({rel:pc,w:0.5}); }
       const key=normKey(s.r.last&&s.r.last.race); if(!key||Math.abs(resid)<0.05) continue;
       for(const later of races){ if(later.no<=race.no) continue; for(const q of active(later)){ if(normKey(q.last&&q.last.race)!==key) continue;
         const qp=num(q.last.pos), rp=num(s.r.last.pos), qm=num(q.last.margin)||0, rm=num(s.r.last.margin)||0; let f=1; if(qp!=null&&rp!=null&&qp>rp) f=clamp(1-(qm-rm)/6,0.3,1);
@@ -382,7 +388,7 @@ function runDay(punter, meeting){
       const perf=Math.tanh(acc/sw); const w0=w[met.key]; const w1=clamp(w0*(1+settings.lr*perf),met.base*0.15,met.base*2.5); if(Math.abs(w1-w0)>0.005){ w[met.key]=+w1.toFixed(3); entry.items.push(`${met.label} ${w0.toFixed(2)} to ${w1.toFixed(2)}`); } } }
     changes.push(entry);
   }
-  return {weights:w, dyn, pred, changes, final:{barrierBias:barrierBiasFrom(barrierRel), jockeyWins}};
+  return {weights:w, dyn, pred, changes, final:{barrierBias:barrierBiasFrom(barrierRel), paceBias:barrierBiasFrom(paceRel), jockeyWins}};
 }
 function barrierBiasFrom(list){ if(list.length<2) return 0; const sw=list.reduce((a,b)=>a+b.w,0); const mean=list.reduce((a,b)=>a+b.rel*b.w,0)/sw; const dev=0.5-mean; if(Math.abs(dev)<0.12) return 0; return clamp(dev*1.5,-0.6,0.6); }
 
@@ -406,7 +412,7 @@ function settleBet(b){ const meeting=state.meetings[b.meetingId]||state.meeting;
   else if(b.type==='place') ret= placed? st*placeOdds(b) : 0;
   else { const half=st/2; ret=(won?half*(num(b.odds)||1):0)+(placed?half*placeOdds(b):0); }
   return {status: ret>0?'won':'lost', ret:+ret.toFixed(2)}; }
-function clubBook(){ let staked=0, ret=0, open=0; const rows=state.bets.map(b=>{ const s=settleBet(b); staked+=num(b.stake)||0; if(s.status==='open') open+=num(b.stake)||0; else ret+=s.ret; return {...b, ...s}; });
+function clubBook(){ let staked=0, ret=0, open=0; const rows=state.bets.filter(b=>!b.meetingId||state.meetings[b.meetingId]).map(b=>{ const s=settleBet(b); staked+=num(b.stake)||0; if(s.status==='open') open+=num(b.stake)||0; else ret+=s.ret; return {...b, ...s}; });
   return {rows, staked, ret, open, pl:+(ret-(staked-open)).toFixed(2)}; }
 function fmtMoney(v){ return (v<0?'-':'')+'$'+Math.abs(v).toFixed(Math.abs(v)%1?2:0); }
 
@@ -620,7 +626,7 @@ function viewRaces(){
   const fin=run.final;
   const overrides=m.races.filter(r=>me().picks[pk(r)]&&me().picks[pk(r)].win).length;
   html+=`<div class="eyebrow">Model tips<span class="sl">/</span>one per race${overrides?', '+overrides+' overridden by you':''}<span class="sl">/</span>${done} of ${m.races.length} results in</div>
-  <div class="bias"><span>Barrier bias <b>${Math.abs(fin.barrierBias)>0?(fin.barrierBias>0?'inside':'outside')+' ('+fin.barrierBias.toFixed(2)+')':'none read yet'}</b></span>
+  <div class="bias"><span>Barrier bias <b>${Math.abs(fin.barrierBias)>0?(fin.barrierBias>0?'inside':'outside')+' ('+fin.barrierBias.toFixed(2)+')':'none read yet'}</b></span><span>Pace bias <b>${Math.abs(fin.paceBias)>0?(fin.paceBias>0?'on-pace':'backmarkers')+' ('+fin.paceBias.toFixed(2)+')':'none read yet'}</b></span>
   ${Object.keys(fin.jockeyWins).length?`<span>Riders on the board <b>${Object.entries(fin.jockeyWins).map(([j,w])=>titleCase(j)+(w>1?' x'+w:'')).join(', ')}</b></span>`:''}</div>`;
   const st={...DEFAULT_SETTINGS,...me().settings};
   html+=multiHTML(dayMulti(run,m,st),st);
@@ -652,10 +658,10 @@ function viewRace(){
   ${res?`<p class="note">Your model had the winner ${pr?ordinal(pr.rank)+' at '+pct(pr.prob):'unrated'}. ${ep.no===res.positions[0]?(ep.override?'Your override won.':'The model tip won.'):(res.positions.slice(1,3).includes(ep.no)?'The tip ran a place.':'The tip missed.')}${res.by?' Entered by '+esc(res.by)+'.':''}</p>`:`<p class="note">${m.source==='racing.com'?'Results arrive from the feed within a couple of minutes of being declared. Manual entry here is the fallback if the feed is late.':'Enter at least the first four home. It goes to every Pelican\'s model.'} Your weights move only when the winner was rated worse than ${ordinal(st.marginRank)} or under ${pct(st.marginProb)}.</p>`}</section>`;
   if(adv&&!res){ const t=adv.top; const tR=t.r; const mkt=t.r.odds?`market $${t.r.odds}`:'no market price'; const multi=dayMulti(run,m,st); const leg=multi&&multi.legs.find(l=>l.raceNo===race.no); const rg=adv.roughie;
     html+=`<div class="banner"><div class="eyebrow" style="color:var(--panel-ink);opacity:.7">Best bet<span class="sl">/</span>${adv.tier} ${pct(t.prob)}${adv.gap<0.04?', not much between the top two':''}</div>
-    <h2>${cloth(tR.no)} ${esc(tR.name)}</h2><p>Our price ${ourPrice(t.prob,st)} at a ${Math.round(st.book*100)}% book (fair ${fmtOdds(t.prob)}), ${mkt}.${t.edge!=null?(isValue(t,st)?` Value: market ${pct(t.market)}, model ${pct(t.prob)}.`:` No value at the market price.`):''}${adv.stakeTop>0?` Stake ${fmtMoney(adv.stakeTop)} win.`:''}</p>
-    ${adv.value&&adv.value.r.no!==tR.no?`<p><b>Value:</b> ${cloth(adv.value.r.no)} ${esc(adv.value.r.name)} at $${adv.value.r.odds}, our price ${ourPrice(adv.value.prob,st)}.${adv.stakeValue>0?' Stake '+fmtMoney(adv.stakeValue)+'.':''}</p>`:''}
+    <h2>${cloth(tR.no)} ${esc(tR.name)}</h2><p>Our price ${ourPrice(t.prob,st)} at a ${Math.round(st.book*100)}% book (fair ${fmtOdds(t.prob)}), ${mkt}.${t.edge!=null?(isValue(t,st)?` Value: market ${pct(t.market)}, form-only model ${pct(t.probFree)}.`:` No value at the market price (form-only ${pct(t.probFree)} against market ${pct(t.market)}).`):''}${adv.stakeTop>0?` Stake ${fmtMoney(adv.stakeTop)} win.`:''}</p>
+    ${adv.value&&adv.value.r.no!==tR.no?`<p><b>Value:</b> ${cloth(adv.value.r.no)} ${esc(adv.value.r.name)} at $${adv.value.r.odds}, form-only price ${ourPrice(adv.value.probFree,st)} against market ${pct(adv.value.market)}.${adv.stakeValue>0?' Stake '+fmtMoney(adv.stakeValue)+'.':''}</p>`:''}
     <div class="eyebrow" style="color:var(--panel-ink);opacity:.7;margin-top:12px">Best roughie</div>
-    ${rg?`<p style="margin-top:4px"><b>${cloth(rg.r.no)} ${esc(rg.r.name)}</b> at $${rg.r.odds}, our price ${ourPrice(rg.prob,st)}. ${rg.prob>=0.10?'Worth an each way.':'Small win bet or leave it.'}</p>`:`<p style="margin-top:4px">Nothing at $8 or better the model can make a case for.</p>`}
+    ${rg?`<p style="margin-top:4px"><b>${cloth(rg.r.no)} ${esc(rg.r.name)}</b> at $${rg.r.odds}, form-only price ${ourPrice(rg.probFree,st)}. ${rg.probFree>=0.10?'Worth an each way.':'Small win bet or leave it.'}</p>`:`<p style="margin-top:4px">Nothing at $8 or better the model can make a case for.</p>`}
     <div class="eyebrow" style="color:var(--panel-ink);opacity:.7;margin-top:12px">Multi</div>
     <p style="margin-top:4px">${leg?`${esc(tR.name)} is a leg of the day's multi (${multi.legs.length} legs, fair $${multi.fair.toFixed(1)}).`:multi?`Not in the multi. Legs are ${multi.legs.map(l=>'R'+l.raceNo).join(', ')}.`:'No multi while fewer than two races are open.'}</p>
     ${ep.override?`<p>You have overridden this race to number ${ep.no}. Tap its Tip button again to go back to the model.</p>`:''}</div>`; }
@@ -663,7 +669,7 @@ function viewRace(){
   const maxR=Math.max(...scored.map(s=>s.rating)), minR=Math.min(...scored.map(s=>s.rating)); const span=(maxR-minR)||1;
   for(const s of scored){ const r=s.r; const k=runnerKey(race,r); const open=state.ui.open===k; const dynv=s.contrib.formline+s.contrib.manual; const a=my.adj[k]||{adj:0,note:''};
     const chips=[]; if(r.barrier!=null) chips.push(`Bar ${r.barrier}`); if(r.weight!=null) chips.push(`${r.weight}kg`); if(r.form) chips.push(`Form ${esc(r.form)}`);
-    if(r.last&&r.last.pos!=null) chips.push(`Last ${r.last.pos}${r.last.field?'/'+r.last.field:''}${r.last.margin!=null&&r.last.pos>1?' '+r.last.margin+'L':''}`); if(r.last&&r.last.days!=null) chips.push(`${r.last.days}d`); if(r.odds) chips.push(`$${r.odds}`);
+    if(r.last&&r.last.pos!=null) chips.push(`Last ${r.last.pos}${r.last.field?'/'+r.last.field:''}${r.last.margin!=null&&r.last.pos>1?' '+r.last.margin+'L':''}`); if(r.last&&r.last.days!=null) chips.push(`${r.last.days}d`); if(num(r.pace)!=null) chips.push(num(r.pace)<0.25?'Leads':num(r.pace)<0.5?'On pace':num(r.pace)<0.75?'Midfield':'Back'); if(r.odds) chips.push(`$${r.odds}`);
     if(s.z.formline>0.05) chips.push(`<span class="chip up">Form line +${s.z.formline.toFixed(2)}</span>`); if(s.z.formline<-0.05) chips.push(`<span class="chip dn">Form line ${s.z.formline.toFixed(2)}</span>`);
     if(a.adj) chips.push(`<span class="chip ${a.adj>0?'up':'dn'}">Your call ${a.adj>0?'+':''}${a.adj}</span>`); if(s.missing>=3) chips.push(`<span class="chip">thin data</span>`);
     if(others.length>1&&flockProb[r.no]!=null) chips.push(`<span class="chip">Flock ${pct(flockProb[r.no])}</span>`);
@@ -767,7 +773,7 @@ function viewLoad(){
   ${live?`<div class="actions" style="margin-bottom:14px"><button class="btn primary" id="syncBtn" data-act="sync">Sync now</button><span class="small">Use this if a result or a scratching looks late.</span></div>`:''}
   <div class="rows">`;
   for(const m of ms){ const loaded=m.races.filter(r=>r.runners&&r.runners.length).length; const done=m.races.filter(r=>r.result).length;
-    html+=`<button class="row" data-act="meeting" data-id="${esc(m.id)}" data-go="races"><span class="idx num">${m.sort&&m.sort<90?m.sort:''}</span><span><span class="t">${esc(m.meeting)}</span><br><span class="s">${esc(m.state||'')} ${esc(m.condition||'')}${m.rail?', rail '+esc(m.rail):''}. ${loaded}/${m.races.length} fields, ${done} results.${m.syncedAt?' Read '+fmtTime(m.syncedAt)+'.':''}${m.manual?' Loaded by hand.':''}</span></span><span class="r"><b>${m.races.length}</b>races</span></button>`; }
+    html+=`<button class="row" data-act="meeting" data-id="${esc(m.id)}" data-go="races"><span class="idx num">${m.sort&&m.sort<90?m.sort:''}</span><span><span class="t">${esc(m.meeting)}</span><br><span class="s">${esc(m.date||'')} ${esc(m.state||'')} ${esc(m.condition||'')}${m.rail?', rail '+esc(m.rail):''}. ${loaded}/${m.races.length} fields, ${done} results.${m.syncedAt?' Read '+fmtTime(m.syncedAt)+'.':''}${m.manual?' Loaded by hand.':''}</span></span><span class="r"><b>${m.races.length}</b>races</span></button>`; }
   if(!ms.length) html+=`<p class="note" style="padding:10px 0">No meetings on the feed yet.${live?' Press Sync now.':''}</p>`;
   html+=`</div>`;
   html+=`<details style="margin-top:26px"><summary class="eyebrow" style="cursor:pointer">Manual load<span class="sl">/</span>JSON or CSV, fallback only</summary>

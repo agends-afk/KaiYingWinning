@@ -43,6 +43,11 @@ function lastStart(form: any[] | null, meetDate: string, todayClass: string) {
   const tr = classRank(todayClass), lr = classRank(l.raceClass); let cc = 0; if (tr != null && lr != null && Math.abs(tr - lr) >= 5) cc = tr > lr ? 1 : -1;
   return { pos: l.position ?? null, field: l.starters ?? null, margin: l.position === 1 ? 0 : num(l.margin), days, race: String(l.raceCode ?? ""), classChange: cc, venue: l.venue ?? "", date: l.date };
 }
+// average early position over the last four real runs, 0 = led, 1 = last
+function paceOf(form: any[] | null, meetDate: string): number | null {
+  if (!form) return null; const runs = form.filter(f => !f.isTrial && !f.isJumpOut && f.date && f.date < meetDate && f.positionAt800 && f.starters > 1).sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 4);
+  if (!runs.length) return null; const v = runs.reduce((a, f) => a + Math.min(1, Math.max(0, (f.positionAt800 - 1) / (f.starters - 1))), 0) / runs.length; return +v.toFixed(2);
+}
 function formString(lastTen: unknown): string {
   try { const arr = JSON.parse(String(lastTen ?? "[]")); return arr.map((c: string) => (c === "-" ? "x" : c)).join("").slice(-8); } catch { return ""; }
 }
@@ -53,7 +58,7 @@ function mapEntry(e: any, meetDate: string, todayClass: string) {
     no: e.raceEntryNumber, name: e.horseName ?? h.name ?? "", barrier: e.liveBarrierNumber || e.barrierNumber || null,
     weight: num(e.weightCarried ?? e.weight), jockey: e.jockey?.fullName ?? e.jockeyName ?? "", trainer: e.trainer?.fullName ?? e.trainerName ?? "",
     age: h.age ?? null, sex: h.sex ? String(h.sex)[0] : "",
-    career: stats(h.careerStats), track: stats(e.trackStats), distance: stats(e.distanceStats), trackDistance: stats(e.trackDistanceStats),
+    career: stats(h.careerStats), track: stats(e.trackStats), distance: stats(e.distanceStats), trackDistance: stats(e.trackDistanceStats), barrierRec: stats(e.atThisBarrierNumberStats), classRec: stats(e.atThisClassStats), pace: paceOf(h.horseForm, meetDate),
     good: stats(h.goodStats), soft: stats(h.softStats), heavy: stats(h.heavyStats), firstUp: stats(h.firstUpStats), secondUp: stats(h.secondUpStats),
     form: formString(h.lastTen), last: lastStart(h.horseForm, meetDate, todayClass),
     jockeyPct: num(e.jockey?.winPercent), trainerPct: num(e.trainer?.winPercent), jockeyRecentPct: num(e.jockey?.recentWinPercent), trainerRecentPct: num(e.trainer?.recentWinPercent),
@@ -66,8 +71,8 @@ function mapEntry(e: any, meetDate: string, todayClass: string) {
 const RACE_FIELDS = `id raceNumber name distance class raceStatus status hasResults resultsString trackCondition trackRating time runnersCount fieldCount totalPrizeMoney`;
 const FORM_QUERY = (meet: string, no: number) => `{ r: getRaceForm(meetCode:"${meet}", raceNumber:${no}){ ${RACE_FIELDS}
   raceEntries { ...E } formRaceEntries { ...E } } }
-fragment E on RaceEntryItem { id raceEntryNumber barrierNumber liveBarrierNumber weight weightCarried scratched isLateScratching emergency finish horseName horseCode jockeyName trainerName gearChanges commentShort trackStats distanceStats trackDistanceStats handicapRating
-    horse { id name age sex careerStats lastTen goodStats softStats heavyStats firstUpStats secondUpStats rating horseForm { date venue distance position starters margin raceClass raceCode isTrial isJumpOut } }
+fragment E on RaceEntryItem { id raceEntryNumber barrierNumber liveBarrierNumber weight weightCarried scratched isLateScratching emergency finish horseName horseCode jockeyName trainerName gearChanges commentShort trackStats distanceStats trackDistanceStats atThisBarrierNumberStats atThisClassStats handicapRating
+    horse { id name age sex careerStats lastTen goodStats softStats heavyStats firstUpStats secondUpStats rating horseForm { date venue distance position starters margin raceClass raceCode isTrial isJumpOut positionAt800 positionAt400 } }
     jockey { fullName winPercent recentWinPercent apprentice weightClaim } trainer { fullName winPercent recentWinPercent } odds { providerCode oddsWin } }`;
 
 async function syncMeeting(feed: any, existing: any | null, force: boolean) {
@@ -105,6 +110,37 @@ async function syncMeeting(feed: any, existing: any | null, force: boolean) {
   return { meetId, name: meeting.meeting, races: outRaces.length, fetched, results: results.length };
 }
 
+// Metro venues we follow, matched on racing.com's venue slug. Order within a state is the order here.
+const METRO: [RegExp, string, string][] = [
+  [/flemington/, "Flemington", "VIC"], [/caulfield/, "Caulfield", "VIC"], [/moonee-valley|the-valley/, "Moonee Valley", "VIC"], [/sandown/, "Sandown", "VIC"],
+  [/randwick/, "Randwick", "NSW"], [/rosehill/, "Rosehill", "NSW"], [/warwick-farm/, "Warwick Farm", "NSW"], [/canterbury/, "Canterbury", "NSW"], [/kensington/, "Kensington", "NSW"],
+  [/eagle-farm/, "Eagle Farm", "QLD"], [/doomben/, "Doomben", "QLD"], [/gold-coast/, "Gold Coast", "QLD"], [/sunshine-coast/, "Sunshine Coast", "QLD"],
+  [/morphettville/, "Morphettville", "SA"], [/ascot/, "Ascot", "WA"], [/belmont/, "Belmont", "WA"],
+];
+const STATE_ORDER: Record<string, number> = { VIC: 1, NSW: 2, QLD: 3, SA: 4, WA: 5 };
+function aestDate(offsetDays = 0) { const d = new Date(Date.now() + 10 * 3600 * 1000 + offsetDays * 86400000); return d.toISOString().slice(0, 10); }
+// Keep the feed pointed at the next metro race day. Runs on every call; does nothing while the current feed is still current.
+async function rollFeed(): Promise<string | null> {
+  const { data: feeds } = await sb.from("kyw_feed").select("*").eq("active", true);
+  const yesterday = aestDate(-1);
+  if ((feeds ?? []).some((f: any) => f.date && String(f.date) >= yesterday)) return null;
+  for (let d = 0; d <= 8; d++) {
+    const date = aestDate(d);
+    const data = await gql(`{ m: GetMeetingByDate(date:"${date}"){ id venueName state isTab isTrial isJumpOut status } }`);
+    const found: any[] = [];
+    for (const m of data.m ?? []) { if (m.isTab !== 1 || m.isTrial || m.isJumpOut) continue; const slug = String(m.venueName ?? "").toLowerCase();
+      const hit = METRO.find(([re]) => re.test(slug)); if (!hit) continue; if (found.some(f => f.state === hit[2])) continue; // one metro per state
+      found.push({ meet_id: String(m.id), name: hit[1], state: hit[2], date, sort: STATE_ORDER[hit[2]] ?? 9 }); }
+    if (!found.length) continue;
+    await sb.from("kyw_feed").update({ active: false }).eq("active", true);
+    await sb.from("kyw_feed").upsert(found.map(({ state, ...f }) => ({ ...f, active: true })), { onConflict: "meet_id" });
+    const keep = found.map(f => f.meet_id);
+    const { data: olds } = await sb.from("kyw_meeting").select("id"); for (const o of olds ?? []) { if (!keep.includes(String(o.id))) await sb.from("kyw_meeting").delete().eq("id", o.id); }
+    return date;
+  }
+  return null;
+}
+
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "content-type, x-flock-code, authorization, apikey", "Access-Control-Allow-Methods": "GET, POST, OPTIONS" };
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
@@ -113,6 +149,7 @@ Deno.serve(async (req) => {
   if (code !== FLOCK) return new Response(JSON.stringify({ error: "not the flock" }), { status: 401, headers: { "Content-Type": "application/json", ...CORS } });
   const force = url.searchParams.get("force") === "1";
   const only = url.searchParams.get("meet");
+  let rolled: string | null = null; try { rolled = await rollFeed(); } catch (e) { console.error("rollFeed", e); }
   const { data: feeds, error } = await sb.from("kyw_feed").select("*").eq("active", true).order("sort");
   if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { "Content-Type": "application/json", ...CORS } });
   const { data: existingRows } = await sb.from("kyw_meeting").select("id,data");
@@ -120,6 +157,6 @@ Deno.serve(async (req) => {
   const out: any[] = [];
   for (const f of feeds ?? []) { if (only && String(f.meet_id) !== only) continue;
     try { out.push(await syncMeeting(f, existing[String(f.meet_id)] ?? null, force)); } catch (e) { out.push({ meetId: f.meet_id, error: String(e).slice(0, 300) }); } }
-  await sb.from("kyw_feed_log").insert({ summary: out });
-  return new Response(JSON.stringify({ ok: true, at: new Date().toISOString(), meetings: out }), { headers: { "Content-Type": "application/json", ...CORS } });
+  await sb.from("kyw_feed_log").insert({ summary: { rolled, meetings: out } });
+  return new Response(JSON.stringify({ ok: true, at: new Date().toISOString(), rolled, meetings: out }), { headers: { "Content-Type": "application/json", ...CORS } });
 });
