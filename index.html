@@ -329,7 +329,16 @@ function tier(p){ return p>=0.30?'Strong':p>=0.20?'Fair':'Skinny'; }
 function kellyStake(s, settings){ const o=num(s.r.odds); if(!(o>1)) return 0; const b=o-1, q=1-s.prob; const f=(b*s.prob-q)/b; if(f<=0) return 0; return Math.max(0, Math.round(settings.bank*settings.kelly*f)); }
 function modelAdvice(scored, settings){ const top=scored[0]; if(!top) return null; const second=scored[1];
   const value=[...scored].filter(s=>isValue(s,settings)).sort((a,b)=>b.edge-a.edge);
-  return {top, tier:tier(top.prob), gap:second?top.prob-second.prob:top.prob, value:value[0]||null, valueAll:value, stakeTop:kellyStake(top,settings), stakeValue:value[0]?kellyStake(value[0],settings):0}; }
+  return {top, tier:tier(top.prob), gap:second?top.prob-second.prob:top.prob, value:value[0]||null, valueAll:value, stakeTop:kellyStake(top,settings), stakeValue:value[0]?kellyStake(value[0],settings):0, roughie:bestRoughie(scored,settings)}; }
+function multiHTML(multi, st){ if(!multi) return ''; return `<div class="banner"><div class="eyebrow" style="color:var(--panel-ink);opacity:.7">Best multi<span class="sl">/</span>${multi.legs.length} legs, model ${pct(multi.prob)}</div>
+  <h2>${multi.legs.map(l=>`R${l.raceNo} ${cloth(l.no)}`).join(' ')}</h2><p>${multi.legs.map(l=>`R${l.raceNo} ${esc(l.name)} (${pct(l.prob)})`).join(', ')}.</p>
+  <p>Fair odds $${multi.fair.toFixed(1)}${multi.odds?`, market pays about $${multi.odds.toFixed(1)}${multi.odds>multi.fair*1.1?' which is value':multi.odds<multi.fair*0.9?' which is under the odds':''}`:''}. Suggested stake ${fmtMoney(multi.stake)}.</p></div>`; }
+function bestRoughie(scored, settings){ const cands=scored.filter(s=>num(s.r.odds)>=8&&num(s.r.odds)<=30&&s.prob>=0.05&&s.rank>1); if(!cands.length) return null;
+  const byEdge=[...cands].filter(s=>s.edge!=null).sort((a,b)=>b.edge-a.edge); return byEdge[0]||[...cands].sort((a,b)=>b.prob-a.prob)[0]; }
+function dayMulti(run, meeting, settings){ const legs=[]; for(const race of meeting.races){ if(race.result) continue; const top=(run.pred[race.no]||[])[0]&&(run.pred[race.no]||[]).find(x=>x.rank===1); if(!top) continue; const r=race.runners.find(h=>h.no===top.no); legs.push({raceNo:race.no,no:top.no,name:r?r.name:'',prob:top.prob,odds:num(r&&r.odds)}); }
+  if(legs.length<2) return null; let pick=legs.filter(l=>l.prob>=0.28).sort((a,b)=>b.prob-a.prob).slice(0,4); if(pick.length<2) pick=[...legs].sort((a,b)=>b.prob-a.prob).slice(0,2);
+  pick.sort((a,b)=>a.raceNo-b.raceNo); const prob=pick.reduce((a,l)=>a*l.prob,1); const odds=pick.every(l=>l.odds>1)?pick.reduce((a,l)=>a*l.odds,1):null;
+  return {legs:pick, prob, odds, fair:1/prob, stake:Math.max(5,Math.round(settings.bank*0.02/5)*5)}; }
 function effectivePick(punter, raceNo, run){ const o=punter.picks&&punter.picks[raceNo]&&punter.picks[raceNo].win; if(o) return {no:o, override:true}; const p=(run.pred[raceNo]||[]).find(x=>x.rank===1); return p?{no:p.no, override:false}:{no:null,override:false}; }
 
 /* ---------------- run the day for one punter ----------------
@@ -585,12 +594,13 @@ function viewRaces(){
   html+=`<div class="eyebrow">Model tips<span class="sl">/</span>one per race${overrides?', '+overrides+' overridden by you':''}<span class="sl">/</span>${done} of ${m.races.length} results in</div>
   <div class="bias"><span>Barrier bias <b>${Math.abs(fin.barrierBias)>0?(fin.barrierBias>0?'inside':'outside')+' ('+fin.barrierBias.toFixed(2)+')':'none read yet'}</b></span>
   ${Object.keys(fin.jockeyWins).length?`<span>Riders on the board <b>${Object.entries(fin.jockeyWins).map(([j,w])=>titleCase(j)+(w>1?' x'+w:'')).join(', ')}</b></span>`:''}</div>`;
-  html+=`<section class="block" style="margin-top:14px"><div class="rows">`;
   const st={...DEFAULT_SETTINGS,...me().settings};
+  html+=multiHTML(dayMulti(run,m,st),st);
+  html+=`<section class="block" style="margin-top:14px"><div class="rows">`;
   for(const race of m.races){ const p=run.pred[race.no]||[]; const res=race.result; const ep=effectivePick(me(),race.no,run); const epR=ep.no&&race.runners.find(r=>r.no===ep.no); let right;
     const scored=scoreRace(race,m,run.weights,st,run.dyn[race.no],me().adj); const adv=modelAdvice(scored,st);
     if(res){ const w=race.runners.find(r=>r.no===res.positions[0]); const pr=p.find(x=>x.no===res.positions[0]); const hit=ep.no===res.positions[0]; right=`<span class="tag ${hit?'good':(pr&&pr.rank<=st.marginRank?'acc':'warn')}">${hit?'Tip won':(pr?'Tip ran '+ordinal(pr.rank)+' rated':'result')}</span><b>${esc(w?w.name:res.positions[0])}</b>`; }
-    else if(adv){ right=`<span class="tag ${ep.override?'acc':(adv.tier==='Strong'?'good':adv.tier==='Fair'?'':'warn')}">${ep.override?'Your override':adv.tier+' '+pct(adv.top.prob)}</span>${!ep.override&&isValue(adv.top,st)?`<span class="tag acc">Value</span>`:(adv.value&&!ep.override?`<span class="tag">Value elsewhere</span>`:'')}<b>${esc(epR?epR.name:'')}</b>`; }
+    else if(adv){ right=`<span class="tag ${ep.override?'acc':(adv.tier==='Strong'?'good':adv.tier==='Fair'?'':'warn')}">${ep.override?'Your override':adv.tier+' '+pct(adv.top.prob)}</span>${!ep.override&&isValue(adv.top,st)?`<span class="tag acc">Value</span>`:''}<b>${esc(epR?epR.name:'')}</b>${adv.roughie?`<span class="small">Roughie ${adv.roughie.r.no} ${esc(adv.roughie.r.name)} $${adv.roughie.r.odds}</span>`:''}`; }
     else right='<b>no runners</b>';
     html+=`<button class="row" data-act="openrace" data-no="${race.no}"><span class="idx num">${race.no}</span><span><span class="t">${esc(race.name||'Race '+race.no)}</span><br><span class="s">${race.distance?race.distance+'m':''} ${esc(race.class||'')} ${race.time?'at '+esc(race.time):''} ${active(race).length} runners</span></span><span class="r">${right}</span></button>`; }
   return html+`</div></section>`;
@@ -611,10 +621,14 @@ function viewRace(){
   <div class="result-entry" style="margin-top:8px"><label class="field">Finishing order, saddlecloth numbers<input id="resIn" placeholder="e.g. 7 2 11 4" value="${res?esc(res.positions.join(' ')):''}" inputmode="numeric"></label>
   <button class="btn primary" data-act="result">${res?'Update result':'Enter result'}</button>${res?`<button class="btn danger" data-act="clearresult">Clear</button>`:''}</div>
   ${res?`<p class="note">Your model had the winner ${pr?ordinal(pr.rank)+' at '+pct(pr.prob):'unrated'}. ${ep.no===res.positions[0]?(ep.override?'Your override won.':'The model tip won.'):(res.positions.slice(1,3).includes(ep.no)?'The tip ran a place.':'The tip missed.')}${res.by?' Entered by '+esc(res.by)+'.':''}</p>`:`<p class="note">Enter at least the first four home. It goes to every Pelican's model. Your weights move only when the winner was rated worse than ${ordinal(my.settings.marginRank)} or under ${pct(my.settings.marginProb)}.</p>`}</section>`;
-  if(adv&&!res){ const t=adv.top; const tR=t.r; const mkt=t.r.odds?`market $${t.r.odds}`:'no market price'; 
-    html+=`<div class="banner"><div class="eyebrow" style="color:var(--panel-ink);opacity:.7">Model says<span class="sl">/</span>${adv.tier} ${pct(t.prob)}${adv.gap<0.04?', not much between the top two':''}</div>
-    <h2>${cloth(tR.no)} ${esc(tR.name)}</h2><p>Fair price ${fmtOdds(t.prob)}, ${mkt}.${t.edge!=null?(isValue(t,st)?` Value: the market has it ${pct(t.market)}, the model ${pct(t.prob)}.`:` No value at the market price.`):''}${adv.stakeTop>0?` Suggested stake ${fmtMoney(adv.stakeTop)} win from a ${fmtMoney(st.bank)} bank.`:''}</p>
-    ${adv.value&&adv.value.r.no!==tR.no?`<p><b>Value bet:</b> ${cloth(adv.value.r.no)} ${esc(adv.value.r.name)} at $${adv.value.r.odds}. Model ${pct(adv.value.prob)} against market ${pct(adv.value.market)}.${adv.stakeValue>0?' Suggested stake '+fmtMoney(adv.stakeValue)+'.':''}</p>`:''}
+  if(adv&&!res){ const t=adv.top; const tR=t.r; const mkt=t.r.odds?`market $${t.r.odds}`:'no market price'; const multi=dayMulti(run,m,st); const leg=multi&&multi.legs.find(l=>l.raceNo===race.no); const rg=adv.roughie;
+    html+=`<div class="banner"><div class="eyebrow" style="color:var(--panel-ink);opacity:.7">Best bet<span class="sl">/</span>${adv.tier} ${pct(t.prob)}${adv.gap<0.04?', not much between the top two':''}</div>
+    <h2>${cloth(tR.no)} ${esc(tR.name)}</h2><p>Fair ${fmtOdds(t.prob)}, ${mkt}.${t.edge!=null?(isValue(t,st)?` Value: market ${pct(t.market)}, model ${pct(t.prob)}.`:` No value at the market price.`):''}${adv.stakeTop>0?` Stake ${fmtMoney(adv.stakeTop)} win.`:''}</p>
+    ${adv.value&&adv.value.r.no!==tR.no?`<p><b>Value:</b> ${cloth(adv.value.r.no)} ${esc(adv.value.r.name)} at $${adv.value.r.odds}, model ${pct(adv.value.prob)} against market ${pct(adv.value.market)}.${adv.stakeValue>0?' Stake '+fmtMoney(adv.stakeValue)+'.':''}</p>`:''}
+    <div class="eyebrow" style="color:var(--panel-ink);opacity:.7;margin-top:12px">Best roughie</div>
+    ${rg?`<p style="margin-top:4px"><b>${cloth(rg.r.no)} ${esc(rg.r.name)}</b> at $${rg.r.odds}. Model ${pct(rg.prob)}${rg.market!=null?' against market '+pct(rg.market):''}. ${rg.prob>=0.10?'Worth an each way.':'Small win bet or leave it.'}</p>`:`<p style="margin-top:4px">Nothing at $8 or better the model can make a case for.</p>`}
+    <div class="eyebrow" style="color:var(--panel-ink);opacity:.7;margin-top:12px">Multi</div>
+    <p style="margin-top:4px">${leg?`${esc(tR.name)} is a leg of the day's multi (${multi.legs.length} legs, fair $${multi.fair.toFixed(1)}).`:multi?`Not in the multi. Legs are ${multi.legs.map(l=>'R'+l.raceNo).join(', ')}.`:'No multi while fewer than two races are open.'}</p>
     ${ep.override?`<p>You have overridden this race to number ${ep.no}. Tap its Tip button again to go back to the model.</p>`:''}</div>`; }
   html+=`<section class="block"><div class="eyebrow">Ratings<span class="sl">/</span>tap a name for the reasons, Tip to override the model</div><div class="rows" style="margin-top:8px">`;
   const maxR=Math.max(...scored.map(s=>s.rating)), minR=Math.min(...scored.map(s=>s.rating)); const span=(maxR-minR)||1;
