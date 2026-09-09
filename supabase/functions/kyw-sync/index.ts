@@ -68,7 +68,7 @@ function mapEntry(e: any, meetDate: string, todayClass: string) {
     jockeyPct: num(e.jockey?.winPercent), trainerPct: num(e.trainer?.winPercent), jockeyRecentPct: num(e.jockey?.recentWinPercent), trainerRecentPct: num(e.trainer?.recentWinPercent),
     apprentice: !!e.jockey?.apprentice, claim: num(e.jockey?.weightClaim), rating: num(h.rating ?? e.handicapRating),
     odds: odds(e.odds), scratched: !!(e.scratched || e.isLateScratching || e.finish === 109), emergency: !!e.emergency,
-    gear: e.gearChanges ?? "", comment: e.commentShort ?? "", horseCode: String(e.horseCode ?? h.id ?? ""), finish: e.finish ?? null,
+    gear: e.gearChanges ?? "", comment: e.commentShort ?? "", horseCode: String(e.horseCode ?? h.id ?? ""), finish: e.finish ?? null, sp: num(e.startingPrice),
   };
 }
 
@@ -77,7 +77,7 @@ const FORM_QUERY = (meet: string, no: number) => `{ r: getRaceForm(meetCode:"${m
   raceEntries { ...E } formRaceEntries { ...E } } }
 fragment E on RaceEntryItem { id raceEntryNumber barrierNumber liveBarrierNumber weight weightCarried scratched isLateScratching emergency finish horseName horseCode jockeyName trainerName gearChanges commentShort trackStats distanceStats trackDistanceStats atThisBarrierNumberStats atThisClassStats handicapRating
     horse { id name age sex careerStats lastTen goodStats softStats heavyStats firstUpStats secondUpStats rating horseForm { date venue distance position starters margin raceClass raceCode isTrial isJumpOut positionAt800 positionAt400 } }
-    jockey { fullName winPercent recentWinPercent apprentice weightClaim } trainer { fullName winPercent recentWinPercent } odds { providerCode oddsWin } }`;
+    jockey { fullName winPercent recentWinPercent apprentice weightClaim } trainer { fullName winPercent recentWinPercent } odds { providerCode oddsWin } startingPrice }`;
 
 async function syncMeeting(feed: any, existing: any | null, force: boolean) {
   const meetId = String(feed.meet_id);
@@ -145,6 +145,22 @@ async function rollFeed(): Promise<string | null> {
   return null;
 }
 
+// Backtest: a finished meeting, mapped as the app would have seen it that morning (runs on or after the day excluded), priced at SP, with results.
+async function backtest(meetId: string) {
+  const d = await gql(`{ m: getMeeting(id:"${meetId}"){ id date meetingName venueName state trackCondition trackRating } races: getRacesForMeet(meetCode:"${meetId}"){ ${RACE_FIELDS} } }`);
+  const m = d.m ?? {}; const meetDate = m.date; const out: any[] = [];
+  for (const r of (d.races ?? []).sort((a: any, b: any) => a.raceNumber - b.raceNumber)) {
+    const fd = await gql(FORM_QUERY(meetId, r.raceNumber)); const fr = fd.r ?? r;
+    const entries = (fr.raceEntries && fr.raceEntries.length) ? fr.raceEntries : (fr.formRaceEntries ?? []);
+    const runners = entries.map((e: any) => mapEntry(e, meetDate, fr.class ?? r.class)).map((x: any) => ({ ...x, odds: x.sp ?? x.odds })).sort((a: any, b: any) => a.no - b.no);
+    const positions = runners.filter((x: any) => x.finish && x.finish > 0 && x.finish < 100).sort((a: any, b: any) => a.finish - b.finish).map((x: any) => x.no);
+    out.push({ no: r.raceNumber, name: fr.name, distance: num(fr.distance), class: fr.class, condition: [fr.trackCondition, fr.trackRating].filter(Boolean).join(" "), runners: runners.map(({ finish, ...rest }: any) => rest), result: positions.length >= 3 ? { positions } : null });
+  }
+  const data = { id: meetId, meeting: m.venueName, date: meetDate, condition: [m.trackCondition, m.trackRating].filter(Boolean).join(" "), races: out };
+  await sb.from("kyw_backtest").upsert({ meet_id: meetId, data, created_at: new Date().toISOString() });
+  return { meetId, name: m.venueName, races: out.length, withResults: out.filter(x => x.result).length };
+}
+
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "content-type, x-flock-code, authorization, apikey", "Access-Control-Allow-Methods": "GET, POST, OPTIONS" };
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
@@ -153,6 +169,8 @@ Deno.serve(async (req) => {
   if (code !== FLOCK) return new Response(JSON.stringify({ error: "not the flock" }), { status: 401, headers: { "Content-Type": "application/json", ...CORS } });
   const force = url.searchParams.get("force") === "1";
   const only = url.searchParams.get("meet");
+  const bt = url.searchParams.get("backtest");
+  if (bt) { try { const r = await backtest(bt); return new Response(JSON.stringify(r), { headers: { "Content-Type": "application/json", ...CORS } }); } catch (e) { return new Response(JSON.stringify({ error: String(e).slice(0, 400) }), { status: 500, headers: { "Content-Type": "application/json", ...CORS } }); } }
   let rolled: string | null = null; try { rolled = await rollFeed(); } catch (e) { console.error("rollFeed", e); }
   const { data: feeds, error } = await sb.from("kyw_feed").select("*").eq("active", true).order("sort");
   if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { "Content-Type": "application/json", ...CORS } });
