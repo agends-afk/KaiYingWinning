@@ -52,8 +52,13 @@ function recentRuns(form: any[] | null, meetDate: string) {
   if (!form) return null; const runs = form.filter(f => !f.isTrial && !f.isJumpOut && f.date && f.date < meetDate).sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 3);
   return runs.map(l => ({ pos: l.position ?? null, field: l.starters ?? null, margin: l.position === 1 ? 0 : num(l.margin), cls: classRank(l.raceClass), date: l.date, venue: l.venue ?? "" }));
 }
-function formString(lastTen: unknown): string {
-  try { const arr = JSON.parse(String(lastTen ?? "[]")); return arr.map((c: string) => (c === "-" ? "x" : c)).join("").slice(-8); } catch { return ""; }
+function formFromRuns(form: any[] | null, meetDate: string, lastTen: unknown): string {
+  const runs = (form ?? []).filter(f => !f.isTrial && !f.isJumpOut && f.date && f.date < meetDate && f.position).sort((a, b) => (a.date < b.date ? -1 : 1));
+  if (!runs.length) { try { const arr = JSON.parse(String(lastTen ?? "[]")); return arr.map((c: string) => (c === "-" ? "x" : c)).join("").slice(-8); } catch { return ""; } }
+  let out = ""; let prev: string | null = null;
+  for (const r of runs) { if (prev && (Date.parse(r.date) - Date.parse(prev)) / 86400000 >= 84) out += "x"; out += r.position >= 10 ? "0" : String(r.position); prev = r.date; }
+  if (prev && (Date.parse(meetDate) - Date.parse(prev)) / 86400000 >= 84) out += "x";
+  return out.slice(-8);
 }
 
 function mapEntry(e: any, meetDate: string, todayClass: string) {
@@ -64,7 +69,7 @@ function mapEntry(e: any, meetDate: string, todayClass: string) {
     age: h.age ?? null, sex: h.sex ? String(h.sex)[0] : "",
     career: stats(h.careerStats), track: stats(e.trackStats), distance: stats(e.distanceStats), trackDistance: stats(e.trackDistanceStats), barrierRec: stats(e.atThisBarrierNumberStats), classRec: stats(e.atThisClassStats), pace: paceOf(h.horseForm, meetDate),
     good: stats(h.goodStats), soft: stats(h.softStats), heavy: stats(h.heavyStats), firstUp: stats(h.firstUpStats), secondUp: stats(h.secondUpStats),
-    form: formString(h.lastTen), last: lastStart(h.horseForm, meetDate, todayClass), recent: recentRuns(h.horseForm, meetDate),
+    form: formFromRuns(h.horseForm, meetDate, h.lastTen), last: lastStart(h.horseForm, meetDate, todayClass), recent: recentRuns(h.horseForm, meetDate),
     jockeyPct: num(e.jockey?.winPercent), trainerPct: num(e.trainer?.winPercent), jockeyRecentPct: num(e.jockey?.recentWinPercent), trainerRecentPct: num(e.trainer?.recentWinPercent),
     apprentice: !!e.jockey?.apprentice, claim: num(e.jockey?.weightClaim), rating: num(h.rating ?? e.handicapRating),
     odds: odds(e.odds), scratched: !!(e.scratched || e.isLateScratching || e.finish === 109), emergency: !!e.emergency,
@@ -152,7 +157,10 @@ async function backtest(meetId: string) {
   for (const r of (d.races ?? []).sort((a: any, b: any) => a.raceNumber - b.raceNumber)) {
     const fd = await gql(FORM_QUERY(meetId, r.raceNumber)); const fr = fd.r ?? r;
     const entries = (fr.raceEntries && fr.raceEntries.length) ? fr.raceEntries : (fr.formRaceEntries ?? []);
-    const runners = entries.map((e: any) => mapEntry(e, meetDate, fr.class ?? r.class)).map((x: any) => ({ ...x, odds: x.sp ?? x.odds })).sort((a: any, b: any) => a.no - b.no);
+    const cond = String(fr.trackCondition ?? "").toLowerCase(); const catKey = cond.startsWith("h") ? "heavy" : (cond.startsWith("so") || cond.startsWith("sy")) ? "soft" : "good";
+    const unrun = (rec: any, fin: number | null) => { if (!rec || !fin || fin > 100) return rec; const [s, w, p] = rec; return [Math.max(0, s - 1), Math.max(0, w - (fin === 1 ? 1 : 0)), Math.max(0, p - (fin === 2 || fin === 3 ? 1 : 0))]; };
+    const runners = entries.map((e: any) => mapEntry(e, meetDate, fr.class ?? r.class)).map((x: any) => ({ ...x, odds: x.sp ?? x.odds, rating: null,
+      career: unrun(x.career, x.finish), track: unrun(x.track, x.finish), distance: unrun(x.distance, x.finish), trackDistance: unrun(x.trackDistance, x.finish), barrierRec: unrun(x.barrierRec, x.finish), [catKey]: unrun(x[catKey], x.finish) })).sort((a: any, b: any) => a.no - b.no);
     const positions = runners.filter((x: any) => x.finish && x.finish > 0 && x.finish < 100).sort((a: any, b: any) => a.finish - b.finish).map((x: any) => x.no);
     out.push({ no: r.raceNumber, name: fr.name, distance: num(fr.distance), class: fr.class, condition: [fr.trackCondition, fr.trackRating].filter(Boolean).join(" "), runners: runners.map(({ finish, ...rest }: any) => rest), result: positions.length >= 3 ? { positions } : null });
   }
