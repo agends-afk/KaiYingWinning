@@ -156,6 +156,8 @@ pre.schema{font-size:11px;line-height:1.45;background:var(--surface);border:1.5p
 .sheet .card{background:var(--ground);color:var(--ink);width:100%;max-width:560px;padding:20px 18px calc(24px + env(safe-area-inset-bottom));border-radius:16px 16px 0 0;border-top:5px solid var(--accent)}
 .sheet .who{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
 .tipbtns{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.switcher{display:flex;gap:6px;overflow-x:auto;padding:0 0 12px;margin:0 0 4px;-webkit-overflow-scrolling:touch}
+.switcher .btn{white-space:nowrap;flex:none;border-radius:999px;padding:7px 14px}
 .avatar{width:40px;height:40px;display:inline-block;vertical-align:middle;flex:none}
 .avatar.sm{width:22px;height:22px}
 .pel .avatar.sm{margin-left:-2px}
@@ -201,7 +203,7 @@ pre.schema{font-size:11px;line-height:1.45;background:var(--surface);border:1.5p
   <button data-tab="race">Race</button>
   <button data-tab="weights">Model</button>
   <button data-tab="flock">Flock</button>
-  <button data-tab="load">Load</button>
+  <button data-tab="load">Feed</button>
 </nav>
 <div class="toast" id="toast" hidden></div>
 <div id="sheet" hidden></div>
@@ -256,7 +258,7 @@ function avatarSVG(kind, colour, cls){ // a pelican head with an accessory per P
 // Standard saddlecloth colours (approximate; cosmetic only)
 const CLOTH = {1:['#D7263D','#fff'],2:['#F7F5EF','#141A22'],3:['#1F4FCC','#fff'],4:['#F5C518','#141A22'],5:['#1E8B4B','#fff'],6:['#141A22','#F5C518'],7:['#F07A1A','#141A22'],8:['#F48FB1','#141A22'],9:['#3CC7C0','#141A22'],10:['#6A2C91','#fff'],11:['#9AA0A6','#B00020'],12:['#B6E51D','#141A22'],13:['#6D4322','#fff'],14:['#7B1F2B','#F5C518'],15:['#8B8455','#141A22'],16:['#B87333','#141A22'],17:['#0F2B46','#fff'],18:['#0F5132','#F5C518'],19:['#C9D6D2','#141A22'],20:['#D91E8B','#F5C518'],21:['#FF7F6E','#141A22'],22:['#E9E9E9','#141A22'],23:['#0F2B46','#F4EFE4'],24:['#D4AF37','#141A22']};
 
-let state = { meeting:null, punters:{}, me:null, comments:[], bets:[], ui:{tab:'races', raceNo:1, open:null, betOn:null}, updatedAt:0 };
+let state = { meetings:{}, meeting:null, punters:{}, me:null, comments:[], bets:[], feed:[], ui:{tab:'races', raceNo:1, open:null, betOn:null, meetingId:null}, updatedAt:0 };
 let db=null, sb=null, saveTimer=null, sampleFn=null;
 
 /* ---------------- helpers ---------------- */
@@ -275,7 +277,13 @@ function rec(v){ if(!v) return null; if(Array.isArray(v)) return {s:num(v[0])||0
 function condCategory(cond){ const c=String(cond||'').toLowerCase(); if(c.startsWith('h')) return 'heavy'; if(c.startsWith('so')||c.startsWith('sl')||c.startsWith('sy')) return 'soft'; return 'good'; }
 function normKey(s){ return String(s||'').toLowerCase().replace(/\s+/g,' ').trim(); }
 function active(race){ return race.runners.filter(r=>!r.scratched); }
-function runnerKey(race,r){ return 'r'+race.no+'_'+r.no; }
+function runnerKey(race,r){ return 'm'+(race.meetingId||'')+'_r'+race.no+'_'+r.no; }
+function pk(race){ return (race.meetingId||'')+':'+race.no; }
+function meetingsList(){ return Object.values(state.meetings).sort((a,b)=>(a.sort||99)-(b.sort||99)||String(a.meeting).localeCompare(String(b.meeting))); }
+function selectMeeting(id){ const m=state.meetings[id]||meetingsList()[0]||null; state.meeting=m; state.ui.meetingId=m?m.id:null; if(m){ for(const r of m.races) r.meetingId=m.id; if(!m.races.some(r=>r.no===state.ui.raceNo)) state.ui.raceNo=m.races[0]?m.races[0].no:1; } }
+function putMeeting(m){ for(const r of m.races) r.meetingId=m.id; state.meetings[m.id]=m; if(!state.meeting||state.meeting.id===m.id) selectMeeting(m.id); }
+function fmtTime(t){ if(!t) return ''; if(/T/.test(String(t))){ const d=new Date(t); if(!isNaN(d)) return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); } return String(t); }
+function shortName(m){ return m?String(m.meeting).replace(/ Gardens| Parks| \(fictional\)/i,''):''; }
 function ordinal(n){ const s=['th','st','nd','rd'], v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); }
 function slug(s){ return String(s).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')||'x'; }
 function titleCase(s){ return s.replace(/\b\w/g,c=>c.toUpperCase()); }
@@ -296,7 +304,7 @@ function formScore(f){ if(!f) return null; const runs=String(f).replace(/[^0-9a-
 function lastScore(l){ if(!l||num(l.pos)==null) return null; const pos=num(l.pos), field=num(l.field)||12, margin=num(l.margin);
   const posS=pos<=1?1:clamp(1-(pos-1)/Math.max(field-1,1),0,1); const marS=margin==null?posS:clamp(1-margin/10,0,1);
   return clamp(0.5*posS+0.5*marS-0.1*(num(l.classChange)||0),0,1); }
-function fitnessScore(l){ const d=l?num(l.days):null; if(d==null) return null; if(d<7) return .55; if(d<14) return .8; if(d<=28) return 1; if(d<=42) return .8; if(d<=90) return .55; return .4; }
+function fitnessScore(l,r){ const d=l?num(l.days):null; if(d==null) return null; if(d<7) return .55; if(d<14) return .8; if(d<=28) return 1; if(d<=42) return .8; if(d<=90) return .55; const fu=r&&rec(r.firstUp); if(fu&&fu.s>=2){ const q=recScore(fu); if(q!=null) return clamp(0.3+q*0.6,0.3,0.9); } return .4; }
 function distanceFactor(dist){ const d=num(dist)||1400; if(d<=1200) return 1; if(d<=1400) return .8; if(d<=1600) return .6; if(d<=2000) return .45; return .3; }
 function barrierScore(r,race,n,bias){ const b=num(r.barrier); if(b==null||n<2) return null; const rel=clamp((b-1)/(n-1),0,1); const eff=clamp(distanceFactor(race.distance)*0.6+(bias||0),-1,1); return clamp(0.5-(rel-0.5)*eff,0,1); }
 function jockeyScore(r){ const p=num(r.jockeyPct); if(p!=null) return clamp(p/25,0,1); const g=num(r.jockeyRating); if(g!=null) return clamp(g/100,0,1); return null; }
@@ -304,14 +312,14 @@ function trainerScore(r){ const p=num(r.trainerPct); if(p!=null) return clamp(p/
 function zscores(vals){ const xs=vals.filter(v=>v!=null); if(xs.length<2) return vals.map(()=>0); const m=xs.reduce((a,b)=>a+b,0)/xs.length; const sd=Math.sqrt(xs.reduce((a,b)=>a+(b-m)**2,0)/xs.length)||0; if(sd<1e-9) return vals.map(()=>0); return vals.map(v=>v==null?0:clamp((v-m)/sd,-2.5,2.5)); }
 
 function scoreRace(race, meeting, weights, settings, dyn, adj){
-  const rs=active(race); const n=rs.length; const cat=condCategory(meeting.condition);
+  const rs=active(race); const n=rs.length; const cat=condCategory(race.condition||meeting.condition);
   const ws=rs.map(r=>num(r.weight)).filter(v=>v!=null); const meanW=ws.length?ws.reduce((a,b)=>a+b,0)/ws.length:null;
   const maxImp=Math.max(...rs.map(r=>{const o=num(r.odds); return o>1?1/o:0;}),0);
   const raw={};
   raw.last=rs.map(r=>lastScore(r.last)); raw.form=rs.map(r=>formScore(r.form)); raw.track=rs.map(r=>recScore(rec(r.track))); raw.distance=rs.map(r=>recScore(rec(r.distance)));
   raw.condition=rs.map(r=>recScore(rec(r[cat])||rec(r.cond)||(r.condition&&rec(r.condition[cat])))); raw.career=rs.map(r=>recScore(rec(r.career)));
   raw.jockey=rs.map(jockeyScore); raw.trainer=rs.map(trainerScore); raw.barrier=rs.map(r=>barrierScore(r,race,n,dyn.barrierBias));
-  raw.weight=rs.map(r=>{const w=num(r.weight); return (w==null||meanW==null)?null:clamp(0.5+(meanW-w)/6,0,1);}); raw.fitness=rs.map(r=>fitnessScore(r.last));
+  raw.weight=rs.map(r=>{const w=num(r.weight); return (w==null||meanW==null)?null:clamp(0.5+(meanW-w)/6,0,1);}); raw.fitness=rs.map(r=>fitnessScore(r.last,r));
   raw.market=rs.map(r=>{const o=num(r.odds); return (o>1&&maxImp>0)?(1/o)/maxImp:null;});
   const z={}; for(const k of Object.keys(raw)) z[k]=zscores(raw[k]);
   z.formline=rs.map(r=>clamp(dyn.formline[runnerKey(race,r)]||0,-2,2));
@@ -341,7 +349,7 @@ function dayMulti(run, meeting, settings){ const legs=[]; for(const race of meet
   if(legs.length<2) return null; let pick=legs.filter(l=>l.prob>=0.28).sort((a,b)=>b.prob-a.prob).slice(0,4); if(pick.length<2) pick=[...legs].sort((a,b)=>b.prob-a.prob).slice(0,2);
   pick.sort((a,b)=>a.raceNo-b.raceNo); const prob=pick.reduce((a,l)=>a*l.prob,1); const odds=pick.every(l=>l.odds>1)?pick.reduce((a,l)=>a*l.odds,1):null;
   return {legs:pick, prob, odds, fair:1/prob, stake:Math.max(5,Math.round(settings.bank*0.02/5)*5)}; }
-function effectivePick(punter, raceNo, run){ const o=punter.picks&&punter.picks[raceNo]&&punter.picks[raceNo].win; if(o) return {no:o, override:true}; const p=(run.pred[raceNo]||[]).find(x=>x.rank===1); return p?{no:p.no, override:false}:{no:null,override:false}; }
+function effectivePick(punter, race, run){ const k=pk(race); const o=punter.picks&&punter.picks[k]&&punter.picks[k].win; if(o) return {no:o, override:true}; const p=(run.pred[race.no]||[]).find(x=>x.rank===1); return p?{no:p.no, override:false}:{no:null,override:false}; }
 
 /* ---------------- run the day for one punter ----------------
    Replays results in race order. Returns adapted weights, per-race dynamics,
@@ -377,30 +385,32 @@ function runDay(punter, meeting){
 function barrierBiasFrom(list){ if(list.length<2) return 0; const sw=list.reduce((a,b)=>a+b.w,0); const mean=list.reduce((a,b)=>a+b.rel*b.w,0)/sw; const dev=0.5-mean; if(Math.abs(dev)<0.12) return 0; return clamp(dev*1.5,-0.6,0.6); }
 
 /* ---------------- tips and leaderboard ---------------- */
-function tipPoints(punter, meeting, run){ let pts=0, wins=0, places=0, tipped=0; run=run||runDay(punter,meeting);
-  for(const race of meeting.races){ if(!race.result) continue; const pos=race.result.positions.map(Number); const ep=effectivePick(punter,race.no,run); const pk=punter.picks&&punter.picks[race.no];
-    if(ep.no){ tipped++; if(pos[0]===ep.no){ pts+=3; wins++; } else if(pos.slice(1,3).includes(ep.no)){ pts+=1; places++; } }
-    for(const p of ((pk&&pk.place)||[])){ if(pos.slice(0,3).includes(p)){ pts+=1; places++; } } }
+function tipPoints(punter, runs){ let pts=0, wins=0, places=0, tipped=0;
+  for(const meeting of meetingsList()){ const run=runs[meeting.id]||runDay(punter,meeting);
+    for(const race of meeting.races){ if(!race.result) continue; const pos=race.result.positions.map(Number); const ep=effectivePick(punter,race,run); const pick=punter.picks&&punter.picks[pk(race)];
+      if(ep.no){ tipped++; if(pos[0]===ep.no){ pts+=3; wins++; } else if(pos.slice(1,3).includes(ep.no)){ pts+=1; places++; } }
+      for(const p of ((pick&&pick.place)||[])){ if(pos.slice(0,3).includes(p)){ pts+=1; places++; } } } }
   return {pts,wins,places,tipped}; }
-function modelScore(run, meeting){ const done=meeting.races.filter(r=>r.result); let top=0,top3=0,placed=0;
-  for(const r of done){ const p=run.pred[r.no]||[]; const wp=p.find(x=>x.no===r.result.positions[0]); if(wp&&wp.rank===1) top++; if(wp&&wp.rank<=3) top3++; const t=p.find(x=>x.rank===1); if(t&&r.result.positions.slice(0,3).includes(t.no)) placed++; }
-  return {done:done.length,top,top3,placed}; }
+function modelScore(runs){ let done=0,top=0,top3=0,placed=0;
+  for(const meeting of meetingsList()){ const run=runs[meeting.id]; if(!run) continue; for(const r of meeting.races.filter(r=>r.result)){ done++; const p=run.pred[r.no]||[]; const wp=p.find(x=>x.no===r.result.positions[0]); if(wp&&wp.rank===1) top++; if(wp&&wp.rank<=3) top3++; const t=p.find(x=>x.rank===1); if(t&&r.result.positions.slice(0,3).includes(t.no)) placed++; } }
+  return {done,top,top3,placed}; }
+function runsFor(punter){ const out={}; for(const m of meetingsList()) out[m.id]=runDay(punter,m); return out; }
 
 /* ---------------- punters club ---------------- */
 function placeOdds(b){ const po=num(b.placeOdds); if(po&&po>1) return po; const o=num(b.odds)||1; return +(1+(o-1)/4).toFixed(2); } // estimate where no place price entered
-function settleBet(b, meeting){ const race=meeting.races.find(r=>r.no===b.raceNo); if(!race||!race.result) return {status:'open', ret:null};
+function settleBet(b){ const meeting=state.meetings[b.meetingId]||state.meeting; const race=meeting&&meeting.races.find(r=>r.no===b.raceNo); if(!race||!race.result) return {status:'open', ret:null};
   const pos=race.result.positions.map(Number); const won=pos[0]===b.runnerNo; const placed=pos.slice(0,3).includes(b.runnerNo); const st=num(b.stake)||0; let ret=0;
   if(b.type==='win') ret= won? st*(num(b.odds)||1) : 0;
   else if(b.type==='place') ret= placed? st*placeOdds(b) : 0;
   else { const half=st/2; ret=(won?half*(num(b.odds)||1):0)+(placed?half*placeOdds(b):0); }
   return {status: ret>0?'won':'lost', ret:+ret.toFixed(2)}; }
-function clubBook(meeting){ let staked=0, ret=0, open=0; const rows=state.bets.map(b=>{ const s=settleBet(b,meeting); staked+=num(b.stake)||0; if(s.status==='open') open+=num(b.stake)||0; else ret+=s.ret; return {...b, ...s}; });
+function clubBook(){ let staked=0, ret=0, open=0; const rows=state.bets.map(b=>{ const s=settleBet(b); staked+=num(b.stake)||0; if(s.status==='open') open+=num(b.stake)||0; else ret+=s.ret; return {...b, ...s}; });
   return {rows, staked, ret, open, pl:+(ret-(staked-open)).toFixed(2)}; }
 function fmtMoney(v){ return (v<0?'-':'')+'$'+Math.abs(v).toFixed(Math.abs(v)%1?2:0); }
 
 /* ---------------- persistence ---------------- */
-function persistLocal(){ try{ localStorage.setItem('kyw', JSON.stringify({meeting:state.meeting,punters:state.punters,me:state.me,comments:state.comments,bets:state.bets,updatedAt:state.updatedAt})); }catch(e){} }
-function loadLocal(){ try{ const j=JSON.parse(localStorage.getItem('kyw')||'null'); if(j){ state.meeting=j.meeting||null; state.punters=j.punters||{}; state.me=j.me||null; state.comments=j.comments||[]; state.bets=j.bets||[]; state.updatedAt=j.updatedAt||0; return true; } }catch(e){} return false; }
+function persistLocal(){ try{ localStorage.setItem('kyw', JSON.stringify({meetings:state.meetings,meetingId:state.ui.meetingId,punters:state.punters,me:state.me,comments:state.comments,bets:state.bets,feed:state.feed,updatedAt:state.updatedAt})); }catch(e){} }
+function loadLocal(){ try{ const j=JSON.parse(localStorage.getItem('kyw')||'null'); if(j){ state.meetings=j.meetings||(j.meeting?{[j.meeting.id]:j.meeting}:{}); state.feed=j.feed||[]; state.punters=j.punters||{}; state.me=j.me||null; state.comments=j.comments||[]; state.bets=j.bets||[]; state.updatedAt=j.updatedAt||0; selectMeeting(j.meetingId); return true; } }catch(e){} return false; }
 function setSync(cls,txt){ const s=$('#sync'); s.className='sync '+cls; s.textContent=txt; }
 // what = 'meeting' | 'punter' | 'result:<no>' | 'all'
 function save(what){ state.updatedAt=Date.now(); if(me()) me().updatedAt=state.updatedAt; persistLocal(); render(); const w=what||'all';
@@ -412,7 +422,7 @@ async function sbInit(){
   sb=window.supabase.createClient(SUPABASE.url,SUPABASE.key,{global:{headers:{'x-flock-code':SUPABASE.flockCode}}});
   setSync('on','connecting');
   try{ await sbPullAll(true); setSync('on','live');
-    sb.channel('kyw').on('postgres_changes',{event:'*',schema:'public',table:'kyw_meeting'},()=>sbPullMeeting().then(ch=>{ if(ch){ persistLocal(); render(); toast('Form updated'); } }))
+    sb.channel('kyw').on('postgres_changes',{event:'*',schema:'public',table:'kyw_meeting'},()=>sbPullMeeting().then(ch=>{ if(ch){ persistLocal(); render(); } }))
       .on('postgres_changes',{event:'*',schema:'public',table:'kyw_results'},()=>sbPullResults().then(ch=>{ if(ch){ persistLocal(); render(); toast('Result in'); } }))
       .on('postgres_changes',{event:'*',schema:'public',table:'kyw_punters'},()=>sbPullPunters().then(ch=>{ if(ch){ persistLocal(); render(); } }))
       .on('postgres_changes',{event:'*',schema:'public',table:'kyw_comments'},()=>sbPullComments().then(()=>{ persistLocal(); render(); }))
@@ -420,29 +430,39 @@ async function sbInit(){
       .subscribe(status=>{ if(status==='SUBSCRIBED') setSync('on','live'); else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT') setSync('err','live off, refresh to catch up'); });
     return true; }catch(e){ console.error(e); setSync('err','backend unreachable'); return false; }
 }
-async function sbPullMeeting(){ const {data,error}=await sb.from('kyw_meeting').select('*').eq('id','current').maybeSingle(); if(error) throw error;
-  if(!data){ if(state.meeting&&!state.meeting.example){ state.meeting=null; return true; } return false; }
-  const m=data.data; if(state.meeting&&(m.updatedAt||0)<=(state.meeting.updatedAt||0)&&state.meeting.id===m.id) return false;
-  const results=state.meeting?Object.fromEntries(state.meeting.races.filter(r=>r.result).map(r=>[r.no,r.result])):{}; state.meeting=m; for(const r of m.races){ if(results[r.no]&&!r.result) r.result=results[r.no]; } return true; }
-async function sbPullResults(){ if(!state.meeting) return false; const {data,error}=await sb.from('kyw_results').select('*').eq('meeting_id',state.meeting.id); if(error) throw error; let ch=false;
-  for(const race of state.meeting.races){ const row=(data||[]).find(x=>x.race_no===race.no); const cur=race.result; if(row){ const res={positions:row.positions,by:row.entered_by,enteredAt:new Date(row.entered_at).getTime()}; if(!cur||JSON.stringify(cur.positions)!==JSON.stringify(res.positions)||cur.by!==res.by){ race.result=res; ch=true; } } else if(cur){ race.result=null; ch=true; } } return ch; }
+async function sbPullMeeting(){
+  const {data:feed}=await sb.from('kyw_feed').select('*').eq('active',true).order('sort'); state.feed=feed||[];
+  const {data,error}=await sb.from('kyw_meeting').select('*'); if(error) throw error; let ch=false; const seen=new Set();
+  for(const row of (data||[])){ const m=row.data; if(!m||!m.races) continue; seen.add(String(m.id)); const cur=state.meetings[m.id];
+    if(cur&&(m.updatedAt||0)<=(cur.updatedAt||0)) continue;
+    const results=cur?Object.fromEntries(cur.races.filter(r=>r.result).map(r=>[r.no,r.result])):{}; for(const r of m.races){ if(results[r.no]&&!r.result) r.result=results[r.no]; }
+    const f=state.feed.find(x=>String(x.meet_id)===String(m.id)); if(f){ m.sort=f.sort; m.meeting=f.name||m.meeting; }
+    putMeeting(m); ch=true; }
+  for(const id of Object.keys(state.meetings)){ if(!seen.has(String(id))&&!state.meetings[id].example){ delete state.meetings[id]; ch=true; } }
+  if(!state.meeting||!state.meetings[state.meeting.id]) selectMeeting(state.ui.meetingId); return ch; }
+async function sbPullResults(){ const {data,error}=await sb.from('kyw_results').select('*'); if(error) throw error; let ch=false;
+  for(const m of Object.values(state.meetings)){ for(const race of m.races){ const row=(data||[]).find(x=>String(x.meeting_id)===String(m.id)&&x.race_no===race.no); const cur=race.result;
+    if(row){ const res={positions:row.positions,by:row.entered_by,enteredAt:new Date(row.entered_at).getTime()}; if(!cur||JSON.stringify(cur.positions)!==JSON.stringify(res.positions)||cur.by!==res.by){ race.result=res; ch=true; } } else if(cur){ race.result=null; ch=true; } } } return ch; }
+async function syncNow(){ if(!SUPABASE.url) { toast('No feed configured'); return; } const btn=$('#syncBtn'); if(btn){ btn.disabled=true; btn.textContent='Syncing...'; }
+  try{ const res=await fetch(SUPABASE.url+'/functions/v1/kyw-sync', {method:'POST', headers:{'x-flock-code':SUPABASE.flockCode,'Content-Type':'application/json'}, body:'{}'}); const j=await res.json(); if(!res.ok||j.error) throw new Error(j.error||res.status);
+    await sbPullMeeting(); await sbPullResults(); persistLocal(); render(); toast('Feed refreshed: '+(j.meetings||[]).map(m=>m.name||m.meetId).join(', ')); }
+  catch(e){ console.error(e); toast('Sync failed: '+e.message); if(btn){ btn.disabled=false; btn.textContent='Sync now'; } } }
 async function sbPullPunters(){ const {data,error}=await sb.from('kyw_punters').select('*'); if(error) throw error; let ch=false; for(const row of (data||[])){ const p=row.data; if(p.id===state.me&&state.punters[p.id]&&(state.punters[p.id].updatedAt||0)>=(p.updatedAt||0)) continue; if(!state.punters[p.id]||(p.updatedAt||0)>(state.punters[p.id].updatedAt||0)){ state.punters[p.id]=p; ch=true; } } return ch; }
 async function sbPullComments(){ const {data,error}=await sb.from('kyw_comments').select('*').order('created_at'); if(error) throw error; state.comments=(data||[]).map(r=>({id:r.id,raceNo:r.race_no,by:r.by,text:r.text,ts:new Date(r.created_at).getTime(),meetingId:r.meeting_id})); }
 async function sbPullBets(){ const {data,error}=await sb.from('kyw_bets').select('*').order('created_at'); if(error) throw error; state.bets=(data||[]).map(r=>({id:r.id,raceNo:r.race_no,runnerNo:r.runner_no,type:r.type,stake:+r.stake,odds:r.odds==null?null:+r.odds,placeOdds:r.place_odds==null?null:+r.place_odds,by:r.by,note:r.note||'',ts:new Date(r.created_at).getTime(),meetingId:r.meeting_id})); }
 async function sbPullAll(first){ await sbPullMeeting(); await sbPullResults(); await sbPullPunters(); await sbPullComments(); await sbPullBets(); ensureRoster(); persistLocal(); render(); if(first&&me()) sbPush('punter'); }
 async function sbPush(what){ try{ setSync('on','saving');
-    if(what==='all'||what==='meeting'){ if(state.meeting&&!state.meeting.example){ const m={...state.meeting, races:state.meeting.races.map(r=>({...r,result:undefined}))}; const {error}=await sb.from('kyw_meeting').upsert({id:'current',data:m,updated_at:new Date().toISOString()}); if(error) throw error; }
-      else if(!state.meeting){ await sb.from('kyw_meeting').delete().eq('id','current'); } }
+    if(what==='all'||what==='meeting'){ if(state.meeting&&!state.meeting.example){ const m={...state.meeting, races:state.meeting.races.map(r=>({...r,result:undefined}))}; const {error}=await sb.from('kyw_meeting').upsert({id:String(m.id),data:m,updated_at:new Date().toISOString()}); if(error) throw error; } }
     if(what.startsWith('result:')){ const no=+what.split(':')[1]; const race=state.meeting.races.find(r=>r.no===no);
-      if(race.result){ const {error}=await sb.from('kyw_results').upsert({meeting_id:state.meeting.id,race_no:no,positions:race.result.positions,entered_by:race.result.by,entered_at:new Date().toISOString()}); if(error) throw error; }
-      else { const {error}=await sb.from('kyw_results').delete().eq('meeting_id',state.meeting.id).eq('race_no',no); if(error) throw error; } }
+      if(race.result){ const {error}=await sb.from('kyw_results').upsert({meeting_id:String(state.meeting.id),race_no:no,positions:race.result.positions,entered_by:race.result.by,entered_at:new Date().toISOString()}); if(error) throw error; }
+      else { const {error}=await sb.from('kyw_results').delete().eq('meeting_id',String(state.meeting.id)).eq('race_no',no); if(error) throw error; } }
     if(what==='all'||what==='punter'){ if(me()){ const {error}=await sb.from('kyw_punters').upsert({id:state.me,data:me(),updated_at:new Date().toISOString()}); if(error) throw error; } }
     setSync('on','live'); }catch(e){ console.error(e); setSync('err','save failed, check signal'); toast('Could not save to the flock. It is kept on this phone.'); } }
 async function sbAddComment(c){ const {error}=await sb.from('kyw_comments').insert({meeting_id:state.meeting.id,race_no:c.raceNo,by:c.by,text:c.text}); if(error){ toast('Comment not saved'); throw error; } }
 async function sbDeleteComment(id){ await sb.from('kyw_comments').delete().eq('id',id); }
 async function sbAddBet(b){ const {error}=await sb.from('kyw_bets').insert({meeting_id:state.meeting.id,race_no:b.raceNo,runner_no:b.runnerNo,type:b.type,stake:b.stake,odds:b.odds,place_odds:b.placeOdds,by:b.by,note:b.note}); if(error){ toast('Bet not saved'); throw error; } }
 async function sbDeleteBet(id){ await sb.from('kyw_bets').delete().eq('id',id); }
-async function sbClearMeetingData(){ await sb.from('kyw_results').delete().neq('race_no',-1); await sb.from('kyw_comments').delete().neq('race_no',-1); await sb.from('kyw_bets').delete().neq('race_no',-1); for(const p of Object.values(state.punters)) await sb.from('kyw_punters').upsert({id:p.id,data:p,updated_at:new Date().toISOString()}); }
+async function sbClearMeetingData(id){ await sb.from('kyw_results').delete().eq('meeting_id',String(id)); await sb.from('kyw_comments').delete().eq('meeting_id',String(id)); await sb.from('kyw_bets').delete().eq('meeting_id',String(id)); await sb.from('kyw_meeting').delete().eq('id',String(id)); }
 
 /* ---- Artifact db backend (Claude hosted) ---- */
 async function pushDb(what){
@@ -455,9 +475,9 @@ async function pushDb(what){
     if((what==='all'||what==='punter')&&me()) await db.doc('punters/'+state.me).set(me());
     if(what==='all'||what==='meeting'){ await db.doc('shared/comments').set({items:state.comments}); await db.doc('shared/bets').set({items:state.bets}); }
     setSync('on','synced'); }catch(e){ console.error(e); setSync('err','sync failed'); } }
-async function pullMeeting(){ const s=await db.doc('settings/main').get(); if(!s.exists) return false; const sd=s.data(); if(!sd.meetingId){ if(state.meeting&&(sd.updatedAt||0)>state.updatedAt){ state.meeting=null; return true; } return false; }
+async function pullMeeting(){ const s=await db.doc('settings/main').get(); if(!s.exists) return false; const sd=s.data(); if(!sd.meetingId){ if(state.meeting&&(sd.updatedAt||0)>state.updatedAt){ state.meetings={}; state.meeting=null; return true; } return false; }
   const md=await db.doc('meetings/'+sd.meetingId).get(); if(!md.exists) return false; const meta=md.data(); if(state.meeting&&(meta.updatedAt||0)<=(state.meeting.updatedAt||0)) return false;
-  const races=(await db.collection('meetings/'+sd.meetingId+'/races').get()).docs.map(d=>d.data()).sort((a,b)=>a.no-b.no); state.meeting={...meta,races};
+  const races=(await db.collection('meetings/'+sd.meetingId+'/races').get()).docs.map(d=>d.data()).sort((a,b)=>a.no-b.no); putMeeting({...meta,races}); selectMeeting(meta.id);
   const c=await db.doc('shared/comments').get(); if(c.exists) state.comments=c.data().items||[]; const b=await db.doc('shared/bets').get(); if(b.exists) state.bets=b.data().items||[]; return true; }
 async function initDb(){
   if(!window.claude||!window.claude.use) return; try{ db=await window.claude.use('db'); }catch(e){ db=null; }
@@ -486,7 +506,7 @@ async function addComment(raceNo,text){ const c={id:'c'+Date.now().toString(36)+
 async function deleteComment(id){ if(sb){ await sbDeleteComment(id); await sbPullComments(); persistLocal(); render(); } else { state.comments=state.comments.filter(c=>c.id!==id); save('meeting'); } }
 async function addBet(b){ b.id='b'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); b.by=me().name; b.ts=Date.now(); b.meetingId=state.meeting.id; if(sb){ await sbAddBet(b); await sbPullBets(); persistLocal(); render(); } else { state.bets.push(b); save('meeting'); } }
 async function deleteBet(id){ if(sb){ await sbDeleteBet(id); await sbPullBets(); persistLocal(); render(); } else { state.bets=state.bets.filter(b=>b.id!==id); save('meeting'); } }
-function resetSharedForNewMeeting(){ state.comments=[]; state.bets=[]; for(const p of Object.values(state.punters)){ p.picks={}; p.adj={}; p.updatedAt=Date.now(); } if(sb) sbClearMeetingData().catch(()=>{}); if(db) for(const p of Object.values(state.punters)) db.doc('punters/'+p.id).set(p).catch(()=>{}); }
+function removeMeeting(id){ state.comments=state.comments.filter(c=>String(c.meetingId)!==String(id)); state.bets=state.bets.filter(b=>String(b.meetingId)!==String(id)); delete state.meetings[id]; if(sb) sbClearMeetingData(id).catch(()=>{}); selectMeeting(null); }
 
 /* ---------------- ingest ---------------- */
 function normaliseMeeting(j){
@@ -497,7 +517,8 @@ function normaliseMeeting(j){
       form:h.form||'', last:h.last?{pos:num(h.last.pos),field:num(h.last.field),margin:num(h.last.margin),days:num(h.last.days),race:h.last.race||'',classChange:num(h.last.classChange)||0}:null,
       jockeyPct:num(h.jockeyPct), trainerPct:num(h.trainerPct), jockeyRating:num(h.jockeyRating), trainerRating:num(h.trainerRating), odds:num(h.odds), scratched:!!h.scratched, gear:h.gear||'', comment:h.comment||'' })) })).filter(r=>r.runners.length);
   if(!races.length) throw new Error('No races with runners found');
-  return { id:slug((j.meeting||'meeting')+'-'+(j.date||Date.now())), meeting:j.meeting||j.track||'Meeting', date:j.date||'', condition:j.condition||'Good 4', rail:j.rail||'', example:!!j.example, races, log:j.log||[], updatedAt:Date.now() };
+  const id=j.id||slug((j.meeting||'meeting')+'-'+(j.date||Date.now())); for(const r of races) r.meetingId=id;
+  return { id, meeting:j.meeting||j.track||'Meeting', date:j.date||'', condition:j.condition||'Good 4', rail:j.rail||'', example:!!j.example, manual:!j.example, sort:j.sort||50, races, log:j.log||[], updatedAt:Date.now() };
 }
 function parseCSV(text){ const lines=text.split(/\r?\n/).filter(l=>l.trim()); if(lines.length<2) throw new Error('CSV needs a header row and at least one runner');
   const split=l=>{ const out=[];let cur='',q=false; for(const ch of l){ if(ch==='"'){q=!q;continue;} if(ch===','&&!q){out.push(cur);cur='';continue;} cur+=ch;} out.push(cur); return out.map(s=>s.trim()); };
@@ -508,9 +529,9 @@ function parseCSV(text){ const lines=text.split(/\r?\n/).filter(l=>l.trim()); if
       last:{pos:num(g('last_pos')),field:num(g('last_field')),margin:num(g('last_margin')),days:num(g('days')),race:g('last_race'),classChange:num(g('class_change'))},jockeyPct:num(g('jockey_pct')),trainerPct:num(g('trainer_pct')),odds:num(g('odds')),scratched:/^(y|true|1)/i.test(g('scratched'))}); }
   return {races:Object.values(races)}; }
 function loadText(text){ text=text.trim(); const j=(text.startsWith('{')||text.startsWith('[')) ? JSON.parse(text) : parseCSV(text); const m=normaliseMeeting(j);
-  state.meeting=m; resetSharedForNewMeeting(); state.ui.raceNo=m.races[0].no; state.ui.tab='races'; racesWatched=null; save('all'); watchRaces();
+  putMeeting(m); selectMeeting(m.id); state.ui.tab='races'; racesWatched=null; save('meeting'); watchRaces();
   const nr=m.races.reduce((a,r)=>a+r.runners.length,0); toast(`Loaded ${m.races.length} race${m.races.length===1?'':'s'}, ${nr} runner${nr===1?'':'s'}. Tips and calls reset.`); }
-function mergeRace(text){ const j=JSON.parse(text.trim()); const one=normaliseMeeting(j.races?j:{races:[j]}); if(!state.meeting){ state.meeting=one; } else { for(const r of one.races){ const i=state.meeting.races.findIndex(x=>x.no===r.no); if(i>=0) state.meeting.races[i]=r; else state.meeting.races.push(r); } state.meeting.races.sort((a,b)=>a.no-b.no); } state.meeting.updatedAt=Date.now(); save('meeting'); toast('Race merged'); }
+function mergeRace(text){ const j=JSON.parse(text.trim()); const one=normaliseMeeting(j.races?j:{races:[j]}); if(!state.meeting){ putMeeting(one); } else { for(const r of one.races){ r.meetingId=state.meeting.id; const i=state.meeting.races.findIndex(x=>x.no===r.no); if(i>=0) state.meeting.races[i]=r; else state.meeting.races.push(r); } state.meeting.races.sort((a,b)=>a.no-b.no); } state.meeting.updatedAt=Date.now(); save('meeting'); toast('Race merged'); }
 
 const SCHEMA_DOC = `{
   "meeting": "Randwick", "date": "2026-09-12", "condition": "Good 4", "rail": "True",
@@ -556,7 +577,8 @@ function exampleMeeting(){
       runners.push({no:k,name,barrier:bars[k-1],weight:+(53+rnd()*7).toFixed(1),jockey:j[0],trainer:t[0],age:ri(3,7),sex:['G','M','H'][ri(0,2)],career:[cs,cw,cp],track:[ts,ri(0,Math.min(ts,2)),ri(0,Math.min(ts,2))],distance:[ds,ri(0,Math.min(ds,3)),ri(0,Math.min(ds,3))],
         good:[gs,ri(0,Math.min(gs,cw)),ri(0,Math.min(gs,cp))],soft:[ri(0,5),ri(0,1),ri(0,2)],heavy:[ri(0,3),ri(0,1),ri(0,1)],form,last:{pos:lp,field:ri(Math.max(lp,8),14),margin:lm,days:ri(7,60),race:lastRaces[ri(0,lastRaces.length-1)],classChange:ri(-1,1)},jockeyPct:j[1],trainerPct:t[1],odds,scratched:rnd()<0.06,gear:rnd()<0.15?'Blinkers first time':'',comment:''}); }
     races.push({no:r,name:['Opening Sprint','Fillies and Mares','Spring Handicap','Mile Stakes','Sprint Stakes','Staying Handicap','Juvenile Plate','Closing Handicap'][r-1],distance:dists[r-1],class:cls[r-1],time:`${11+Math.floor((r+1)/2)}:${(r%2)?'40':'15'}`,runners}); }
-  return {id:'example-fictional', meeting:'Example meeting (fictional)', date:'', condition:'Good 4', rail:'True', example:true, races, log:[], updatedAt:Date.now()};
+  for(const r of races) r.meetingId='example-fictional';
+  return {id:'example-fictional', meeting:'Example (fictional)', date:'', condition:'Good 4', rail:'True', example:true, sort:98, races, log:[], updatedAt:Date.now()};
 }
 
 /* ---------------- rendering ---------------- */
@@ -564,10 +586,10 @@ function render(){
   const m=state.meeting; document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===state.ui.tab));
   $('#hMeeting').textContent = m ? m.meeting : 'Kai Ying Winning';
   $('#hMe').innerHTML = me() ? `<span class="sl">/</span>${esc(me().name)}` : '';
-  $('#hSub').textContent = m ? [m.date, m.condition, m.rail?('Rail '+m.rail):''].filter(Boolean).join(' / ') : 'No form loaded yet';
+  $('#hSub').textContent = m ? [m.date, m.condition, m.rail?('Rail '+m.rail):'', m.syncedAt?('feed '+fmtTime(m.syncedAt)):''].filter(Boolean).join(' / ') : 'No form loaded yet';
   const main=$('#main'); const tab=state.ui.tab;
   if(!state.me){ main.innerHTML=''; showWho(); return; }
-  if(!m && tab!=='load'){ main.innerHTML=emptyState(); bind(main); return; }
+  if(!m && tab!=='load'){ main.innerHTML=meetingSwitcher()+emptyState(); bind(main); return; }
   main.innerHTML = tab==='races'?viewRaces() : tab==='race'?viewRace() : tab==='weights'?viewWeights() : tab==='flock'?viewFlock() : viewLoad();
   bind(main);
 }
@@ -580,49 +602,52 @@ function showWho(){ ensureRoster(); const sh=$('#sheet'); const others=Object.va
   sh.querySelectorAll('[data-who]').forEach(b=>b.addEventListener('click',()=>{ state.me=b.dataset.who; sh.hidden=true; save('punter'); }));
   $('#whoGo').addEventListener('click',()=>{ const v=$('#whoIn').value.trim(); if(!v){ toast('A name, please'); return; } const p=newPunter(v); if(state.punters[p.id]){ state.me=p.id; } else { state.punters[p.id]=p; state.me=p.id; } sh.hidden=true; save('punter'); });
 }
-function emptyState(){ return `<div class="banner"><div class="eyebrow" style="color:var(--panel-ink);opacity:.7">Card</div><h2>No form loaded</h2><p>Load the finalised form on the Load tab, or open the fictional example meeting to see how the ratings and the live adjustment behave.</p></div>
-  <div class="actions"><button class="btn primary" data-act="tab" data-tab="load">Load form</button><button class="btn" data-act="example">Open example</button></div>`; }
+function emptyState(){ return `<div class="banner"><div class="eyebrow" style="color:var(--panel-ink);opacity:.7">Card</div><h2>No meetings yet</h2><p>The feed fills the card from racing.com. Refresh it on the Feed tab, or open the fictional example to see how the ratings behave.</p></div>
+  <div class="actions"><button class="btn primary" data-act="tab" data-tab="load">Feed</button><button class="btn" data-act="example">Open example</button></div>`; }
+function meetingSwitcher(){ const ms=meetingsList(); if(ms.length<2) return ''; return `<div class="switcher">${ms.map(m=>`<button class="btn ${state.meeting&&m.id===state.meeting.id?'on':''}" data-act="meeting" data-id="${esc(m.id)}">${esc(shortName(m))}${m.races.filter(r=>r.result).length?` <span class="small" style="color:inherit;opacity:.7">${m.races.filter(r=>r.result).length}/${m.races.length}</span>`:''}</button>`).join('')}</div>`; }
 
 function viewRaces(){
-  const m=state.meeting; const run=runDay(me(),m); const done=m.races.filter(r=>r.result).length; let html='';
+  const m=state.meeting; const run=runDay(me(),m); const done=m.races.filter(r=>r.result).length; let html=meetingSwitcher();
   if(m.example) html+=`<div class="banner"><div class="eyebrow" style="color:var(--panel-ink);opacity:.7">Practice card</div><h2>Example meeting</h2><p>Every horse, rider and result here is fictional. It exists to show the mechanics. Load the real form on the Load tab when it is finalised.</p></div>`;
-  html+=`<div class="hdr-edit">
+  if(m.source==='racing.com') html+=`<p class="note" style="margin:0 0 12px">${esc(m.condition)}${m.rail?', rail '+esc(m.rail):''}${m.weather?', '+esc(String(m.weather).toLowerCase()):''}. ${m.races.filter(r=>r.runners.length).length} of ${m.races.length} fields loaded. Feed last read ${fmtTime(m.syncedAt)}.</p>`;
+  else html+=`<div class="hdr-edit">
     <label class="field">Meeting<input data-meta="meeting" value="${esc(m.meeting)}"></label>
     <label class="field">Date<input data-meta="date" value="${esc(m.date)}" placeholder="2026-09-12"></label>
     <label class="field">Track condition<select data-meta="condition">${['Good 3','Good 4','Soft 5','Soft 6','Soft 7','Heavy 8','Heavy 9','Heavy 10','Synthetic'].map(c=>`<option ${c===m.condition?'selected':''}>${c}</option>`).join('')}</select></label>
     <label class="field">Rail<input data-meta="rail" value="${esc(m.rail)}" placeholder="True, +3m"></label></div>`;
   const fin=run.final;
-  const overrides=m.races.filter(r=>me().picks[r.no]&&me().picks[r.no].win).length;
+  const overrides=m.races.filter(r=>me().picks[pk(r)]&&me().picks[pk(r)].win).length;
   html+=`<div class="eyebrow">Model tips<span class="sl">/</span>one per race${overrides?', '+overrides+' overridden by you':''}<span class="sl">/</span>${done} of ${m.races.length} results in</div>
   <div class="bias"><span>Barrier bias <b>${Math.abs(fin.barrierBias)>0?(fin.barrierBias>0?'inside':'outside')+' ('+fin.barrierBias.toFixed(2)+')':'none read yet'}</b></span>
   ${Object.keys(fin.jockeyWins).length?`<span>Riders on the board <b>${Object.entries(fin.jockeyWins).map(([j,w])=>titleCase(j)+(w>1?' x'+w:'')).join(', ')}</b></span>`:''}</div>`;
   const st={...DEFAULT_SETTINGS,...me().settings};
   html+=multiHTML(dayMulti(run,m,st),st);
   html+=`<section class="block" style="margin-top:14px"><div class="rows">`;
-  for(const race of m.races){ const p=run.pred[race.no]||[]; const res=race.result; const ep=effectivePick(me(),race.no,run); const epR=ep.no&&race.runners.find(r=>r.no===ep.no); let right;
+  for(const race of m.races){ const p=run.pred[race.no]||[]; const res=race.result; const ep=effectivePick(me(),race,run); const epR=ep.no&&race.runners.find(r=>r.no===ep.no); let right;
     const scored=scoreRace(race,m,run.weights,st,run.dyn[race.no],me().adj); const adv=modelAdvice(scored,st);
     if(res){ const w=race.runners.find(r=>r.no===res.positions[0]); const pr=p.find(x=>x.no===res.positions[0]); const hit=ep.no===res.positions[0]; right=`<span class="tag ${hit?'good':(pr&&pr.rank<=st.marginRank?'acc':'warn')}">${hit?'Tip won':(pr?'Tip ran '+ordinal(pr.rank)+' rated':'result')}</span><b>${esc(w?w.name:res.positions[0])}</b>`; }
     else if(adv){ right=`<span class="tag ${ep.override?'acc':(adv.tier==='Strong'?'good':adv.tier==='Fair'?'':'warn')}">${ep.override?'Your override':adv.tier+' '+pct(adv.top.prob)}</span>${!ep.override&&isValue(adv.top,st)?`<span class="tag acc">Value</span>`:''}<b>${esc(epR?epR.name:'')}</b>${adv.roughie?`<span class="small">Roughie ${adv.roughie.r.no} ${esc(adv.roughie.r.name)} $${adv.roughie.r.odds}</span>`:''}`; }
     else right='<b>no runners</b>';
-    html+=`<button class="row" data-act="openrace" data-no="${race.no}"><span class="idx num">${race.no}</span><span><span class="t">${esc(race.name||'Race '+race.no)}</span><br><span class="s">${race.distance?race.distance+'m':''} ${esc(race.class||'')} ${race.time?'at '+esc(race.time):''} ${active(race).length} runners</span></span><span class="r">${right}</span></button>`; }
+    html+=`<button class="row" data-act="openrace" data-no="${race.no}"><span class="idx num">${race.no}</span><span><span class="t">${esc(race.name||'Race '+race.no)}</span><br><span class="s">${race.distance?race.distance+'m':''} ${esc(race.class||'')} ${race.time?'at '+esc(fmtTime(race.time)):''} ${active(race).length} runners${race.raceStatus&&!res?' <span class="small">'+esc(race.raceStatus)+'</span>':''}</span></span><span class="r">${right}</span></button>`; }
   return html+`</div></section>`;
 }
 
 function viewRace(){
   const m=state.meeting; const race=m.races.find(r=>r.no===state.ui.raceNo)||m.races[0]; if(!race) return emptyState(); state.ui.raceNo=race.no;
   const my=me(); const run=runDay(my,m); const scored=scoreRace(race,m,run.weights,{...DEFAULT_SETTINGS,...my.settings},run.dyn[race.no],my.adj);
-  const idx=m.races.indexOf(race); const prev=m.races[idx-1], next=m.races[idx+1]; const res=race.result; const picks=my.picks[race.no]||{win:null,place:[]};
-  const st={...DEFAULT_SETTINGS,...my.settings}; const adv=modelAdvice(scored,st); const ep=effectivePick(my,race.no,run);
+  const idx=m.races.indexOf(race); const prev=m.races[idx-1], next=m.races[idx+1]; const res=race.result; const picks=my.picks[pk(race)]||{win:null,place:[]};
+  const st={...DEFAULT_SETTINGS,...my.settings}; const adv=modelAdvice(scored,st); const ep=effectivePick(my,race,run);
   // flock: other punters' tips and consensus
   const others=Object.values(state.punters); const flockProb={}; const tips={};
-  for(const p of others){ const r=p.id===my.id?run:runDay(p,m); for(const x of (r.pred[race.no]||[])) flockProb[x.no]=(flockProb[x.no]||0)+x.prob/others.length; const pk=p.picks&&p.picks[race.no]; if(pk&&pk.win){ (tips[pk.win]=tips[pk.win]||[]).push(p); } }
-  let html=`<div class="racehead"><div><button class="back" data-act="tab" data-tab="races">All races</button><h2>Race ${race.no} ${esc(race.name||'')}</h2><div class="s">${race.distance?race.distance+'m':''} ${esc(race.class||'')} ${race.time?'at '+esc(race.time):''} on ${esc(m.condition)}. ${active(race).length} runners.</div></div>
+  for(const p of others){ const r=p.id===my.id?run:runDay(p,m); for(const x of (r.pred[race.no]||[])) flockProb[x.no]=(flockProb[x.no]||0)+x.prob/others.length; const pick=p.picks&&p.picks[pk(race)]; if(pick&&pick.win){ (tips[pick.win]=tips[pick.win]||[]).push(p); } }
+  let html=`<div class="racehead"><div><button class="back" data-act="tab" data-tab="races">All races</button><h2>${esc(shortName(m))} R${race.no} ${esc(race.name||'')}</h2><div class="s">${race.distance?race.distance+'m':''} ${esc(race.class||'')} ${race.time?'at '+esc(fmtTime(race.time)):''} on ${esc(race.condition||m.condition)}. ${active(race).length} runners.${race.raceStatus?' '+esc(race.raceStatus)+'.':''}</div></div>
     <div class="actions" style="margin:0"><button class="btn" data-act="openrace" data-no="${prev?prev.no:race.no}" ${prev?'':'disabled'}>Prev</button><button class="btn" data-act="openrace" data-no="${next?next.no:race.no}" ${next?'':'disabled'}>Next</button></div></div>`;
   const pr=res&&(run.pred[race.no]||[]).find(x=>x.no===res.positions[0]);
   html+=`<section class="block"><div class="eyebrow">Result<span class="sl">/</span>${res?'in':'not yet run'}</div>
   <div class="result-entry" style="margin-top:8px"><label class="field">Finishing order, saddlecloth numbers<input id="resIn" placeholder="e.g. 7 2 11 4" value="${res?esc(res.positions.join(' ')):''}" inputmode="numeric"></label>
   <button class="btn primary" data-act="result">${res?'Update result':'Enter result'}</button>${res?`<button class="btn danger" data-act="clearresult">Clear</button>`:''}</div>
-  ${res?`<p class="note">Your model had the winner ${pr?ordinal(pr.rank)+' at '+pct(pr.prob):'unrated'}. ${ep.no===res.positions[0]?(ep.override?'Your override won.':'The model tip won.'):(res.positions.slice(1,3).includes(ep.no)?'The tip ran a place.':'The tip missed.')}${res.by?' Entered by '+esc(res.by)+'.':''}</p>`:`<p class="note">Enter at least the first four home. It goes to every Pelican's model. Your weights move only when the winner was rated worse than ${ordinal(my.settings.marginRank)} or under ${pct(my.settings.marginProb)}.</p>`}</section>`;
+  ${res&&res.by&&/feed/i.test(res.by)?`<p class="note">Result from the racing.com feed.</p>`:''}
+  ${res?`<p class="note">Your model had the winner ${pr?ordinal(pr.rank)+' at '+pct(pr.prob):'unrated'}. ${ep.no===res.positions[0]?(ep.override?'Your override won.':'The model tip won.'):(res.positions.slice(1,3).includes(ep.no)?'The tip ran a place.':'The tip missed.')}${res.by?' Entered by '+esc(res.by)+'.':''}</p>`:`<p class="note">${m.source==='racing.com'?'Results arrive from the feed within a couple of minutes of being declared. Manual entry here is the fallback if the feed is late.':'Enter at least the first four home. It goes to every Pelican\'s model.'} Your weights move only when the winner was rated worse than ${ordinal(st.marginRank)} or under ${pct(st.marginProb)}.</p>`}</section>`;
   if(adv&&!res){ const t=adv.top; const tR=t.r; const mkt=t.r.odds?`market $${t.r.odds}`:'no market price'; const multi=dayMulti(run,m,st); const leg=multi&&multi.legs.find(l=>l.raceNo===race.no); const rg=adv.roughie;
     html+=`<div class="banner"><div class="eyebrow" style="color:var(--panel-ink);opacity:.7">Best bet<span class="sl">/</span>${adv.tier} ${pct(t.prob)}${adv.gap<0.04?', not much between the top two':''}</div>
     <h2>${cloth(tR.no)} ${esc(tR.name)}</h2><p>Our price ${ourPrice(t.prob,st)} at a ${Math.round(st.book*100)}% book (fair ${fmtOdds(t.prob)}), ${mkt}.${t.edge!=null?(isValue(t,st)?` Value: market ${pct(t.market)}, model ${pct(t.prob)}.`:` No value at the market price.`):''}${adv.stakeTop>0?` Stake ${fmtMoney(adv.stakeTop)} win.`:''}</p>
@@ -661,14 +686,14 @@ function viewRace(){
     html+=`</div>`; }
   html+=`</div></section>`;
   // race comments
-  const cs=state.comments.filter(c=>c.raceNo===race.no);
+  const cs=state.comments.filter(c=>c.raceNo===race.no&&String(c.meetingId||m.id)===String(m.id));
   html+=`<section class="block"><div class="eyebrow">Flock talk<span class="sl">/</span>race ${race.no}</div>`;
   for(const c of cs){ const p=punterByName(c.by); html+=`<div class="comment">${avatarSVG(p.avatar||'plain',p.colour,'sm')}<span><span class="by">${esc(c.by)}</span> <span class="t">${new Date(c.ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span><br>${esc(c.text)}</span>${c.by===my.name?`<button data-act="delcomment" data-id="${esc(c.id)}">remove</button>`:'<span></span>'}</div>`; }
   if(!cs.length) html+=`<p class="note">Nothing said yet.</p>`;
   html+=`<div class="cform"><input id="commentIn" class="field" style="border:1.5px solid var(--rule);background:var(--surface);padding:9px 10px;border-radius:6px" placeholder="Track bias, a plunge, a hunch" maxlength="240"><button class="btn" data-act="comment">Post</button></div></section>`;
   return html;
 }
-function clubOn(runnerNo,raceNo){ return state.bets.filter(b=>b.raceNo===raceNo&&b.runnerNo===runnerNo); }
+function clubOn(runnerNo,raceNo){ const mid=state.meeting?String(state.meeting.id):''; return state.bets.filter(b=>b.raceNo===raceNo&&b.runnerNo===runnerNo&&String(b.meetingId||mid)===mid); }
 function betForm(race,r){ const open=state.ui.betOn===runnerKey(race,r); const existing=clubOn(r.no,race.no);
   if(!open) return `<div class="actions" style="margin-top:10px"><button class="btn" data-act="betopen" data-key="${runnerKey(race,r)}" ${race.result?'disabled':''}>Club bet on ${r.no}</button>${existing.length?`<span class="small">${existing.length} already on</span>`:''}</div>`;
   return `<div class="betform"><label class="field">Type<select id="betType"><option value="win">Win</option><option value="place">Place</option><option value="ew">Each way</option></select></label>
@@ -702,31 +727,31 @@ function viewWeights(){
 
 function viewFlock(){
   const m=state.meeting; const ps=Object.values(state.punters);
-  const runs={}; for(const p of ps) runs[p.id]=runDay(p,m);
-  const bookAll=clubBook(m); const plBy={}; for(const b of bookAll.rows){ if(b.status==='open') continue; plBy[b.by]=(plBy[b.by]||0)+(b.ret-(num(b.stake)||0)); }
-  const rows=ps.map(p=>({p, tips:tipPoints(p,m,runs[p.id]), model:modelScore(runs[p.id],m), pl:plBy[p.name]||0})).sort((a,b)=>b.pl-a.pl||b.tips.pts-a.tips.pts);
+  const runs={}; for(const p of ps) runs[p.id]=runsFor(p);
+  const bookAll=clubBook(); const plBy={}; for(const b of bookAll.rows){ if(b.status==='open') continue; plBy[b.by]=(plBy[b.by]||0)+(b.ret-(num(b.stake)||0)); }
+  const rows=ps.map(p=>({p, tips:tipPoints(p,runs[p.id]), model:modelScore(runs[p.id]), pl:plBy[p.name]||0})).sort((a,b)=>b.pl-a.pl||b.tips.pts-a.tips.pts);
   let html=`<div class="eyebrow">Who won what<span class="sl">/</span>${ps.length} Pelican${ps.length===1?'':'s'}</div><p class="note" style="margin:6px 0 10px">Settled club bets by the Pelican who put them on. Tip points alongside: three for a winner, one for a place, on each Pelican's model tip or override.</p><div class="board">`;
   rows.forEach((r,i)=>{ html+=`<div class="brow"><span class="pos num">${i+1}</span><span>${pelChip(r.p)}${r.p.id===state.me?' <span class="tag acc">you</span>':''}<div class="sub">${r.tips.wins} winner${r.tips.wins===1?'':'s'}, ${r.tips.places} placed from ${r.tips.tipped} tips, ${r.tips.pts} pts</div></span><span class="sub num">model ${r.model.top}/${r.model.done}</span><span class="pts num" style="color:${r.pl>0?'var(--good)':r.pl<0?'var(--bad)':'inherit'}">${r.pl?fmtMoney(r.pl):'-'}</span></div>`; });
   html+=`</div>`;
-  html+=`<section class="block" style="margin-top:22px"><div class="eyebrow">Tips board<span class="sl">/</span>each model's tip by race, ringed orange where overridden</div><div class="tipsboard" style="margin-top:8px"><table><thead><tr><th style="text-align:left">Race</th>${ps.map(p=>`<th>${avatarSVG(p.avatar||'plain',p.colour,'sm')}<br>${esc(p.name)}</th>`).join('')}<th>Result</th></tr></thead><tbody>`;
-  for(const r of m.races){ const win=r.result&&r.result.positions[0]; html+=`<tr><td>${r.no}</td>${ps.map(p=>{const e=effectivePick(p,r.no,runs[p.id]); const t=e.no; return `<td>${t?`<span class="${win===t?'hit':''}" style="display:inline-block;border-radius:6px;${e.override?'outline:2px solid var(--accent);outline-offset:-2px':''}">${cloth(t)}</span>`:'<span class="small">-</span>'}</td>`;}).join('')}<td>${win?cloth(win):'<span class="small">-</span>'}</td></tr>`; }
+  html+=meetingSwitcher()+`<section class="block" style="margin-top:12px"><div class="eyebrow">Tips board<span class="sl">/</span>${esc(shortName(m))}, ringed orange where overridden</div><div class="tipsboard" style="margin-top:8px"><table><thead><tr><th style="text-align:left">Race</th>${ps.map(p=>`<th>${avatarSVG(p.avatar||'plain',p.colour,'sm')}<br>${esc(p.name)}</th>`).join('')}<th>Result</th></tr></thead><tbody>`;
+  for(const r of m.races){ const win=r.result&&r.result.positions[0]; html+=`<tr><td>${r.no}</td>${ps.map(p=>{const e=effectivePick(p,r,runs[p.id][m.id]); const t=e.no; return `<td>${t?`<span class="${win===t?'hit':''}" style="display:inline-block;border-radius:6px;${e.override?'outline:2px solid var(--accent);outline-offset:-2px':''}">${cloth(t)}</span>`:'<span class="small">-</span>'}</td>`;}).join('')}<td>${win?cloth(win):'<span class="small">-</span>'}</td></tr>`; }
   html+=`</tbody></table></div></section>`;
-  const done=m.races.filter(r=>r.result).sort((a,b)=>b.no-a.no);
-  html+=`<section class="block" style="margin-top:22px"><div class="eyebrow">Results<span class="sl">/</span>newest first</div>`;
+  const done=[]; for(const mm of meetingsList()) for(const r of mm.races) if(r.result) done.push({r,mm}); done.sort((a,b)=>(b.r.result.enteredAt||0)-(a.r.result.enteredAt||0));
+  html+=`<section class="block" style="margin-top:22px"><div class="eyebrow">Results<span class="sl">/</span>all meetings, newest first</div>`;
   if(!done.length) html+=`<p class="note">Nothing in yet.</p>`;
-  for(const r of done){ const w=r.runners.find(h=>h.no===r.result.positions[0]); const tippers=ps.filter(p=>effectivePick(p,r.no,runs[p.id]).no===r.result.positions[0]);
-    html+=`<div class="logrow"><div class="when">Race ${r.no}${r.result.by?' entered by '+esc(r.result.by):''}</div>${cloth(r.result.positions[0])} <b>${esc(w?w.name:'')}</b> from ${r.result.positions.slice(1).join(', ')}.${tippers.length?`<div class="flock" style="margin-top:6px">${tippers.map(p=>pelChip(p)).join('')} <span class="small">tipped it</span></div>`:''}</div>`; }
+  for(const {r,mm} of done){ const w=r.runners.find(h=>h.no===r.result.positions[0]); const tippers=ps.filter(p=>effectivePick(p,r,runs[p.id][mm.id]).no===r.result.positions[0]);
+    html+=`<div class="logrow"><div class="when">${esc(shortName(mm))} R${r.no}${r.result.by?' via '+esc(r.result.by):''}</div>${cloth(r.result.positions[0])} <b>${esc(w?w.name:'')}</b> from ${r.result.positions.slice(1).join(', ')}.${tippers.length?`<div class="flock" style="margin-top:6px">${tippers.map(p=>pelChip(p)).join('')} <span class="small">tipped it</span></div>`:''}</div>`; }
   html+=`</section>`;
-  const book=clubBook(m);
+  const book=clubBook();
   html+=`<section class="block"><div class="eyebrow">Punters club<span class="sl">/</span>${book.rows.length} bet${book.rows.length===1?'':'s'}</div>
   <div class="kpis" style="margin-top:8px"><div class="kpi"><b class="num">${fmtMoney(book.staked)}</b><span>Staked</span></div><div class="kpi"><b class="num">${fmtMoney(book.ret)}</b><span>Returned</span></div><div class="kpi"><b class="num" style="color:${book.pl>0?'var(--good)':book.pl<0?'var(--bad)':'inherit'}">${fmtMoney(book.pl)}</b><span>Settled P&amp;L</span></div></div>`;
   if(book.open>0) html+=`<p class="small" style="margin-top:6px">${fmtMoney(book.open)} still running.</p>`;
   const byP={}; for(const b of book.rows){ byP[b.by]=(byP[b.by]||0)+(num(b.stake)||0); } const contrib=Object.entries(byP); const silent=ps.filter(p=>!byP[p.name]);
   if(contrib.length) html+=`<div class="flock" style="margin:8px 0">${contrib.map(([n,v])=>{const p=punterByName(n);return `<span class="pel">${avatarSVG(p.avatar||'plain',p.colour,'sm')}${esc(n)} ${fmtMoney(v)}</span>`;}).join('')}</div>`;
   if(silent.length&&book.rows.length) html+=`<p class="small">Yet to put anything on: ${silent.map(p=>esc(p.name)).join(', ')}.</p>`;
-  for(const b of [...book.rows].reverse()){ const race=m.races.find(r=>r.no===b.raceNo); const h=race&&race.runners.find(x=>x.no===b.runnerNo); const p=punterByName(b.by);
+  for(const b of [...book.rows].reverse()){ const bm=state.meetings[b.meetingId]||m; const race=bm.races.find(r=>r.no===b.raceNo); const h=race&&race.runners.find(x=>x.no===b.runnerNo); const p=punterByName(b.by);
     const amt= b.status==='open'? fmtMoney(b.stake) : (b.ret>0? '+'+fmtMoney(b.ret-b.stake) : '-'+fmtMoney(b.stake));
-    html+=`<div class="betrow">${avatarSVG(p.avatar||'plain',p.colour,'sm')}<span><b>R${b.raceNo}</b> ${cloth(b.runnerNo)} ${esc(h?h.name:'')} <span class="s">${b.type==='ew'?'each way':b.type} ${fmtMoney(b.stake)}${b.odds?' @ '+b.odds:''}${b.type!=='win'?' (place '+placeOdds(b)+(b.placeOdds?'':' est.')+')':''} by ${esc(b.by)}${b.note?', '+esc(b.note):''}</span></span><span class="amt num ${b.status==='won'?'pos':b.status==='lost'?'neg':''}">${amt}${b.status==='open'&&b.by===me().name?` <button class="btn" style="padding:2px 8px;font-size:11px" data-act="delbet" data-id="${esc(b.id)}">x</button>`:''}</span></div>`; }
+    html+=`<div class="betrow">${avatarSVG(p.avatar||'plain',p.colour,'sm')}<span><b>${esc(shortName(bm))} R${b.raceNo}</b> ${cloth(b.runnerNo)} ${esc(h?h.name:'')} <span class="s">${b.type==='ew'?'each way':b.type} ${fmtMoney(b.stake)}${b.odds?' @ '+b.odds:''}${b.type!=='win'?' (place '+placeOdds(b)+(b.placeOdds?'':' est.')+')':''} by ${esc(b.by)}${b.note?', '+esc(b.note):''}</span></span><span class="amt num ${b.status==='won'?'pos':b.status==='lost'?'neg':''}">${amt}${b.status==='open'&&b.by===me().name?` <button class="btn" style="padding:2px 8px;font-size:11px" data-act="delbet" data-id="${esc(b.id)}">x</button>`:''}</span></div>`; }
   if(!book.rows.length) html+=`<p class="note">No club bets recorded. Open a runner on the race screen to put one on the book.</p>`;
   html+=`<p class="small" style="margin-top:8px">Place returns use the place price you enter, or a quarter of the win odds where none is given, so treat those as estimates.</p></section>`;
   html+=`<div class="actions"><button class="btn" data-act="switch">Switch Pelican</button></div>`;
@@ -734,20 +759,27 @@ function viewFlock(){
 }
 
 function viewLoad(){
-  const m=state.meeting;
-  return `<div class="eyebrow">Load form<span class="sl">/</span>JSON or CSV</div>
-  <p class="note" style="margin:8px 0 12px">Paste the finalised form as JSON in the schema below, or as CSV with the listed columns. Loading replaces the current meeting for every Pelican and clears tips and calls. ${m?`Current meeting: ${esc(m.meeting)} (${m.races.length} races).`:''}</p>
+  const ms=meetingsList().filter(x=>!x.example); const live=!!SUPABASE.url;
+  let html=`<div class="eyebrow">Feed<span class="sl">/</span>racing.com via the flock's server</div>
+  <p class="note" style="margin:8px 0 12px">${live?'The server reads racing.com every two minutes: fields, form, fixed odds, scratchings and results for the meetings below. Ratings are still ours; the feed only supplies the raw form.':'This copy has no server feed. Load form by hand below.'}</p>
+  ${live?`<div class="actions" style="margin-bottom:14px"><button class="btn primary" id="syncBtn" data-act="sync">Sync now</button><span class="small">Use this if a result or a scratching looks late.</span></div>`:''}
+  <div class="rows">`;
+  for(const m of ms){ const loaded=m.races.filter(r=>r.runners&&r.runners.length).length; const done=m.races.filter(r=>r.result).length;
+    html+=`<button class="row" data-act="meeting" data-id="${esc(m.id)}" data-go="races"><span class="idx num">${m.sort&&m.sort<90?m.sort:''}</span><span><span class="t">${esc(m.meeting)}</span><br><span class="s">${esc(m.state||'')} ${esc(m.condition||'')}${m.rail?', rail '+esc(m.rail):''}. ${loaded}/${m.races.length} fields, ${done} results.${m.syncedAt?' Read '+fmtTime(m.syncedAt)+'.':''}${m.manual?' Loaded by hand.':''}</span></span><span class="r"><b>${m.races.length}</b>races</span></button>`; }
+  if(!ms.length) html+=`<p class="note" style="padding:10px 0">No meetings on the feed yet.${live?' Press Sync now.':''}</p>`;
+  html+=`</div>`;
+  html+=`<details style="margin-top:26px"><summary class="eyebrow" style="cursor:pointer">Manual load<span class="sl">/</span>JSON or CSV, fallback only</summary>
+  <p class="note" style="margin:8px 0 12px">Paste form as JSON in the schema below, or CSV with the listed columns. It is added as its own meeting alongside the feed.</p>
   <label class="field">Form data<textarea id="loadIn" placeholder="Paste JSON or CSV here"></textarea></label>
-  <div class="actions"><button class="btn primary" data-act="load">Load as new meeting</button><button class="btn" data-act="mergerace">Add or replace one race</button><button class="btn" id="convertBtn" data-act="convert" hidden>Convert raw form text with Claude</button></div>
-  <p class="small" id="convertNote" hidden>Converting sends the pasted text to Claude from this page and asks for JSON in the schema. A full meeting can take a minute. Check the runner counts after it loads.</p>
-  <section class="block" style="margin-top:22px"><div class="eyebrow">Other ways in</div>
-  <div class="actions"><button class="btn" data-act="copyprompt">Copy conversion prompt for Claude</button><button class="btn" data-act="copyjson" ${m?'':'disabled'}>Copy current meeting as JSON</button><button class="btn" data-act="example">Load fictional example</button><button class="btn danger" data-act="clear" ${m?'':'disabled'}>Clear meeting</button></div>
-  <p class="small">The conversion prompt carries the schema and the rules. Paste it into Claude with the form guide text or PDF, then paste the JSON it returns here.</p></section>
-  <section class="block"><div class="eyebrow">JSON schema</div><pre class="schema">${esc(SCHEMA_DOC)}</pre>
-  <p class="small">Records are [starts, wins, placings]. Form reads oldest to newest with the most recent run last. Omit or null anything not in the form; that metric is then neutral for the runner.</p></section>
-  <section class="block"><div class="eyebrow">CSV columns</div><pre class="schema">race, race_name, race_distance, race_class, race_time, no, name, barrier, weight, jockey, trainer,
+  <div class="actions"><button class="btn primary" data-act="load">Load as a meeting</button><button class="btn" data-act="mergerace">Add or replace one race in the current meeting</button><button class="btn" id="convertBtn" data-act="convert" hidden>Convert raw form text with Claude</button></div>
+  <p class="small" id="convertNote" hidden>Converting sends the pasted text to Claude from this page and asks for JSON in the schema.</p>
+  <div class="actions"><button class="btn" data-act="copyprompt">Copy conversion prompt for Claude</button><button class="btn" data-act="copyjson" ${state.meeting?'':'disabled'}>Copy current meeting as JSON</button><button class="btn" data-act="example">Load fictional example</button><button class="btn danger" data-act="clear" ${state.meeting&&(state.meeting.manual||state.meeting.example)?'':'disabled'}>Remove current manual meeting</button></div>
+  <pre class="schema" style="margin-top:12px">${esc(SCHEMA_DOC)}</pre>
+  <p class="small">Records are [starts, wins, placings]. Form reads oldest to newest with the most recent run last.</p>
+  <pre class="schema">race, race_name, race_distance, race_class, race_time, no, name, barrier, weight, jockey, trainer,
 career, track, distance, good, soft, heavy   (each as 20-4-7 for starts-wins-placings)
-form, last_pos, last_field, last_margin, days, last_race, class_change, jockey_pct, trainer_pct, odds, scratched</pre></section>`;
+form, last_pos, last_field, last_margin, days, last_race, class_change, jockey_pct, trainer_pct, odds, scratched</pre></details>`;
+  return html;
 }
 
 /* ---------------- events ---------------- */
@@ -759,16 +791,16 @@ function bind(root){
   root.querySelectorAll('[data-act="note"]').forEach(el=>el.addEventListener('change',()=>{ const a=me().adj[el.dataset.key]||(me().adj[el.dataset.key]={adj:0,note:''}); a.note=el.value; save('punter'); }));
   const conv=$('#convertBtn'); if(conv&&sampleFn){ conv.hidden=false; $('#convertNote').hidden=false; }
 }
-function currentRace(){ return state.meeting.races.find(r=>r.no===state.ui.raceNo); }
+function currentRace(){ return state.meeting.races.find(r=>r.no===state.ui.raceNo)||state.meeting.races[0]; }
 document.addEventListener('click', async e=>{
   const b=e.target.closest('[data-act]'); if(!b) return; const act=b.dataset.act;
   if(act==='tab'){ state.ui.tab=b.dataset.tab; render(); }
   else if(act==='openrace'){ state.ui.raceNo=+b.dataset.no; state.ui.tab='race'; state.ui.open=null; render(); window.scrollTo(0,0); }
   else if(act==='toggle'){ state.ui.open= state.ui.open===b.dataset.key?null:b.dataset.key; render(); }
   else if(act==='scratch'){ const r=currentRace().runners.find(x=>x.no===+b.dataset.no); r.scratched=!r.scratched; currentRace().updatedAt=Date.now(); save('meeting'); }
-  else if(act==='tipwin'){ const race=currentRace(); const run=runDay(me(),state.meeting); const model=effectivePick({...me(),picks:{}},race.no,run).no; const pk=me().picks[race.no]||(me().picks[race.no]={win:null,place:[]}); const no=+b.dataset.no;
-    if(pk.win===no||no===model){ pk.win=null; toast(no===model&&pk.win!==no?'That is the model tip already':'Back to the model tip'); } else { pk.win=no; toast('Override set. The model tip stands for scoring only if you clear this.'); } pk.place=(pk.place||[]).filter(n=>n!==pk.win); save('punter'); }
-  else if(act==='tipplace'){ const race=currentRace(); const pk=me().picks[race.no]||(me().picks[race.no]={win:null,place:[]}); const no=+b.dataset.no; pk.place=pk.place||[]; if(pk.place.includes(no)) pk.place=pk.place.filter(n=>n!==no); else { if(pk.place.length>=2){ toast('Two place tips per race'); return; } if(pk.win===no) pk.win=null; pk.place.push(no); } save('punter'); }
+  else if(act==='tipwin'){ const race=currentRace(); const run=runDay(me(),state.meeting); const model=effectivePick({...me(),picks:{}},race,run).no; const key=pk(race); const pick=me().picks[key]||(me().picks[key]={win:null,place:[]}); const no=+b.dataset.no;
+    if(pick.win===no||no===model){ const was=pick.win; pick.win=null; toast(no===model&&was!==no?'That is the model tip already':'Back to the model tip'); } else { pick.win=no; toast('Override set. Tap again to go back to the model.'); } pick.place=(pick.place||[]).filter(n=>n!==pick.win); save('punter'); }
+  else if(act==='tipplace'){ const race=currentRace(); const key=pk(race); const pick=me().picks[key]||(me().picks[key]={win:null,place:[]}); const no=+b.dataset.no; pick.place=pick.place||[]; if(pick.place.includes(no)) pick.place=pick.place.filter(n=>n!==no); else { if(pick.place.length>=2){ toast('Two place tips per race'); return; } if(pick.win===no) pick.win=null; pick.place.push(no); } save('punter'); }
   else if(act==='result'){ const v=$('#resIn').value.trim(); const pos=v.split(/[^0-9]+/).filter(Boolean).map(Number); if(!pos.length){ toast('Enter the finishing order first'); return; } if(new Set(pos).size!==pos.length){ toast('A number is repeated'); return; }
     const race=currentRace(); const known=new Set(active(race).map(r=>r.no)); const bad=pos.filter(n=>!known.has(n)); if(bad.length){ toast('Not in this field: '+bad.join(', ')); return; }
     race.result={positions:pos, enteredAt:Date.now(), by:me().name}; race.updatedAt=Date.now(); state.meeting.updatedAt=Date.now(); save('result:'+race.no); toast('Result in. Every model on the card has been updated.'); }
@@ -776,8 +808,10 @@ document.addEventListener('click', async e=>{
   else if(act==='resetweights'){ me().weights=Object.fromEntries(METRICS.map(m=>[m.key,m.base])); save('punter'); }
   else if(act==='load'){ try{ loadText($('#loadIn').value); }catch(err){ toast('Could not read that: '+err.message); } }
   else if(act==='mergerace'){ try{ mergeRace($('#loadIn').value); }catch(err){ toast('Could not read that: '+err.message); } }
-  else if(act==='example'){ state.meeting=exampleMeeting(); resetSharedForNewMeeting(); state.ui.raceNo=1; state.ui.tab='races'; racesWatched=null; save('all'); watchRaces(); }
-  else if(act==='clear'){ if(!confirm('Clear the current meeting, results, comments and club bets for every Pelican?')) return; state.meeting=null; resetSharedForNewMeeting(); save('meeting'); }
+  else if(act==='example'){ const ex=exampleMeeting(); putMeeting(ex); selectMeeting(ex.id); state.ui.tab='races'; racesWatched=null; persistLocal(); render(); }
+  else if(act==='meeting'){ selectMeeting(b.dataset.id); state.ui.open=null; if(b.dataset.go) state.ui.tab=b.dataset.go; persistLocal(); render(); }
+  else if(act==='sync'){ await syncNow(); }
+  else if(act==='clear'){ if(!state.meeting||!(state.meeting.manual||state.meeting.example)) return; if(!confirm('Remove this meeting, its results, comments and club bets for every Pelican?')) return; removeMeeting(state.meeting.id); persistLocal(); render(); }
   else if(act==='copyprompt'){ await copy(CONVERT_RULES+SCHEMA_DOC); toast('Conversion prompt copied'); }
   else if(act==='copyjson'){ await copy(JSON.stringify(state.meeting,null,1)); toast('Meeting JSON copied'); }
   else if(act==='convert'){ await convertWithClaude(); }
@@ -805,7 +839,7 @@ async function convertWithClaude(){
 
 /* ---------------- boot ---------------- */
 (async function boot(){
-  loadLocal(); ensureRoster(); let seen=false; try{ seen=!!localStorage.getItem('kyw_seen'); localStorage.setItem('kyw_seen','1'); }catch(e){} if(!state.meeting&&!seen) state.meeting=exampleMeeting();
+  loadLocal(); ensureRoster(); let seen=false; try{ seen=!!localStorage.getItem('kyw_seen'); localStorage.setItem('kyw_seen','1'); }catch(e){} if(!state.meeting&&!seen&&!SUPABASE.url){ const ex=exampleMeeting(); putMeeting(ex); selectMeeting(ex.id); }
   render(); const web=await sbInit(); if(!web) initDb();
   if(window.claude&&window.claude.use){ window.claude.use('sample').then(s=>{ sampleFn=s; if(s&&state.ui.tab==='load') render(); }).catch(()=>{}); }
 })();

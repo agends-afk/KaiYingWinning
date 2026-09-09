@@ -1,0 +1,125 @@
+// Kai Ying Winning feed: racing.com -> Supabase tables the app reads.
+// Runs on a schedule (pg_cron -> pg_net) and on demand from the app ("Sync now").
+// Racing.com is the raw data source only. Ratings are computed in the app from each Pelican's weights.
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
+
+const GQL = "https://graphql.rmdprod.racing.com/";
+const GQL_KEY = "da2-6nsi4ztsynar3l3frgxf77q5fe"; // racing.com's public site key, taken from their config.js
+const FLOCK = Deno.env.get("KYW_FLOCK_CODE") ?? "pelicans-2026";
+const TOTE_PROVIDERS = new Set(["V", "N", "Q"]);
+
+const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+async function gql(query: string) {
+  const res = await fetch(GQL, { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": GQL_KEY, "User-Agent": "Mozilla/5.0" }, body: JSON.stringify({ query }) });
+  if (!res.ok) throw new Error(`racing.com ${res.status}`);
+  const j = await res.json();
+  if (j.errors && !j.data) throw new Error(JSON.stringify(j.errors).slice(0, 300));
+  return j.data;
+}
+
+const num = (v: unknown): number | null => { if (v === null || v === undefined || v === "") return null; const n = parseFloat(String(v).replace(/[^0-9.\-]/g, "")); return isNaN(n) ? null : n; };
+// "6-3-0-1" or "2:1-0-1" -> [starts, wins, seconds+thirds]
+function stats(s: unknown): [number, number, number] | null {
+  if (!s) return null; const m = String(s).match(/(\d+)[:\-](\d+)-(\d+)-(\d+)/); if (!m) return null;
+  return [+m[1], +m[2], +m[3] + +m[4]];
+}
+function classRank(c: string | null | undefined): number | null {
+  if (!c) return null; const s = c.toUpperCase();
+  if (/GROUP\s*1|\bG1\b/.test(s)) return 100; if (/GROUP\s*2|\bG2\b/.test(s)) return 90; if (/GROUP\s*3|\bG3\b/.test(s)) return 80; if (/LISTED|\bLR\b/.test(s)) return 70;
+  const bm = s.match(/BM\s*(\d+)/); if (bm) return +bm[1]; if (/MDN|MAIDEN/.test(s)) return 40; const cl = s.match(/\bCL(\d)/); if (cl) return 45 + +cl[1] * 3; if (/OPEN|HCP/.test(s)) return 75; return null;
+}
+function median(xs: number[]) { if (!xs.length) return null; const a = [...xs].sort((x, y) => x - y); const m = Math.floor(a.length / 2); return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; }
+function odds(list: any[] | null): number | null {
+  if (!list) return null; const fixed = list.filter(o => o.oddsWin && !String(o.providerCode).startsWith("BTOTE") && !TOTE_PROVIDERS.has(o.providerCode)).map(o => num(o.oddsWin)!).filter(v => v && v > 1);
+  const any = list.map(o => num(o.oddsWin)!).filter(v => v && v > 1); const m = median(fixed.length ? fixed : any); return m ? +m.toFixed(2) : null;
+}
+function lastStart(form: any[] | null, meetDate: string, todayClass: string) {
+  if (!form) return null;
+  const runs = form.filter(f => !f.isTrial && !f.isJumpOut && f.date && f.date < meetDate).sort((a, b) => (a.date < b.date ? 1 : -1));
+  const l = runs[0]; if (!l) return null;
+  const days = Math.round((Date.parse(meetDate) - Date.parse(l.date)) / 86400000);
+  const tr = classRank(todayClass), lr = classRank(l.raceClass); let cc = 0; if (tr != null && lr != null && Math.abs(tr - lr) >= 5) cc = tr > lr ? 1 : -1;
+  return { pos: l.position ?? null, field: l.starters ?? null, margin: l.position === 1 ? 0 : num(l.margin), days, race: String(l.raceCode ?? ""), classChange: cc, venue: l.venue ?? "", date: l.date };
+}
+function formString(lastTen: unknown): string {
+  try { const arr = JSON.parse(String(lastTen ?? "[]")); return arr.map((c: string) => (c === "-" ? "x" : c)).join("").slice(-8); } catch { return ""; }
+}
+
+function mapEntry(e: any, meetDate: string, todayClass: string) {
+  const h = e.horse ?? {};
+  return {
+    no: e.raceEntryNumber, name: e.horseName ?? h.name ?? "", barrier: e.liveBarrierNumber || e.barrierNumber || null,
+    weight: num(e.weightCarried ?? e.weight), jockey: e.jockey?.fullName ?? e.jockeyName ?? "", trainer: e.trainer?.fullName ?? e.trainerName ?? "",
+    age: h.age ?? null, sex: h.sex ? String(h.sex)[0] : "",
+    career: stats(h.careerStats), track: stats(e.trackStats), distance: stats(e.distanceStats), trackDistance: stats(e.trackDistanceStats),
+    good: stats(h.goodStats), soft: stats(h.softStats), heavy: stats(h.heavyStats), firstUp: stats(h.firstUpStats), secondUp: stats(h.secondUpStats),
+    form: formString(h.lastTen), last: lastStart(h.horseForm, meetDate, todayClass),
+    jockeyPct: num(e.jockey?.winPercent), trainerPct: num(e.trainer?.winPercent), jockeyRecentPct: num(e.jockey?.recentWinPercent), trainerRecentPct: num(e.trainer?.recentWinPercent),
+    apprentice: !!e.jockey?.apprentice, claim: num(e.jockey?.weightClaim), rating: num(h.rating ?? e.handicapRating),
+    odds: odds(e.odds), scratched: !!(e.scratched || e.isLateScratching || e.finish === 109), emergency: !!e.emergency,
+    gear: e.gearChanges ?? "", comment: e.commentShort ?? "", horseCode: String(e.horseCode ?? h.id ?? ""), finish: e.finish ?? null,
+  };
+}
+
+const RACE_FIELDS = `id raceNumber name distance class raceStatus status hasResults resultsString trackCondition trackRating time runnersCount fieldCount totalPrizeMoney`;
+const FORM_QUERY = (meet: string, no: number) => `{ r: getRaceForm(meetCode:"${meet}", raceNumber:${no}){ ${RACE_FIELDS}
+  raceEntries { ...E } formRaceEntries { ...E } } }
+fragment E on RaceEntryItem { id raceEntryNumber barrierNumber liveBarrierNumber weight weightCarried scratched isLateScratching emergency finish horseName horseCode jockeyName trainerName gearChanges commentShort trackStats distanceStats trackDistanceStats handicapRating
+    horse { id name age sex careerStats lastTen goodStats softStats heavyStats firstUpStats secondUpStats rating horseForm { date venue distance position starters margin raceClass raceCode isTrial isJumpOut } }
+    jockey { fullName winPercent recentWinPercent apprentice weightClaim } trainer { fullName winPercent recentWinPercent } odds { providerCode oddsWin } }`;
+
+async function syncMeeting(feed: any, existing: any | null, force: boolean) {
+  const meetId = String(feed.meet_id);
+  const d = await gql(`{ m: getMeeting(id:"${meetId}"){ id date meetingName venueName state trackCondition trackRating railPosition weather racesCount status }
+    races: getRacesForMeet(meetCode:"${meetId}"){ ${RACE_FIELDS} } }`);
+  const m = d.m ?? {}; const races: any[] = (d.races ?? []).sort((a: any, b: any) => a.raceNumber - b.raceNumber);
+  const meetDate = m.date ?? feed.date; const now = Date.now();
+  const stored: any = existing?.data ?? null; const storedRaces: Record<number, any> = {}; for (const r of stored?.races ?? []) storedRaces[r.no] = r;
+  const outRaces: any[] = []; const results: any[] = []; let fetched = 0;
+  for (const r of races) {
+    const no = r.raceNumber; const prev = storedRaces[no]; const t = r.time ? Date.parse(r.time) : null;
+    const finished = !!(r.hasResults || (r.resultsString && r.resultsString.trim()));
+    const near = t != null && Math.abs(t - now) < 45 * 60 * 1000;
+    const prevHasResult = !!(prev && prev.feedResult);
+    const need = force || !prev || (near && !prevHasResult) || (finished && !prevHasResult) || (r.raceStatus !== prev?.raceStatus);
+    let race: any;
+    if (need) {
+      fetched++;
+      const fd = await gql(FORM_QUERY(meetId, no)); const fr = fd.r ?? r;
+      const entries = (fr.raceEntries && fr.raceEntries.length) ? fr.raceEntries : (fr.formRaceEntries ?? []);
+      const runners = entries.map((e: any) => mapEntry(e, meetDate, fr.class ?? r.class)).sort((a: any, b: any) => a.no - b.no);
+      const order = runners.filter((x: any) => x.finish && x.finish > 0 && x.finish < 100).sort((a: any, b: any) => a.finish - b.finish).map((x: any) => x.no);
+      const positions = order.length ? order : (finished && fr.resultsString ? String(fr.resultsString).split(/[^0-9]+/).filter(Boolean).map(Number) : []);
+      race = { no, name: fr.name ?? "", distance: num(fr.distance), class: fr.class ?? "", time: fr.time ?? null, raceStatus: fr.raceStatus ?? "", condition: [fr.trackCondition, fr.trackRating].filter(Boolean).join(" "), prizemoney: fr.totalPrizeMoney ?? null, meetingId: meetId,
+        runners: runners.map(({ finish, ...rest }: any) => rest), feedResult: positions.length >= 3 ? { positions, at: new Date().toISOString() } : null, syncedAt: new Date().toISOString() };
+    } else { race = { ...prev, raceStatus: r.raceStatus ?? prev.raceStatus }; }
+    outRaces.push(race);
+    if (race.feedResult) results.push({ meeting_id: meetId, race_no: no, positions: race.feedResult.positions, entered_by: "racing.com feed", entered_at: race.feedResult.at });
+  }
+  const meeting = { id: meetId, meeting: feed.name ?? m.venueName ?? m.meetingName, venue: m.venueName ?? "", state: m.state ?? "", date: meetDate, condition: [m.trackCondition, m.trackRating].filter(Boolean).join(" ") || (stored?.condition ?? "Good 4"), rail: m.railPosition ?? "", weather: m.weather ?? "", status: m.status ?? "", sort: feed.sort ?? 99,
+    races: outRaces, source: "racing.com", syncedAt: new Date().toISOString(), updatedAt: Date.now() };
+  const { error } = await sb.from("kyw_meeting").upsert({ id: meetId, data: meeting, updated_at: new Date().toISOString() }); if (error) throw error;
+  if (results.length) { const { error: e2 } = await sb.from("kyw_results").upsert(results, { onConflict: "meeting_id,race_no", ignoreDuplicates: true }); if (e2) throw e2; }
+  return { meetId, name: meeting.meeting, races: outRaces.length, fetched, results: results.length };
+}
+
+const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "content-type, x-flock-code, authorization, apikey", "Access-Control-Allow-Methods": "GET, POST, OPTIONS" };
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+  const url = new URL(req.url);
+  const code = req.headers.get("x-flock-code") ?? url.searchParams.get("code");
+  if (code !== FLOCK) return new Response(JSON.stringify({ error: "not the flock" }), { status: 401, headers: { "Content-Type": "application/json", ...CORS } });
+  const force = url.searchParams.get("force") === "1";
+  const only = url.searchParams.get("meet");
+  const { data: feeds, error } = await sb.from("kyw_feed").select("*").eq("active", true).order("sort");
+  if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { "Content-Type": "application/json", ...CORS } });
+  const { data: existingRows } = await sb.from("kyw_meeting").select("id,data");
+  const existing: Record<string, any> = {}; for (const r of existingRows ?? []) existing[r.id] = r;
+  const out: any[] = [];
+  for (const f of feeds ?? []) { if (only && String(f.meet_id) !== only) continue;
+    try { out.push(await syncMeeting(f, existing[String(f.meet_id)] ?? null, force)); } catch (e) { out.push({ meetId: f.meet_id, error: String(e).slice(0, 300) }); } }
+  await sb.from("kyw_feed_log").insert({ summary: out });
+  return new Response(JSON.stringify({ ok: true, at: new Date().toISOString(), meetings: out }), { headers: { "Content-Type": "application/json", ...CORS } });
+});
