@@ -77,6 +77,14 @@ function mapEntry(e: any, meetDate: string, todayClass: string) {
   };
 }
 
+// Before race day racing.com's raceEntries holds only the scratchings; the full field is in formRaceEntries. Merge on saddlecloth number, raceEntries winning where both exist.
+function mergeEntries(a: any[] | null | undefined, b: any[] | null | undefined): any[] {
+  const byNo = new Map<number, any>();
+  for (const e of b ?? []) if (e && e.raceEntryNumber != null) byNo.set(e.raceEntryNumber, e);
+  for (const e of a ?? []) { if (!e || e.raceEntryNumber == null) continue; const base = { ...(byNo.get(e.raceEntryNumber) ?? {}) }; for (const [k, v] of Object.entries(e)) if (v !== null && v !== undefined) (base as any)[k] = v; byNo.set(e.raceEntryNumber, base); }
+  return [...byNo.values()];
+}
+
 const RACE_FIELDS = `id raceNumber name distance class raceStatus status hasResults resultsString trackCondition trackRating time runnersCount fieldCount totalPrizeMoney`;
 const FORM_QUERY = (meet: string, no: number) => `{ r: getRaceForm(meetCode:"${meet}", raceNumber:${no}){ ${RACE_FIELDS}
   raceEntries { ...E } formRaceEntries { ...E } } }
@@ -106,7 +114,7 @@ async function syncMeeting(feed: any, existing: any | null, force: boolean) {
     if (need) {
       fetched++;
       const fd = await gql(FORM_QUERY(meetId, no)); const fr = fd.r ?? r;
-      const entries = (fr.raceEntries && fr.raceEntries.length) ? fr.raceEntries : (fr.formRaceEntries ?? []);
+      const entries = mergeEntries(fr.raceEntries, fr.formRaceEntries);
       const runners = entries.map((e: any) => mapEntry(e, meetDate, fr.class ?? r.class)).sort((a: any, b: any) => a.no - b.no);
       const order = runners.filter((x: any) => x.finish && x.finish > 0 && x.finish < 100).sort((a: any, b: any) => a.finish - b.finish).map((x: any) => x.no);
       const positions = order.length ? order : (finished && fr.resultsString ? String(fr.resultsString).split(/[^0-9]+/).filter(Boolean).map(Number) : []);
@@ -160,7 +168,7 @@ async function backtest(meetId: string) {
   const m = d.m ?? {}; const meetDate = m.date; const out: any[] = [];
   for (const r of (d.races ?? []).sort((a: any, b: any) => a.raceNumber - b.raceNumber)) {
     const fd = await gql(FORM_QUERY(meetId, r.raceNumber)); const fr = fd.r ?? r;
-    const entries = (fr.raceEntries && fr.raceEntries.length) ? fr.raceEntries : (fr.formRaceEntries ?? []);
+    const entries = mergeEntries(fr.raceEntries, fr.formRaceEntries);
     const cond = String(fr.trackCondition ?? "").toLowerCase(); const catKey = cond.startsWith("h") ? "heavy" : (cond.startsWith("so") || cond.startsWith("sy")) ? "soft" : "good";
     const unrun = (rec: any, fin: number | null) => { if (!rec || !fin || fin > 100) return rec; const [s, w, p] = rec; return [Math.max(0, s - 1), Math.max(0, w - (fin === 1 ? 1 : 0)), Math.max(0, p - (fin === 2 || fin === 3 ? 1 : 0))]; };
     const runners = entries.map((e: any) => mapEntry(e, meetDate, fr.class ?? r.class)).map((x: any) => ({ ...x, odds: x.sp ?? x.odds, rating: null,
