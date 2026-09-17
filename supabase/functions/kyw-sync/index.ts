@@ -1,5 +1,5 @@
 // Kai Ying Winning feed: racing.com -> Supabase tables the app reads.
-// Runs on a schedule (pg_cron -> pg_net) and on demand from the app ("Sync now").
+// Runs on a schedule (pg_cron -> pg_net: 10 minutes during race hours, plus a 6am AEST daily roll) and on demand from the app ("Sync now").
 // Racing.com is the raw data source only. Ratings are computed in the app from each Pelican's weights.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -107,8 +107,8 @@ async function syncMeeting(feed: any, existing: any | null, force: boolean) {
     const prevAge = prev?.syncedAt ? now - Date.parse(prev.syncedAt) : Infinity;
     const minsTo = t != null ? (t - now) / 60000 : null;
     // Field reads: the daily forced refresh, one read about 30 minutes out, then the last six minutes through to the result.
-    const halfHour = minsTo != null && minsTo <= 32 && minsTo > 26 && prevAge > 4 * 60 * 1000;
-    const jump = minsTo != null && minsTo <= 6 && !prevHasResult && prevAge > 3 * 60 * 1000;
+    const halfHour = minsTo != null && minsTo <= 35 && minsTo > 20 && prevAge > 15 * 60 * 1000;
+    const jump = minsTo != null && minsTo <= 10 && !prevHasResult && prevAge > 8 * 60 * 1000;
     const need = force || !prev || halfHour || jump || (finished && !prevHasResult) || (r.raceStatus !== prev?.raceStatus);
     let race: any;
     if (need) {
@@ -125,41 +125,68 @@ async function syncMeeting(feed: any, existing: any | null, force: boolean) {
     if (race.feedResult) results.push({ meeting_id: meetId, race_no: no, positions: race.feedResult.positions, entered_by: "racing.com feed", entered_at: race.feedResult.at });
   }
   const meeting = { id: meetId, meeting: feed.name ?? m.venueName ?? m.meetingName, venue: m.venueName ?? "", state: m.state ?? "", date: meetDate, condition: [m.trackCondition, m.trackRating].filter(Boolean).join(" ") || (stored?.condition ?? "Good 4"), rail: m.railPosition ?? "", weather: m.weather ?? "", status: m.status ?? "", sort: feed.sort ?? 99,
-    races: outRaces, source: "racing.com", syncedAt: new Date().toISOString(), updatedAt: Date.now() };
-  const { error } = await sb.from("kyw_meeting").upsert({ id: meetId, data: meeting, updated_at: new Date().toISOString() }); if (error) throw error;
-  if (results.length) { const { error: e2 } = await sb.from("kyw_results").upsert(results, { onConflict: "meeting_id,race_no", ignoreDuplicates: true }); if (e2) throw e2; }
-  return { meetId, name: meeting.meeting, races: outRaces.length, fetched, results: results.length };
+    races: outRaces, source: "racing.com", syncedAt: stored?.syncedAt ?? new Date().toISOString(), updatedAt: stored?.updatedAt ?? Date.now() };
+  // Write only when something other than the timestamps differs.
+  const sig = (x: any) => JSON.stringify({ ...x, syncedAt: 0, updatedAt: 0, races: (x.races ?? []).map((r: any) => ({ ...r, syncedAt: 0, feedResult: r.feedResult ? { positions: r.feedResult.positions } : null })) });
+  const changed = !stored || sig(meeting) !== sig(stored);
+  if (changed) { meeting.syncedAt = new Date().toISOString(); meeting.updatedAt = Date.now(); const { error } = await sb.from("kyw_meeting").upsert({ id: meetId, data: meeting, updated_at: new Date().toISOString() }); if (error) throw error; }
+  const newResults = results.filter(r => !(storedRaces[r.race_no]?.feedResult));
+  if (newResults.length) { const { error: e2 } = await sb.from("kyw_results").upsert(newResults, { onConflict: "meeting_id,race_no", ignoreDuplicates: true }); if (e2) throw e2; }
+  // Keep the feed row's race window current so the scheduler knows when to run.
+  const times = races.map((r: any) => r.time ? Date.parse(r.time) : NaN).filter((t: number) => !isNaN(t));
+  if (times.length) { const first = new Date(Math.min(...times)).toISOString(), last = new Date(Math.max(...times)).toISOString();
+    const same = (a: any, b: string) => a && Date.parse(a) === Date.parse(b);
+    if (!same(feed.first_at, first) || !same(feed.last_at, last)) await sb.from("kyw_feed").update({ first_at: first, last_at: last }).eq("meet_id", meetId); }
+  return { meetId, name: meeting.meeting, races: outRaces.length, fetched, changed, results: newResults.length };
 }
 
-// Metro venues we follow, matched on racing.com's venue slug. Order within a state is the order here.
+// Venues we name. Metro list first (used in full on Wednesdays and Saturdays), then Hong Kong and Canberra.
 const METRO: [RegExp, string, string][] = [
   [/flemington/, "Flemington", "VIC"], [/caulfield/, "Caulfield", "VIC"], [/moonee-valley|the-valley/, "Moonee Valley", "VIC"], [/sandown/, "Sandown", "VIC"],
   [/randwick/, "Randwick", "NSW"], [/rosehill/, "Rosehill", "NSW"], [/warwick-farm/, "Warwick Farm", "NSW"], [/canterbury/, "Canterbury", "NSW"], [/kensington/, "Kensington", "NSW"],
   [/eagle-farm/, "Eagle Farm", "QLD"], [/doomben/, "Doomben", "QLD"], [/gold-coast/, "Gold Coast", "QLD"], [/sunshine-coast/, "Sunshine Coast", "QLD"],
   [/morphettville/, "Morphettville", "SA"], [/ascot/, "Ascot", "WA"], [/belmont/, "Belmont", "WA"],
 ];
-const STATE_ORDER: Record<string, number> = { VIC: 1, NSW: 2, QLD: 3, SA: 4, WA: 5 };
+const HK_VENUES: [RegExp, string][] = [[/sha-tin/, "Sha Tin"], [/happy-valley/, "Happy Valley"]];
+const TOP_STATES = ["NSW", "VIC", "QLD", "ACT", "WA"]; // one meeting a day from each, the richest card
+const STATE_ORDER: Record<string, number> = { VIC: 1, NSW: 2, QLD: 3, SA: 4, ACT: 5, WA: 6, HK: 7 };
 function aestDate(offsetDays = 0) { const d = new Date(Date.now() + 10 * 3600 * 1000 + offsetDays * 86400000); return d.toISOString().slice(0, 10); }
-// Keep the feed pointed at the next metro race day. Runs on every call; does nothing while the current feed is still current.
-async function rollFeed(): Promise<string | null> {
-  const { data: feeds } = await sb.from("kyw_feed").select("*").eq("active", true);
-  const yesterday = aestDate(-1);
-  if ((feeds ?? []).some((f: any) => f.date && String(f.date) >= yesterday)) return null;
-  for (let d = 0; d <= 8; d++) {
-    const date = aestDate(d);
-    const data = await gql(`{ m: GetMeetingByDate(date:"${date}"){ id venueName state isTab isTrial isJumpOut status } }`);
-    const found: any[] = [];
-    for (const m of data.m ?? []) { if (m.isTab !== 1 || m.isTrial || m.isJumpOut) continue; const slug = String(m.venueName ?? "").toLowerCase();
-      const hit = METRO.find(([re]) => re.test(slug)); if (!hit) continue; if (found.some(f => f.state === hit[2])) continue; // one metro per state
-      found.push({ meet_id: String(m.id), name: hit[1], state: hit[2], date, sort: STATE_ORDER[hit[2]] ?? 9 }); }
-    if (!found.length) continue;
+function aestDow(date: string) { return new Date(date + "T00:00:00Z").getUTCDay(); } // 0 Sun .. 6 Sat
+function prettyVenue(slug: string) { return slug.split("-").filter(w => !/^(bet365|ladbrokes|sportsbet|tab|pioneer|park)$/i.test(w)).map(w => w[0].toUpperCase() + w.slice(1)).join(" "); }
+
+// Which meetings we follow on a given day.
+// Wednesday and Saturday: every metro meeting. Every day: the richest TAB meeting in each of NSW, VIC, QLD, ACT and WA where no metro is already taken.
+// Wednesday and Sunday: Hong Kong.
+async function selectMeetings(date: string) {
+  const dow = aestDow(date); const metroDay = dow === 3 || dow === 6; const hkDay = dow === 3 || dow === 0;
+  const data = await gql(`{ m: GetMeetingByDate(date:"${date}"){ id venueName state country isTab isTrial isJumpOut } }`);
+  const all = (data.m ?? []).filter((m: any) => m.isTab === 1 && !m.isTrial && !m.isJumpOut);
+  const picks: any[] = []; const taken = new Set<string>();
+  if (metroDay) for (const m of all) { const slug = String(m.venueName ?? "").toLowerCase(); const hit = METRO.find(([re]) => re.test(slug)); if (!hit) continue;
+    picks.push({ meet_id: String(m.id), name: hit[1], state: hit[2], date, sort: STATE_ORDER[hit[2]] ?? 9 }); taken.add(hit[2]); }
+  for (const st of TOP_STATES) { if (taken.has(st)) continue; const cands = all.filter((m: any) => m.state === st); if (!cands.length) continue;
+    let best: any = null, bestPrize = -1;
+    for (const c of cands) { let prize = 0; try { const r = await gql(`{ races: getRacesForMeet(meetCode:"${c.id}"){ totalPrizeMoney } }`); prize = (r.races ?? []).reduce((a: number, x: any) => a + (num(x.totalPrizeMoney) ?? 0), 0); } catch { prize = 0; }
+      if (prize > bestPrize) { bestPrize = prize; best = c; } }
+    if (best) { const slug = String(best.venueName ?? "").toLowerCase(); const hit = METRO.find(([re]) => re.test(slug)); picks.push({ meet_id: String(best.id), name: hit ? hit[1] : prettyVenue(slug), state: st, date, sort: STATE_ORDER[st] ?? 9 }); taken.add(st); } }
+  if (hkDay) for (const m of all) { if (m.state !== "HK") continue; const slug = String(m.venueName ?? "").toLowerCase(); const hit = HK_VENUES.find(([re]) => re.test(slug));
+    picks.push({ meet_id: String(m.id), name: hit ? hit[1] : prettyVenue(slug), state: "HK", date, sort: STATE_ORDER.HK }); }
+  return picks;
+}
+
+// Once a day: point the feed at today's meetings, drop yesterday's, trim the log.
+async function dailyRoll(): Promise<{ date: string; picks: any[] }> {
+  const date = aestDate(0);
+  const picks = await selectMeetings(date);
+  if (picks.length) {
     await sb.from("kyw_feed").update({ active: false }).eq("active", true);
-    await sb.from("kyw_feed").upsert(found.map(({ state, ...f }) => ({ ...f, active: true })), { onConflict: "meet_id" });
-    const keep = found.map(f => f.meet_id);
-    const { data: olds } = await sb.from("kyw_meeting").select("id"); for (const o of olds ?? []) { if (!keep.includes(String(o.id))) await sb.from("kyw_meeting").delete().eq("id", o.id); }
-    return date;
+    await sb.from("kyw_feed").upsert(picks.map(({ state, ...f }) => ({ ...f, active: true, first_at: null, last_at: null })), { onConflict: "meet_id" });
+    const keep = picks.map(f => f.meet_id);
+    const { data: olds } = await sb.from("kyw_meeting").select("id"); for (const o of olds ?? []) { if (!keep.includes(String(o.id))) { await sb.from("kyw_meeting").delete().eq("id", o.id); await sb.from("kyw_results").delete().eq("meeting_id", o.id); } }
+    await sb.from("kyw_feed").delete().eq("active", false).lt("date", aestDate(-14));
   }
-  return null;
+  await sb.from("kyw_feed_log").delete().lt("at", new Date(Date.now() - 7 * 86400000).toISOString());
+  return { date, picks };
 }
 
 // Backtest: a finished meeting, mapped as the app would have seen it that morning (runs on or after the day excluded), priced at SP, with results.
@@ -200,14 +227,15 @@ Deno.serve(async (req) => {
   const bt = url.searchParams.get("backtest"); const btd = url.searchParams.get("backtestdate");
   if (btd) { try { const r = await backtestDate(btd); return new Response(JSON.stringify(r), { headers: { "Content-Type": "application/json", ...CORS } }); } catch (e) { return new Response(JSON.stringify({ error: String(e).slice(0, 400) }), { status: 500, headers: { "Content-Type": "application/json", ...CORS } }); } }
   if (bt) { try { const r = await backtest(bt); return new Response(JSON.stringify(r), { headers: { "Content-Type": "application/json", ...CORS } }); } catch (e) { return new Response(JSON.stringify({ error: String(e).slice(0, 400) }), { status: 500, headers: { "Content-Type": "application/json", ...CORS } }); } }
-  let rolled: string | null = null; try { rolled = await rollFeed(); } catch (e) { console.error("rollFeed", e); }
+  const daily = url.searchParams.get("daily") === "1";
+  let rolled: any = null; if (daily) { try { rolled = await dailyRoll(); } catch (e) { console.error("dailyRoll", e); rolled = { error: String(e).slice(0, 200) }; } }
   const { data: feeds, error } = await sb.from("kyw_feed").select("*").eq("active", true).order("sort");
   if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { "Content-Type": "application/json", ...CORS } });
   const { data: existingRows } = await sb.from("kyw_meeting").select("id,data");
   const existing: Record<string, any> = {}; for (const r of existingRows ?? []) existing[r.id] = r;
   const out: any[] = [];
   for (const f of feeds ?? []) { if (only && String(f.meet_id) !== only) continue;
-    try { out.push(await syncMeeting(f, existing[String(f.meet_id)] ?? null, force)); } catch (e) { out.push({ meetId: f.meet_id, error: String(e).slice(0, 300) }); } }
-  await sb.from("kyw_feed_log").insert({ summary: { rolled, meetings: out } });
+    try { out.push(await syncMeeting(f, existing[String(f.meet_id)] ?? null, force || daily)); } catch (e) { out.push({ meetId: f.meet_id, error: String(e).slice(0, 300) }); } }
+  if (daily || out.some(o => o.error || o.changed || o.fetched)) await sb.from("kyw_feed_log").insert({ summary: { rolled, meetings: out } });
   return new Response(JSON.stringify({ ok: true, at: new Date().toISOString(), rolled, meetings: out }), { headers: { "Content-Type": "application/json", ...CORS } });
 });
