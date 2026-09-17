@@ -127,7 +127,9 @@ async function syncMeeting(feed: any, existing: any | null, force: boolean) {
   const meeting = { id: meetId, meeting: feed.name ?? m.venueName ?? m.meetingName, venue: m.venueName ?? "", state: m.state ?? "", date: meetDate, condition: [m.trackCondition, m.trackRating].filter(Boolean).join(" ") || (stored?.condition ?? "Good 4"), rail: m.railPosition ?? "", weather: m.weather ?? "", status: m.status ?? "", sort: feed.sort ?? 99,
     races: outRaces, source: "racing.com", syncedAt: stored?.syncedAt ?? new Date().toISOString(), updatedAt: stored?.updatedAt ?? Date.now() };
   // Write only when something other than the timestamps differs.
-  const sig = (x: any) => JSON.stringify({ ...x, syncedAt: 0, updatedAt: 0, races: (x.races ?? []).map((r: any) => ({ ...r, syncedAt: 0, feedResult: r.feedResult ? { positions: r.feedResult.positions } : null })) });
+  // Postgres returns jsonb with its own key order, so compare a key-sorted rendering.
+  const canon = (v: any): string => Array.isArray(v) ? "[" + v.map(canon).join(",") + "]" : (v && typeof v === "object") ? "{" + Object.keys(v).sort().map(k => JSON.stringify(k) + ":" + canon(v[k])).join(",") + "}" : JSON.stringify(v ?? null);
+  const sig = (x: any) => canon({ ...x, syncedAt: 0, updatedAt: 0, races: (x.races ?? []).map((r: any) => ({ ...r, syncedAt: 0, feedResult: r.feedResult ? { positions: r.feedResult.positions } : null })) });
   const changed = !stored || sig(meeting) !== sig(stored);
   if (changed) { meeting.syncedAt = new Date().toISOString(); meeting.updatedAt = Date.now(); const { error } = await sb.from("kyw_meeting").upsert({ id: meetId, data: meeting, updated_at: new Date().toISOString() }); if (error) throw error; }
   const newResults = results.filter(r => !(storedRaces[r.race_no]?.feedResult));
