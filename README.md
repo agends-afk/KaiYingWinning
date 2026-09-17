@@ -16,7 +16,16 @@ Independently of the weights, each result feeds three live adjustments into race
 
 ## The feed
 
-A Supabase Edge Function, `supabase/functions/kyw-sync/index.ts`, reads racing.com's public data API every two minutes for the meetings listed in the `kyw_feed` table and writes fields, form, fixed odds (median of the fixed-odds bookmakers), scratchings and results into the app's tables. Racing.com supplies raw form only; every rating in the app comes from the Pelican's own weights. Results land as `racing.com feed` and settle tips and club bets. The app carries several meetings at once with a switcher on the Card and Flock tabs.
+A Supabase Edge Function reads racing.com's public GraphQL and writes the meetings, fields, prices and results the app reads. It runs on two schedules:
+
+- 6am AEST daily: picks the day's meetings, drops yesterday's, and loads every field.
+- Every 10 minutes, but only while a followed meeting is racing (45 minutes before its first race to 20 minutes after its last).
+
+Which meetings: every metro meeting on Wednesdays and Saturdays; on every day, the richest TAB card in each of NSW, Victoria, Queensland, the ACT and WA where no metro is already taken; Hong Kong (Sha Tin and Happy Valley) on Wednesdays and Sundays.
+
+Within a run a field is re-read about 30 minutes before the race, then in the last ten minutes until the result lands. The function writes a meeting only when something has changed, and logs itself only when it did work. Sync now on the Feed tab forces a full re-read.
+
+Hong Kong from racing.com carries fields, barriers, weights, riders, track and distance records, prices and results, but not the horse form history the model uses for last start, recent form and class. HKJC's results and horse pages are plain HTML and reachable from the Edge runtime, so that history can be added from HKJC later.
 
 ## Loading the form by hand
 
