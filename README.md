@@ -18,7 +18,7 @@ Independently of the weights, each result feeds three live adjustments into race
 
 A Supabase Edge Function reads racing.com's public GraphQL and writes the meetings, fields, prices and results the app reads. It runs on two schedules:
 
-- 6am AEST daily: picks the day's meetings, drops yesterday's, and loads every field.
+- 6am AEST daily: archives yesterday's followed meetings into the backtest table (form as at the morning, priced at SP, with results), picks the day's meetings, and loads every field.
 - Every 10 minutes, but only while a followed meeting is racing (45 minutes before its first race to 20 minutes after its last).
 
 Which meetings: every metro meeting on Wednesdays and Saturdays; on every day, the richest TAB card in each of NSW, Victoria, Queensland, the ACT and WA where no metro is already taken; Hong Kong (Sha Tin and Happy Valley) on Wednesdays and Sundays.

@@ -177,9 +177,13 @@ async function selectMeetings(date: string) {
 }
 
 // Once a day: point the feed at today's meetings, drop yesterday's, trim the log.
-async function dailyRoll(): Promise<{ date: string; picks: any[] }> {
+async function dailyRoll(): Promise<{ date: string; picks: any[]; archived: any[] }> {
   const date = aestDate(0);
   const picks = await selectMeetings(date);
+  // Archive the meetings we followed, as the form stood that morning and priced at SP, so any weights can be tested against them later.
+  const archived: any[] = [];
+  const { data: oldFeeds } = await sb.from("kyw_feed").select("meet_id,name,date").eq("active", true);
+  for (const f of oldFeeds ?? []) { if (String(f.date) >= date) continue; try { archived.push(await backtest(String(f.meet_id))); } catch (e) { archived.push({ meetId: f.meet_id, error: String(e).slice(0, 200) }); } }
   if (picks.length) {
     await sb.from("kyw_feed").update({ active: false }).eq("active", true);
     await sb.from("kyw_feed").upsert(picks.map(({ state, ...f }) => ({ ...f, active: true, first_at: null, last_at: null })), { onConflict: "meet_id" });
@@ -188,14 +192,14 @@ async function dailyRoll(): Promise<{ date: string; picks: any[] }> {
     await sb.from("kyw_feed").delete().eq("active", false).lt("date", aestDate(-14));
   }
   await sb.from("kyw_feed_log").delete().lt("at", new Date(Date.now() - 7 * 86400000).toISOString());
-  return { date, picks };
+  return { date, picks, archived };
 }
 
 // Backtest: a finished meeting, mapped as the app would have seen it that morning (runs on or after the day excluded), priced at SP, with results.
 async function backtest(meetId: string) {
   const d = await gql(`{ m: getMeeting(id:"${meetId}"){ id date meetingName venueName state trackCondition trackRating } races: getRacesForMeet(meetCode:"${meetId}"){ ${RACE_FIELDS} } }`);
-  const m = d.m ?? {}; const meetDate = m.date; const out: any[] = [];
-  for (const r of (d.races ?? []).sort((a: any, b: any) => a.raceNumber - b.raceNumber)) {
+  const m = d.m ?? {}; const meetDate = m.date;
+  const out: any[] = await Promise.all((d.races ?? []).sort((a: any, b: any) => a.raceNumber - b.raceNumber).map(async (r: any) => {
     const fd = await gql(FORM_QUERY(meetId, r.raceNumber)); const fr = fd.r ?? r;
     const entries = mergeEntries(fr.raceEntries, fr.formRaceEntries);
     const cond = String(fr.trackCondition ?? "").toLowerCase(); const catKey = cond.startsWith("h") ? "heavy" : (cond.startsWith("so") || cond.startsWith("sy")) ? "soft" : "good";
@@ -203,9 +207,9 @@ async function backtest(meetId: string) {
     const runners = entries.map((e: any) => mapEntry(e, meetDate, fr.class ?? r.class)).map((x: any) => ({ ...x, odds: x.sp ?? x.odds, rating: null,
       career: unrun(x.career, x.finish), track: unrun(x.track, x.finish), distance: unrun(x.distance, x.finish), trackDistance: unrun(x.trackDistance, x.finish), barrierRec: unrun(x.barrierRec, x.finish), [catKey]: unrun(x[catKey], x.finish) })).sort((a: any, b: any) => a.no - b.no);
     const positions = runners.filter((x: any) => x.finish && x.finish > 0 && x.finish < 100).sort((a: any, b: any) => a.finish - b.finish).map((x: any) => x.no);
-    out.push({ no: r.raceNumber, name: fr.name, distance: num(fr.distance), class: fr.class, condition: [fr.trackCondition, fr.trackRating].filter(Boolean).join(" "), runners: runners.map(({ finish, ...rest }: any) => rest), result: positions.length >= 3 ? { positions } : null });
-  }
-  const data = { id: meetId, meeting: m.venueName, date: meetDate, condition: [m.trackCondition, m.trackRating].filter(Boolean).join(" "), races: out };
+    return { no: r.raceNumber, name: fr.name, distance: num(fr.distance), class: fr.class, condition: [fr.trackCondition, fr.trackRating].filter(Boolean).join(" "), runners: runners.map(({ finish, ...rest }: any) => rest), result: positions.length >= 3 ? { positions } : null };
+  }));
+  const data = { id: meetId, meeting: m.venueName, state: m.state ?? "", date: meetDate, condition: [m.trackCondition, m.trackRating].filter(Boolean).join(" "), races: out };
   await sb.from("kyw_backtest").upsert({ meet_id: meetId, data, created_at: new Date().toISOString() });
   return { meetId, name: m.venueName, races: out.length, withResults: out.filter(x => x.result).length };
 }
@@ -236,8 +240,9 @@ Deno.serve(async (req) => {
   const { data: existingRows } = await sb.from("kyw_meeting").select("id,data");
   const existing: Record<string, any> = {}; for (const r of existingRows ?? []) existing[r.id] = r;
   const out: any[] = [];
-  for (const f of feeds ?? []) { if (only && String(f.meet_id) !== only) continue;
-    try { out.push(await syncMeeting(f, existing[String(f.meet_id)] ?? null, force || daily)); } catch (e) { out.push({ meetId: f.meet_id, error: String(e).slice(0, 300) }); } }
+  const todo = (feeds ?? []).filter((f: any) => !only || String(f.meet_id) === only);
+  const one = async (f: any) => { try { return await syncMeeting(f, existing[String(f.meet_id)] ?? null, force || daily); } catch (e) { return { meetId: f.meet_id, error: String(e).slice(0, 300) }; } };
+  if (daily || force) out.push(...await Promise.all(todo.map(one))); else for (const f of todo) out.push(await one(f));
   if (daily || out.some(o => o.error || o.changed || o.fetched)) await sb.from("kyw_feed_log").insert({ summary: { rolled, meetings: out } });
   return new Response(JSON.stringify({ ok: true, at: new Date().toISOString(), rolled, meetings: out }), { headers: { "Content-Type": "application/json", ...CORS } });
 });
