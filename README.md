@@ -39,17 +39,9 @@ Where the artifact runtime allows it, a "Convert raw form text with Claude" butt
 
 Records are `[starts, wins, placings]`. Form strings read oldest to newest, most recent run last, as in Australian form guides. The `last.race` field ("2026-08-22 Rosehill R4") is what links horses for form lines, so it needs to be written consistently across runners.
 
-## Pelicans
+## Your model
 
-On first open each person picks a name. The form, scratchings and results are shared. Each Pelican keeps their own metric weights, adaptation settings, runner calls, notes and tips (one win tip and up to two place tips per race). Every result is replayed through every Pelican's model on their own margin settings, so nobody's weights depend on who entered the result. The Flock tab scores tips (three points for a winner, one for a tip that runs a place) and shows how many winners each model had on top.
-
-## Punters club and flock talk
-
-Each race has a comment thread. Anyone can record a club bet on a runner (win, place or each way, with stake and odds). Existing bets on the runner show before you record another and the app asks before a same-type double-up. Once the result is in, bets settle and the Flock tab shows staked, returned and P&L, who has contributed and who has not. Place returns use the place price entered or a quarter of the win odds as an estimate.
-
-## Roster
-
-Mick, Wilko, Big Dog and Shirty are preset with their own avatar and colour. Anyone else can add a name on the roll call.
+The page is public and single-user. Your weights, adjustments and picks are kept in your browser and never sent anywhere; the shared database is read-only from the page. Drag a slider on the Model tab and the current race reprices in front of you.
 
 ## Hosting and storage
 
