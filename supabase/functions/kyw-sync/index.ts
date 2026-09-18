@@ -122,7 +122,7 @@ async function syncMeeting(feed: any, existing: any | null, force: boolean) {
       const freshRunners = runners.map(({ finish, ...rest }: any) => rest);
       const frozen = (prev?.frozenAt && prev?.runners?.length) ? prev.runners : (positions.length >= 3 && prev?.runners?.length && !prevHasResult ? prev.runners : null);
       race = { no, name: fr.name ?? "", distance: num(fr.distance), class: fr.class ?? "", time: fr.time ?? null, raceStatus: fr.raceStatus ?? "", condition: [fr.trackCondition, fr.trackRating].filter(Boolean).join(" "), prizemoney: fr.totalPrizeMoney ?? null, meetingId: meetId,
-        runners: frozen ?? freshRunners, frozenAt: frozen ? (prev.frozenAt ?? prev.syncedAt) : undefined, feedResult: positions.length >= 3 ? { positions, at: prev?.feedResult?.at ?? new Date().toISOString() } : null, syncedAt: new Date().toISOString() };
+        runners: frozen ?? freshRunners, frozenAt: frozen ? (prev.frozenAt ?? prev.syncedAt) : undefined, lockOverride: prev?.lockOverride, feedResult: positions.length >= 3 ? { positions, at: prev?.feedResult?.at ?? new Date().toISOString() } : null, syncedAt: new Date().toISOString() };
     } else { race = { ...prev, raceStatus: r.raceStatus ?? prev.raceStatus }; }
     outRaces.push(race);
     if (race.feedResult) results.push({ meeting_id: meetId, race_no: no, positions: race.feedResult.positions, entered_by: "racing.com feed", entered_at: race.feedResult.at });

@@ -416,6 +416,11 @@ function applyLocks(punter, meeting, run, settings){
   if(!meeting||meeting.example||!state.meetings||state.meetings[meeting.id]!==meeting) return;
   punter.locks=punter.locks||{}; let added=false; const now=Date.now();
   for(const race of meeting.races){ const k=pk(race); const past=!!(race.result&&race.result.positions&&race.result.positions.length)||(race.time&&Date.parse(race.time)<now);
+    // A lockOverride on the race (set on the server to correct a record) outranks anything on the device. Its ranks list the tip first and
+    // the winner's rated position; runners it does not mention keep the model's order after them.
+    if(race.lockOverride&&race.lockOverride.ranks){ const o=race.lockOverride; const rest=(run.pred[race.no]||[]).filter(x=>!o.ranks.some(y=>y.no===x.no));
+      const ranks=[...o.ranks.map((y,i)=>({no:y.no,rank:y.rank||i+1,prob:null})), ...rest.map((x,i)=>({...x,rank:o.ranks.length+i+1}))];
+      punter.locks[k]={ranks, roughie:o.roughie??null, at:now, override:true}; run.pred[race.no]=ranks; run.roughie[race.no]=o.roughie??null; run.locked[race.no]=true; continue; }
     const lock=punter.locks[k];
     if(lock){ run.pred[race.no]=lock.ranks; run.roughie[race.no]=lock.roughie; run.locked[race.no]=true; continue; }
     if(!past||!(run.pred[race.no]||[]).length) continue;
