@@ -309,7 +309,7 @@ function titleCase(s){ return s.replace(/\b\w/g,c=>c.toUpperCase()); }
 function cloth(no){ const c=CLOTH[no]||['#DCD5C6','#141A22']; return `<span class="cloth num" style="background:${c[0]};color:${c[1]}">${no}</span>`; }
 function me(){ return state.punters[state.me]; }
 function newPunter(name){ const r=ROSTER.find(x=>x.id===slug(name)); const used=Object.values(state.punters).map(p=>p.colour); const colour=r?r.colour:(PUNTER_COLOURS.find(c=>!used.includes(c))||PUNTER_COLOURS[Object.keys(state.punters).length%PUNTER_COLOURS.length]);
-  return {id:slug(name), name:r?r.name:name.trim(), colour, avatar:r?r.avatar:'plain', weights:Object.fromEntries(METRICS.map(m=>[m.key,m.base])), settings:{...DEFAULT_SETTINGS}, adj:{}, picks:{}, updatedAt:Date.now()}; }
+  return {id:slug(name), name:r?r.name:name.trim(), colour, avatar:r?r.avatar:'plain', weights:Object.fromEntries(METRICS.map(m=>[m.key,m.base])), settings:{...DEFAULT_SETTINGS}, adj:{}, picks:{}, locks:{}, updatedAt:Date.now()}; }
 function ensureRoster(){ for(const r of ROSTER){ if(!state.punters[r.id]) state.punters[r.id]=newPunter(r.name); } }
 function pelChip(p){ return `<span class="pel">${avatarSVG(p.avatar||'plain',p.colour,'sm')}${esc(p.name)}</span>`; }
 function punterByName(n){ return Object.values(state.punters).find(p=>p.name===n)||{name:n,colour:'#7E8794',avatar:'plain'}; }
@@ -405,7 +405,24 @@ function runDay(punter, meeting){
       const perf=Math.tanh(acc/sw); const w0=w[met.key]; const w1=clamp(w0*(1+settings.lr*perf),met.base*0.15,met.base*2.5); if(Math.abs(w1-w0)>0.005){ w[met.key]=+w1.toFixed(3); entry.items.push(`${met.label} ${w0.toFixed(2)} to ${w1.toFixed(2)}`); } } }
     changes.push(entry);
   }
-  return {weights:w, dyn, pred, changes, final:{barrierBias:barrierBiasFrom(barrierRel), paceBias:barrierBiasFrom(paceRel), jockeyWins}};
+  const run={weights:w, dyn, pred, changes, roughie:{}, locked:{}, final:{barrierBias:barrierBiasFrom(barrierRel), paceBias:barrierBiasFrom(paceRel), jockeyWins}};
+  applyLocks(punter, meeting, run, settings);
+  return run;
+}
+/* Tips are fixed at the jump. The first time a race is seen past its start time (or with a result in), the model's ranking and roughie
+   for that race are written to the punter's locks and used from then on, so later slider moves or data changes cannot rewrite history.
+   Only live feed meetings are locked; the example and past meetings used by the proving ground are not. */
+function applyLocks(punter, meeting, run, settings){
+  if(!meeting||meeting.example||!state.meetings||state.meetings[meeting.id]!==meeting) return;
+  punter.locks=punter.locks||{}; let added=false; const now=Date.now();
+  for(const race of meeting.races){ const k=pk(race); const past=!!(race.result&&race.result.positions&&race.result.positions.length)||(race.time&&Date.parse(race.time)<now);
+    const lock=punter.locks[k];
+    if(lock){ run.pred[race.no]=lock.ranks; run.roughie[race.no]=lock.roughie; run.locked[race.no]=true; continue; }
+    if(!past||!(run.pred[race.no]||[]).length) continue;
+    const scored=scoreRace(race,meeting,run.weights,settings,run.dyn[race.no],punter.adj); const adv=modelAdvice(scored,settings);
+    punter.locks[k]={ranks:run.pred[race.no], roughie:adv&&adv.roughie?adv.roughie.r.no:null, at:now};
+    run.roughie[race.no]=punter.locks[k].roughie; run.locked[race.no]=true; added=true; }
+  if(added) persistLocal();
 }
 function barrierBiasFrom(list){ if(list.length<2) return 0; const sw=list.reduce((a,b)=>a+b.w,0); const mean=list.reduce((a,b)=>a+b.rel*b.w,0)/sw; const dev=0.5-mean; if(Math.abs(dev)<0.12) return 0; return clamp(dev*1.5,-0.6,0.6); }
 
@@ -664,7 +681,7 @@ function viewRaces(){
     <label class="field">Rail<input data-meta="rail" value="${esc(m.rail)}" placeholder="True, +3m"></label></div>`;
   const fin=run.final;
   const overrides=m.races.filter(r=>me().picks[pk(r)]&&me().picks[pk(r)].win).length;
-  html+=`<div class="eyebrow">Model tips<span class="sl">/</span>one per race${overrides?', '+overrides+' overridden by you':''}<span class="sl">/</span>${done} of ${m.races.length} results in</div>${done?`<p class="small" style="margin:4px 0 0">Run races show the winner, where our tip finished (Tip), where the winner sat in our ratings (Wnr), and whether it was our roughie.</p>`:''}
+  html+=`<div class="eyebrow">Model tips<span class="sl">/</span>one per race${overrides?', '+overrides+' overridden by you':''}<span class="sl">/</span>${done} of ${m.races.length} results in</div>${done?`<p class="small" style="margin:4px 0 0">Tips are fixed at the jump. Run races show the winner, where our tip finished (Tip), where the winner sat in our ratings (Wnr), and whether it was our roughie.</p>`:''}
   <div class="bias"><span>Barrier bias <b>${Math.abs(fin.barrierBias)>0?(fin.barrierBias>0?'inside':'outside')+' ('+fin.barrierBias.toFixed(2)+')':'none read yet'}</b></span><span>Pace bias <b>${Math.abs(fin.paceBias)>0?(fin.paceBias>0?'on-pace':'backmarkers')+' ('+fin.paceBias.toFixed(2)+')':'none read yet'}</b></span>
   ${Object.keys(fin.jockeyWins).length?`<span>Riders on the board <b>${Object.entries(fin.jockeyWins).map(([j,w])=>titleCase(j)+(w>1?' x'+w:'')).join(', ')}</b></span>`:''}</div>`;
   const st={...DEFAULT_SETTINGS,...me().settings};
@@ -673,7 +690,7 @@ function viewRaces(){
   for(const race of m.races){ const p=run.pred[race.no]||[]; const res=race.result; const ep=effectivePick(me(),race,run); const epR=ep.no&&race.runners.find(r=>r.no===ep.no); let right;
     const scored=scoreRace(race,m,run.weights,st,run.dyn[race.no],me().adj); const adv=modelAdvice(scored,st);
     if(res){ const win=res.positions[0]; const w=race.runners.find(r=>r.no===win); const pr=p.find(x=>x.no===win); const tipIdx=res.positions.indexOf(ep.no); const tipPos=tipIdx>=0?tipIdx+1:null;
-      const rough=adv&&adv.roughie&&adv.roughie.r.no===win;
+      const rNo=run.locked&&run.locked[race.no]?run.roughie[race.no]:(adv&&adv.roughie?adv.roughie.r.no:null); const rough=rNo===win;
       right=`<span class="tag ${tipPos===1?'good':tipPos&&tipPos<=3?'acc':''}">Tip ${tipPos?ordinal(tipPos):'unpl'}</span><span class="tag ${pr&&pr.rank<=st.marginRank?'':'warn'}">Wnr ${pr?ordinal(pr.rank):'-'}</span>${rough?'<span class="tag acc">Roughie</span>':''}<b>${esc(w?w.name:win)}</b>`; }
     else if(adv){ right=`<span class="tag ${ep.override?'acc':(adv.tier==='Strong'?'good':adv.tier==='Fair'?'':'warn')}">${ep.override?'Your override':adv.tier+' '+pct(adv.top.prob)}</span>${!ep.override&&isValue(adv.top,st)?`<span class="tag acc">Value</span>`:''}<b>${esc(epR?epR.name:'')}</b><span class="small">Ours ${ourPrice(adv.top.prob,st)}${adv.top.r.odds?', mkt $'+adv.top.r.odds:''}</span>${adv.roughie?`<span class="small">Roughie ${adv.roughie.r.no} ${esc(adv.roughie.r.name)} $${adv.roughie.r.odds}</span>`:''}`; }
     else right='<b>no runners</b>';

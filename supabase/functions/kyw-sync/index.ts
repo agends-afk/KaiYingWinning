@@ -118,8 +118,11 @@ async function syncMeeting(feed: any, existing: any | null, force: boolean) {
       const runners = entries.map((e: any) => mapEntry(e, meetDate, fr.class ?? r.class)).sort((a: any, b: any) => a.no - b.no);
       const order = runners.filter((x: any) => x.finish && x.finish > 0 && x.finish < 100).sort((a: any, b: any) => a.finish - b.finish).map((x: any) => x.no);
       const positions = order.length ? order : (finished && fr.resultsString ? String(fr.resultsString).split(/[^0-9]+/).filter(Boolean).map(Number) : []);
+      // The field the app judges a run race by is the last one read before the result: pre-race prices and scratchings, never post-race data.
+      const freshRunners = runners.map(({ finish, ...rest }: any) => rest);
+      const frozen = (prev?.frozenAt && prev?.runners?.length) ? prev.runners : (positions.length >= 3 && prev?.runners?.length && !prevHasResult ? prev.runners : null);
       race = { no, name: fr.name ?? "", distance: num(fr.distance), class: fr.class ?? "", time: fr.time ?? null, raceStatus: fr.raceStatus ?? "", condition: [fr.trackCondition, fr.trackRating].filter(Boolean).join(" "), prizemoney: fr.totalPrizeMoney ?? null, meetingId: meetId,
-        runners: runners.map(({ finish, ...rest }: any) => rest), feedResult: positions.length >= 3 ? { positions, at: new Date().toISOString() } : null, syncedAt: new Date().toISOString() };
+        runners: frozen ?? freshRunners, frozenAt: frozen ? (prev.frozenAt ?? prev.syncedAt) : undefined, feedResult: positions.length >= 3 ? { positions, at: prev?.feedResult?.at ?? new Date().toISOString() } : null, syncedAt: new Date().toISOString() };
     } else { race = { ...prev, raceStatus: r.raceStatus ?? prev.raceStatus }; }
     outRaces.push(race);
     if (race.feedResult) results.push({ meeting_id: meetId, race_no: no, positions: race.feedResult.positions, entered_by: "racing.com feed", entered_at: race.feedResult.at });
