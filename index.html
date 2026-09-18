@@ -55,6 +55,9 @@ header.top svg{width:56px;height:56px;display:block}
 header.top .eyebrow{color:var(--panel-ink);opacity:.72}
 header.top h1{color:var(--panel-ink)}
 header.top .sub{opacity:.8;font-size:13px;margin-top:4px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+header.top .refresh{background:none;border:1.5px solid rgba(244,239,228,.45);color:var(--panel-ink);border-radius:6px;padding:3px 9px;font-size:12px;font-weight:600;letter-spacing:.6px;cursor:pointer}
+header.top .refresh:active,header.top .refresh.busy{opacity:.55}
+.pullhint{position:fixed;top:0;left:0;right:0;text-align:center;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--panel-ink);background:var(--accent);padding:6px;z-index:30;transform:translateY(-100%);transition:transform .15s}.pullhint.show{transform:none}
 .sync{display:inline-flex;align-items:center;gap:6px;font-size:11px;letter-spacing:1.4px;text-transform:uppercase;font-weight:600}
 .sync::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--muted2);display:inline-block}
 .sync.on::before{background:var(--good)} .sync.err::before{background:var(--bad)}
@@ -208,7 +211,7 @@ pre.schema{font-size:11px;line-height:1.45;background:var(--surface);border:1.5p
     <div>
       <div class="eyebrow">Form model<span class="sl">/</span>Australian and Hong Kong racing<span id="hMe"></span></div>
       <h1 id="hMeeting">Kai Ying Winning</h1>
-      <div class="sub"><span id="hSub"></span><span class="sync" id="sync">connecting</span></div>
+      <div class="sub"><span id="hSub"></span><span class="sync" id="sync">connecting</span><button class="refresh" id="refreshBtn" type="button" aria-label="Refresh">&#8635; Refresh</button></div>
     </div>
   </header>
   <main id="main"></main>
@@ -511,6 +514,15 @@ async function sbPullMeeting(){
 async function sbPullResults(){ const {data,error}=await sb.from('kyw_results').select('*'); if(error) throw error; let ch=false;
   for(const m of Object.values(state.meetings)){ for(const race of m.races){ const row=(data||[]).find(x=>String(x.meeting_id)===String(m.id)&&x.race_no===race.no); const cur=race.result;
     if(row){ const res={positions:row.positions,by:row.entered_by,enteredAt:new Date(row.entered_at).getTime()}; if(!cur||JSON.stringify(cur.positions)!==JSON.stringify(res.positions)||cur.by!==res.by){ race.result=res; ch=true; } } else if(cur){ race.result=null; ch=true; } } } return ch; }
+async function refreshNow(){ const btn=$('#refreshBtn'); if(btn){ btn.classList.add('busy'); btn.disabled=true; }
+  try{ if(!sb){ toast('No feed connection'); return; } const a=await sbPullMeeting(); const b=await sbPullResults(); persistLocal(); render(); toast(a||b?'Updated from the feed':'Already up to date'); }
+  catch(e){ console.error(e); toast('Refresh failed, check signal'); }
+  finally{ if(btn){ btn.classList.remove('busy'); btn.disabled=false; } } }
+// Pull down from the top of the page to refresh (home-screen apps have no browser refresh).
+function bindPullToRefresh(){ let y0=null, armed=false; const hint=document.createElement('div'); hint.className='pullhint'; hint.textContent='Release to refresh'; document.body.appendChild(hint);
+  document.addEventListener('touchstart',e=>{ y0=(window.scrollY<=0)?e.touches[0].clientY:null; armed=false; },{passive:true});
+  document.addEventListener('touchmove',e=>{ if(y0==null) return; const d=e.touches[0].clientY-y0; armed=d>80; hint.classList.toggle('show',armed); },{passive:true});
+  document.addEventListener('touchend',()=>{ hint.classList.remove('show'); if(armed) refreshNow(); y0=null; armed=false; }); }
 async function syncNow(){ if(!SUPABASE.url) { toast('No feed configured'); return; } const btn=$('#syncBtn'); if(btn){ btn.disabled=true; btn.textContent='Syncing...'; }
   try{ const res=await fetch(SUPABASE.url+'/functions/v1/kyw-sync?force=1', {method:'POST', headers:{'x-flock-code':SUPABASE.flockCode,'Content-Type':'application/json'}, body:'{}'}); const j=await res.json(); if(!res.ok||j.error) throw new Error(j.error||res.status);
     await sbPullMeeting(); await sbPullResults(); persistLocal(); render(); toast('Feed refreshed: '+(j.meetings||[]).map(m=>m.name||m.meetId).join(', ')); }
@@ -919,7 +931,7 @@ async function convertWithClaude(){
 /* ---------------- boot ---------------- */
 (async function boot(){
   loadLocal(); ensureRoster(); let seen=false; try{ seen=!!localStorage.getItem('kyw_seen'); localStorage.setItem('kyw_seen','1'); }catch(e){} if(!state.meeting&&!seen&&!SUPABASE.url){ const ex=exampleMeeting(); putMeeting(ex); selectMeeting(ex.id); }
-  render(); const web=await sbInit(); if(!web) initDb();
+  render(); const rb=$('#refreshBtn'); if(rb) rb.addEventListener('click',refreshNow); bindPullToRefresh(); const web=await sbInit(); if(!web) initDb();
   if(window.claude&&window.claude.use){ window.claude.use('sample').then(s=>{ sampleFn=s; if(s&&state.ui.tab==='load') render(); }).catch(()=>{}); }
 })();
 </script>
