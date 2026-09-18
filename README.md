@@ -23,7 +23,7 @@ A Supabase Edge Function reads racing.com's public GraphQL and writes the meetin
 
 Which meetings: every metro meeting on Wednesdays and Saturdays; on every day, the richest TAB card in each of NSW, Victoria, Queensland, the ACT and WA where no metro is already taken; Hong Kong (Sha Tin and Happy Valley) on Wednesdays and Sundays.
 
-Within a run a field is re-read about 30 minutes before the race, then in the last ten minutes until the result lands. The function writes a meeting only when something has changed, and logs itself only when it did work. Sync now on the Feed tab forces a full re-read.
+Within a run every race is re-read until its result is in, so fields, scratchings, prices and results are never more than ten minutes old during racing hours. The function writes a meeting only when something has changed, and logs itself only when it did work. Sync now on the Feed tab forces a full re-read.
 
 Hong Kong from racing.com carries fields, barriers, weights, riders, track and distance records, prices and results, but not the horse form history the model uses for last start, recent form and class. HKJC's results and horse pages are plain HTML and reachable from the Edge runtime, so that history can be added from HKJC later.
 

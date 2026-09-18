@@ -101,15 +101,11 @@ async function syncMeeting(feed: any, existing: any | null, force: boolean) {
   const stored: any = existing?.data ?? null; const storedRaces: Record<number, any> = {}; for (const r of stored?.races ?? []) storedRaces[r.no] = r;
   const outRaces: any[] = []; const results: any[] = []; let fetched = 0;
   for (const r of races) {
-    const no = r.raceNumber; const prev = storedRaces[no]; const t = r.time ? Date.parse(r.time) : null;
+    const no = r.raceNumber; const prev = storedRaces[no];
     const finished = !!(r.hasResults || (r.resultsString && r.resultsString.trim()));
     const prevHasResult = !!(prev && prev.feedResult);
-    const prevAge = prev?.syncedAt ? now - Date.parse(prev.syncedAt) : Infinity;
-    const minsTo = t != null ? (t - now) / 60000 : null;
-    // Field reads: the daily forced refresh, one read about 30 minutes out, then the last six minutes through to the result.
-    const halfHour = minsTo != null && minsTo <= 35 && minsTo > 20 && prevAge > 15 * 60 * 1000;
-    const jump = minsTo != null && minsTo <= 10 && !prevHasResult && prevAge > 8 * 60 * 1000;
-    const need = force || !prev || halfHour || jump || (finished && !prevHasResult) || (r.raceStatus !== prev?.raceStatus);
+    // Every run (10 minutes apart during racing hours) re-reads each race until its result is in. Writes happen only when something changed.
+    const need = force || !prev || !prevHasResult || (r.raceStatus !== prev?.raceStatus);
     let race: any;
     if (need) {
       fetched++;
