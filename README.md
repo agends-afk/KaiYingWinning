@@ -41,6 +41,8 @@ Records are `[starts, wins, placings]`. Form strings read oldest to newest, most
 
 ## Your model
 
+Tips are fixed at the jump. The first time a race is seen past its start time, or with a result in, the model's ranking and roughie for that race are locked on the device and shown from then on, so later slider moves cannot rewrite what was tipped. The feed also keeps the last pre-result field for a run race, so post-race price and scratching changes do not alter the judgement.
+
 The page is public and single-user. Your weights, adjustments and picks are kept in your browser and never sent anywhere; the shared database is read-only from the page. Drag a slider on the Model tab and the current race reprices in front of you.
 
 ## Hosting and storage
