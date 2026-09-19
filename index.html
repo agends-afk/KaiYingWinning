@@ -257,6 +257,7 @@ const METRICS = [
 const DEFAULT_SETTINGS = { marginRank:3, marginProb:0.12, lr:0.12, formlineGain:0.6, beta:2.2, autoAdapt:true, bank:200, kelly:0.25, valueEdge:0.05, book:1.20 };
 const PUNTER_COLOURS = ['#E8801A','#2F8F5B','#3B6FD4','#C43C2F','#8E5BC6','#D4A72C','#1BA5A5','#D45FA0','#6B7F2E','#8C5A2B'];
 // Web-hosted backend. Filled in once the Supabase project is chosen. Empty url = no shared backend.
+const BUILD='2026-09-19.1';
 const SUPABASE = { url:'https://qgomklldlpspwilyjdqx.supabase.co', key:'sb_publishable_nhOXF3eXlHAyys2B0rzxxQ_W_Kb4OZP', flockCode:'pelicans-2026' };
 // The roster. Anyone else can still add a name on the roll call.
 const ROSTER = [
@@ -415,6 +416,9 @@ function runDay(punter, meeting){
 /* Tips are fixed at the jump. The first time a race is seen past its start time (or with a result in), the model's ranking and roughie
    for that race are written to the punter's locks and used from then on, so later slider moves or data changes cannot rewrite history.
    Only live feed meetings are locked; the example and past meetings used by the proving ground are not. */
+// Reorder a live scoring to a race's locked ranking (rank and chance from the lock), so nothing on screen moves after the jump.
+function lockedScore(scored, run, race){ if(!run.locked||!run.locked[race.no]) return scored; const ranks=run.pred[race.no]||[]; const byNo=Object.fromEntries(ranks.map(x=>[x.no,x]));
+  const out=scored.map(s=>{ const l=byNo[s.r.no]; return l?{...s, rank:l.rank, prob:l.prob!=null?l.prob:s.prob}:{...s, rank:ranks.length+1+s.rank}; }); out.sort((a,b)=>a.rank-b.rank); return out; }
 function applyLocks(punter, meeting, run, settings){
   if(!meeting||meeting.example||!state.meetings||state.meetings[meeting.id]!==meeting) return;
   punter.locks=punter.locks||{}; let added=false; const now=Date.now();
@@ -514,7 +518,9 @@ async function sbPullMeeting(){
 async function sbPullResults(){ const {data,error}=await sb.from('kyw_results').select('*'); if(error) throw error; let ch=false;
   for(const m of Object.values(state.meetings)){ for(const race of m.races){ const row=(data||[]).find(x=>String(x.meeting_id)===String(m.id)&&x.race_no===race.no); const cur=race.result;
     if(row){ const res={positions:row.positions,by:row.entered_by,enteredAt:new Date(row.entered_at).getTime()}; if(!cur||JSON.stringify(cur.positions)!==JSON.stringify(res.positions)||cur.by!==res.by){ race.result=res; ch=true; } } else if(cur){ race.result=null; ch=true; } } } return ch; }
-async function refreshNow(){ const btn=$('#refreshBtn'); if(btn){ btn.classList.add('busy'); btn.disabled=true; }
+// A home-screen web app can hold on to an old copy of the page for days. Compare the build stamp with the one on the server.
+async function checkForUpdate(){ try{ const r=await fetch('version.txt?t='+Date.now(),{cache:'no-store'}); if(!r.ok) return; const v=(await r.text()).trim(); if(v&&v!==BUILD){ const t=$('#toast'); t.innerHTML=`New version ${esc(v)} available. <b>Tap to update</b>`; t.hidden=false; t.style.cursor='pointer'; t.onclick=()=>{ location.reload(); }; } }catch(e){} }
+async function refreshNow(){ const btn=$('#refreshBtn'); if(btn){ btn.classList.add('busy'); btn.disabled=true; } checkForUpdate();
   try{ if(!sb){ toast('No feed connection'); return; } const a=await sbPullMeeting(); const b=await sbPullResults(); persistLocal(); render(); toast(a||b?'Updated from the feed':'Already up to date'); }
   catch(e){ console.error(e); toast('Refresh failed, check signal'); }
   finally{ if(btn){ btn.classList.remove('busy'); btn.disabled=false; } } }
@@ -717,7 +723,7 @@ function viewRaces(){
 
 function viewRace(){
   const m=state.meeting; const race=m.races.find(r=>r.no===state.ui.raceNo)||m.races[0]; if(!race) return emptyState(); state.ui.raceNo=race.no;
-  const my=me(); const run=runDay(my,m); const scored=scoreRace(race,m,run.weights,{...DEFAULT_SETTINGS,...my.settings},run.dyn[race.no],my.adj);
+  const my=me(); const run=runDay(my,m); const scored=lockedScore(scoreRace(race,m,run.weights,{...DEFAULT_SETTINGS,...my.settings},run.dyn[race.no],my.adj), run, race);
   const idx=m.races.indexOf(race); const prev=m.races[idx-1], next=m.races[idx+1]; const res=race.result; const picks=my.picks[pk(race)]||{win:null,place:[]};
   const st={...DEFAULT_SETTINGS,...my.settings}; const adv=modelAdvice(scored,st); const ep=effectivePick(my,race,run);
   // flock: other punters' tips and consensus
@@ -779,6 +785,7 @@ function recStr(v){ const r=rec(v); return r? `${r.s}:${r.w}-${r.p}` : 'n/a'; }
 function weightWord(w,base){ const r=base?w/base:0; const word= w<=0?'off':r<0.6?'light':r<1.4?'default':r<2?'heavy':'max'; return `${w.toFixed(2)} <small>${word}</small>`; }
 function weightTipsHTML(){ const m=state.meeting; if(!m) return `<p class="note">Load a meeting and the field will reprice here as you drag.</p>`; const my=me(); const st={...DEFAULT_SETTINGS,...my.settings}; const run=runDay(my,m);
   const race=m.races.find(r=>r.no===state.ui.raceNo)||m.races.find(r=>!r.result&&active(r).length>=2)||m.races[0]; if(!race) return ''; state.ui.raceNo=race.no;
+  if(run.locked&&run.locked[race.no]) return `<section class="block" style="margin:0 0 14px"><div class="eyebrow">Repriced by your weights<span class="sl">/</span>${esc(shortName(m))} R${race.no}</div><p class="note" style="margin-top:6px">This race has jumped. Its tip is fixed and no longer moves with the sliders. Pick an unrun race on the Card to see the field reprice.</p></section>`;
   const idx=m.races.indexOf(race); const prev=m.races[idx-1], next=m.races[idx+1];
   const sc=scoreRace(race,m,run.weights,st,run.dyn[race.no],my.adj);
   const rows=sc.map(t=>`<div class="wtip ${t.r.scratched?'scr':''}"><span class="nm">${cloth(t.r.no)} ${esc(t.r.name)}</span><span class="num">${pct(t.prob)}</span><span class="num">${ourPrice(t.prob,st)}</span><span class="num muted">${t.r.odds?'$'+t.r.odds:'-'}</span></div>`).join('');
@@ -850,7 +857,7 @@ function viewFlock(){
 
 function viewLoad(){
   const ms=meetingsList().filter(x=>!x.example); const live=!!SUPABASE.url;
-  let html=`<div class="eyebrow">Feed<span class="sl">/</span>racing.com, refreshed on race days</div>
+  let html=`<div class="eyebrow">Feed<span class="sl">/</span>racing.com, refreshed on race days<span class="sl">/</span>build ${BUILD}</div>
   <p class="note" style="margin:8px 0 12px">${live?'Fields, form, fixed odds, scratchings and results for the meetings below come from racing.com: every metro meeting on Wednesdays and Saturdays, the richest card in each of NSW, Victoria, Queensland, the ACT and WA every day, and Hong Kong on Wednesdays and Sundays. Fields, prices and results refresh every ten minutes during racing hours. Ratings are computed here from your weights.':'This copy has no server feed. Load form by hand below.'}</p>
   <div class="rows">`;
   for(const m of ms){ const loaded=m.races.filter(r=>r.runners&&r.runners.length).length; const done=m.races.filter(r=>r.result).length;
@@ -931,7 +938,7 @@ async function convertWithClaude(){
 /* ---------------- boot ---------------- */
 (async function boot(){
   loadLocal(); ensureRoster(); let seen=false; try{ seen=!!localStorage.getItem('kyw_seen'); localStorage.setItem('kyw_seen','1'); }catch(e){} if(!state.meeting&&!seen&&!SUPABASE.url){ const ex=exampleMeeting(); putMeeting(ex); selectMeeting(ex.id); }
-  render(); const rb=$('#refreshBtn'); if(rb) rb.addEventListener('click',refreshNow); bindPullToRefresh(); const web=await sbInit(); if(!web) initDb();
+  render(); const rb=$('#refreshBtn'); if(rb) rb.addEventListener('click',refreshNow); bindPullToRefresh(); checkForUpdate(); const web=await sbInit(); if(!web) initDb();
   if(window.claude&&window.claude.use){ window.claude.use('sample').then(s=>{ sampleFn=s; if(s&&state.ui.tab==='load') render(); }).catch(()=>{}); }
 })();
 </script>
