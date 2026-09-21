@@ -1,6 +1,6 @@
 // Kai Ying Winning edge hunt: one row per runner per race, from racing.com, for every TAB meeting on a date.
 // ?date=YYYY-MM-DD pulls that date; &states=VIC,HK restricts to those states. ?next=1 works kyw_runs_queue newest-first until the time budget (?budget= ms, default 60000) is spent.
-// Nothing here touches the live feed tables.
+// Each runner's earlier runs (any state, dated before the race) go to kyw_form. Nothing here touches the live feed tables.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -27,7 +27,18 @@ const price = (v: any): number | null => { const n = num(v); return n != null &&
 
 const RACE_Q = (meet: string, no: number) => `{ r: getRaceForm(meetCode:"${meet}", raceNumber:${no}){ id raceNumber name distance class trackCondition trackRating fieldCount hasSectionals timingSource time totalPrizeMoney
   raceEntries { raceEntryNumber barrierNumber liveBarrierNumber weight weightCarried weightPrevious scratched isLateScratching emergency finish margin beatenMargin horseName horseCode jockeyName jockeyCode trainerName trainerCode gearChanges gearHasChanges jockeyChanged handicapRating lastRaceDate startingPrice bettingFluctuationsPriceOpen bettingFluctuationsPriceMoveOne bettingFluctuationsPriceMoveTwo speedValue positionAtSettled positionAt800 positionAt400 prizeMoney
-    horse { age sex } jockey { apprentice weightClaim } timing { finishTimeSeconds sixHundredMetresTime twoHundredMetresTime timeVarToWinner distanceTravelled } } } }`;
+    horse { age sex horseForm { date venue distance position starters margin raceClass startingPrice weightCarried trackCondition positionAt800 positionAt400 barrier jockeyName winningTime isTrial isJumpOut } } jockey { apprentice weightClaim } timing { finishTimeSeconds sixHundredMetresTime twoHundredMetresTime timeVarToWinner distanceTravelled } } } }`;
+
+// A runner's earlier runs (racing.com keeps the latest ten, any state). Only runs dated before this race are history.
+function mapForm(m: any, e: any) {
+  const raceDate = String(m.date ?? "");
+  return (e.horse?.horseForm ?? []).filter((f: any) => f && f.date && String(f.date) < raceDate && !f.isTrial && !f.isJumpOut).map((f: any) => ({
+    horse_code: String(e.horseCode ?? ""), date: f.date, venue: f.venue ?? "", distance: num(f.distance) ?? 0,
+    position: (f.position && f.position > 0 && f.position < 100) ? f.position : null, starters: f.starters ?? null, margin: num(f.margin), class: f.raceClass ?? null,
+    sp: price(f.startingPrice), weight: num(f.weightCarried), condition: f.trackCondition ?? null, pos_800: f.positionAt800 ?? null, pos_400: f.positionAt400 ?? null,
+    barrier: f.barrier ?? null, jockey: f.jockeyName ?? null, time_s: f.winningTime ? num(f.winningTime) / 100 : null,
+  })).filter((x: any) => x.horse_code);
+}
 
 function mapRace(m: any, r: any) {
   const sect = !!r.hasSectionals;
@@ -60,14 +71,18 @@ async function pullDate(date: string, states: Set<string> | null) {
     try {
       const rd = await gql(`{ races: getRacesForMeet(meetCode:"${m.id}"){ raceNumber } }`);
       const nos: number[] = (rd.races ?? []).map((r: any) => r.raceNumber).filter((n: any) => n != null);
-      const all: any[] = [];
+      const all: any[] = []; const form = new Map<string, any>();
       for (let k = 0; k < nos.length; k += 4) {
-        const part = await Promise.all(nos.slice(k, k + 4).map(async (n) => { const x = await gql(RACE_Q(String(m.id), n)); return mapRace({ ...m, date: m.date ?? date }, x.r ?? {}); }));
+        const part = await Promise.all(nos.slice(k, k + 4).map(async (n) => { const x = await gql(RACE_Q(String(m.id), n)); const mm = { ...m, date: m.date ?? date };
+          for (const e of x.r?.raceEntries ?? []) for (const f of mapForm(mm, e)) form.set(`${f.horse_code}|${f.date}|${f.venue}|${f.distance}`, f);
+          return mapRace(mm, x.r ?? {}); }));
         all.push(...part.flat()); await pause(1200);
       }
+      const formRows = [...form.values()];
+      for (let j = 0; j < formRows.length; j += 500) { const { error } = await sb.from("kyw_form").upsert(formRows.slice(j, j + 500), { onConflict: "horse_code,date,venue,distance" }); if (error) throw new Error(error.message); }
       races += nos.length;
       for (let j = 0; j < all.length; j += 500) { const { error } = await sb.from("kyw_runs").upsert(all.slice(j, j + 500), { onConflict: "race_id,no" }); if (error) throw new Error(error.message); }
-      rows += all.length; out.push({ meet: m.venueName, state: m.state, races: nos.length, rows: all.length });
+      rows += all.length; out.push({ meet: m.venueName, state: m.state, races: nos.length, rows: all.length, form: formRows.length });
     } catch (e) { const msg = String(e); out.push({ meet: m.venueName, error: msg.slice(0, 200) }); if (msg.includes("Throttled")) throw e; }
     await pause(800);
   }
