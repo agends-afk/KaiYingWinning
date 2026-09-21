@@ -31,7 +31,10 @@ const RACE_Q = (meet: string, no: number) => `{ r: getRaceForm(meetCode:"${meet}
 
 function mapRace(m: any, r: any) {
   const sect = !!r.hasSectionals;
-  return (r.raceEntries ?? []).filter((e: any) => e && e.raceEntryNumber != null).map((e: any) => ({
+  // racing.com can list a saddlecloth twice (an emergency and a scratching); keep the entry that ran, else the last seen.
+  const byNo = new Map<number, any>();
+  for (const e of r.raceEntries ?? []) { if (!e || e.raceEntryNumber == null) continue; const cur = byNo.get(e.raceEntryNumber); if (!cur || (e.finish && e.finish < 100) || !(cur.finish && cur.finish < 100)) byNo.set(e.raceEntryNumber, e); }
+  return [...byNo.values()].map((e: any) => ({
     race_id: String(r.id), no: e.raceEntryNumber, meet_id: String(m.id), date: m.date, venue: m.venueName ?? "", state: m.state ?? "", category: m.category ?? null, meet_quality: m.meetQuality ?? null, rail: m.railPosition ?? null,
     race_no: r.raceNumber, race_name: r.name ?? null, distance: num(r.distance), class: r.class ?? null, condition: r.trackCondition ?? null, rating: r.trackRating ?? null, field_count: r.fieldCount ?? null, prize: num(r.totalPrizeMoney), race_time: r.time ?? null,
     horse_code: String(e.horseCode ?? ""), horse: e.horseName ?? "", age: num(e.horse?.age), sex: e.horse?.sex ? String(e.horse.sex)[0] : null,
