@@ -51,6 +51,8 @@ Two backends. On GitHub Pages (workflow in `.github/workflows/pages.yml`) the pa
 
 ## Stress test
 
+The market is not part of the rating by default. Prices (the median fixed-odds price on racing.com at the last read) are the benchmark the form rating is judged against, and the Edge board on the Card lists the biggest disagreements. A Trust setting controls how far a disagreement is backed for value calls and stakes; the market weight slider can put the market back into the rating for anyone who wants it.
+
 The model was run over 220 metro Saturday races (8 August to 5 September 2026) with the form as it stood that morning and settled at starting price. Records that included the day's run were unwound and ratings withheld, so the test does not see the result before it tips.
 
 | Selection | Result | Flat-stake return |

@@ -141,7 +141,8 @@ input[type=range]{accent-color:var(--accent);width:100%}
 .wrow .d{font-size:12.5px;color:var(--muted);margin:2px 0 6px}
 .wrow .delta{font-size:12.5px;color:var(--accent);font-weight:600}
 .wrow .l span small{font-family:var(--body);font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted2)}
-.wtips{margin-top:8px}.wtip{display:grid;grid-template-columns:1fr 54px 56px 52px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--rule);font-size:14px}.wtip .idx{font-family:var(--display);font-weight:800;font-size:16px}.wtip .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.wtip .num{text-align:right;font-weight:700}.wtip .muted{color:var(--muted2);font-weight:500}.wtip.hd{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);border-bottom:2px solid var(--rule);padding:4px 0}.wtip.hd .num{font-weight:600}.wtip.scr{opacity:.4;text-decoration:line-through}.chips button.chip{cursor:pointer}
+.wtips{margin-top:8px}.wtip{display:grid;grid-template-columns:1fr 54px 56px 52px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--rule);font-size:14px}.wtip .idx{font-family:var(--display);font-weight:800;font-size:16px}.wtip .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.wtip .num{text-align:right;font-weight:700}.wtip .muted{color:var(--muted2);font-weight:500}.wtips.edge .wtip{grid-template-columns:1fr 84px 52px 52px}
+.wtip.hd{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);border-bottom:2px solid var(--rule);padding:4px 0}.wtip.hd .num{font-weight:600}.wtip.scr{opacity:.4;text-decoration:line-through}.chips button.chip{cursor:pointer}
 .result-entry{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
 .result-entry .field{flex:1;min-width:150px}
 .logrow{padding:10px 0;border-bottom:1px solid var(--rule);font-size:13.5px}
@@ -250,14 +251,14 @@ const METRICS = [
   {key:'barrierrec',label:'Record from this gate', base:0.3, desc:'The horse\'s own record from this barrier number, where the feed supplies it.'},
   {key:'weight',    label:'Weight carried',     base:0.4, desc:'Weight relative to the field average.'},
   {key:'fitness',   label:'Freshness',          base:0.5, desc:'Days since last run. Fourteen to twenty-eight is treated as ideal; first-up runs are marked down.'},
-  {key:'market',    label:'Market',             base:1.5, desc:'Implied chance from the odds. Used in the blended tip only; value is judged with this switched off.'},
+  {key:'market',    label:'Market',             base:0, desc:'Implied chance from the odds. Off by default so the rating is pure form and the market is only the benchmark to beat. Turn it up and the tip leans toward the market.'},
   {key:'formline',  label:'Form lines today',   base:1.0, desc:'Live: horses out of the same last-start race as one that ran above or below expectation today, and riders winning on the day.'},
   {key:'manual',    label:'Your call',          base:1.0, desc:'Your own plus or minus on a runner, set on the race screen.'}
 ];
-const DEFAULT_SETTINGS = { marginRank:3, marginProb:0.12, lr:0.12, formlineGain:0.6, beta:2.2, autoAdapt:true, bank:200, kelly:0.25, valueEdge:0.05, book:1.20 };
+const DEFAULT_SETTINGS = { marginRank:3, marginProb:0.12, lr:0.12, formlineGain:0.6, beta:2.2, autoAdapt:true, bank:200, kelly:0.25, valueEdge:0.05, book:1.20, trust:0.5 };
 const PUNTER_COLOURS = ['#E8801A','#2F8F5B','#3B6FD4','#C43C2F','#8E5BC6','#D4A72C','#1BA5A5','#D45FA0','#6B7F2E','#8C5A2B'];
 // Web-hosted backend. Filled in once the Supabase project is chosen. Empty url = no shared backend.
-const BUILD='2026-09-19.1';
+const BUILD='2026-09-21.1';
 const SUPABASE = { url:'https://qgomklldlpspwilyjdqx.supabase.co', key:'sb_publishable_nhOXF3eXlHAyys2B0rzxxQ_W_Kb4OZP', flockCode:'pelicans-2026' };
 // The roster. Anyone else can still add a name on the roll call.
 const ROSTER = [
@@ -360,7 +361,7 @@ function scoreRace(race, meeting, weights, settings, dyn, adj){
   const exF=scored.map(s=>Math.exp(beta*s.ratingFree)); const sumF=exF.reduce((a,b)=>a+b,0)||1; scored.forEach((s,i)=>s.probFree=exF[i]/sumF);
   const order=[...scored].sort((a,b)=>b.rating-a.rating); order.forEach((s,i)=>s.rank=i+1);
   const imp=order.map(s=>{const o=num(s.r.odds); return o>1?1/o:null;}); const impSum=imp.reduce((a,b)=>a+(b||0),0);
-  order.forEach((s,i)=>{ s.market= imp[i]!=null&&impSum>0 ? imp[i]/impSum : null; s.probValue= s.market!=null ? 0.5*s.probFree+0.5*s.market : s.probFree; s.edge= s.market!=null ? s.probValue-s.market : null; });
+  order.forEach((s,i)=>{ s.market= imp[i]!=null&&impSum>0 ? imp[i]/impSum : null; s.probValue= s.market!=null ? (settings.trust??0.5)*s.probFree+(1-(settings.trust??0.5))*s.market : s.probFree; s.edge= s.market!=null ? s.probValue-s.market : null; });
   return order;
 }
 function isValue(s,settings){ return s.edge!=null && s.market>=0.05 && s.probValue>=0.10 && s.edge>=settings.valueEdge && s.probValue/s.market>=1.35; }
@@ -369,6 +370,15 @@ function kellyStake(s, settings){ const o=num(s.r.odds); if(!(o>1)) return 0; co
 function modelAdvice(scored, settings){ const top=scored[0]; if(!top) return null; const second=scored[1];
   const value=[...scored].filter(s=>isValue(s,settings)).sort((a,b)=>b.edge-a.edge);
   return {top, tier:tier(top.prob), gap:second?top.prob-second.prob:top.prob, value:value[0]||null, valueAll:value, stakeTop:kellyStake(top,settings), stakeValue:value[0]?kellyStake(value[0],settings):0, roughie:bestRoughie(scored,settings)}; }
+// The edge board: where the form-only rating and the market disagree most, across today's unrun races.
+function valueBoardHTML(m,run,st){ const rows=[];
+  for(const race of m.races){ if(race.result||(run.locked&&run.locked[race.no])||active(race).length<5) continue; const sc=scoreRace(race,m,run.weights,st,run.dyn[race.no],me().adj);
+    for(const x of sc){ if(x.market==null||x.probFree<0.08||!(num(x.r.odds)>1)) continue; const ratio=x.probFree/x.market; if(ratio<1.25) continue; rows.push({race,x,ratio}); } }
+  rows.sort((a,b)=>b.ratio-a.ratio); const top=rows.slice(0,5);
+  const read=(()=>{ const t=m.races.map(r=>r.frozenAt||r.syncedAt).filter(Boolean).sort().pop(); return t?fmtTime(t):null; })();
+  return `<section class="block" style="margin-top:14px"><div class="eyebrow">Edge board<span class="sl">/</span>form-only rating against the market${read?', prices read '+esc(read):''}</div>
+  <p class="small" style="margin:4px 0 6px">Market is the median fixed-odds price on racing.com at the last read, not a live price. Rows are where our form rating is at least 25% above the market's chance. Value tags on the card apply your trust setting on top.</p>
+  ${top.length?`<div class="wtips edge">${top.map(({race,x,ratio})=>`<div class="wtip"><span class="nm"><b>R${race.no}</b> ${cloth(x.r.no)} ${esc(x.r.name)}</span><span class="num">${pct(x.probFree)} v ${pct(x.market)}</span><span class="num">${ourPrice(x.probFree,st)}</span><span class="num muted">$${x.r.odds}</span></div>`).join('')}</div>`:'<p class="note">No unrun race where the form rating beats the market by 25% or more.</p>'}</section>`; }
 function multiHTML(multi, st){ if(!multi) return ''; return `<div class="banner"><div class="eyebrow" style="color:var(--panel-ink);opacity:.7">Best multi<span class="sl">/</span>${multi.legs.length} legs, model ${pct(multi.prob)}</div>
   <h2>${multi.legs.map(l=>`R${l.raceNo} ${cloth(l.no)}`).join(' ')}</h2><p>${multi.legs.map(l=>`R${l.raceNo} ${esc(l.name)} (${pct(l.prob)})`).join(', ')}.</p>
   <p>Our price $${(1/(multi.prob*Math.pow(st.book,multi.legs.length))).toFixed(1)} (fair $${multi.fair.toFixed(1)})${multi.odds?`, market pays about $${multi.odds.toFixed(1)}${multi.odds>multi.fair*1.1?' which is value':multi.odds<multi.fair*0.9?' which is under the odds':''}`:''}. Suggested stake ${fmtMoney(multi.stake)}.</p></div>`; }
@@ -676,6 +686,7 @@ function render(){
   $('#hSub').textContent = m ? [m.date, m.condition, m.rail?('Rail '+m.rail):'', m.syncedAt?('feed '+fmtTime(m.syncedAt)):''].filter(Boolean).join(' / ') : 'No form loaded yet';
   const main=$('#main'); const tab=state.ui.tab;
   if(!state.me||!state.punters[state.me]){ const p=newPunter('You'); p.id='you'; state.punters={you:p}; state.me='you'; persistLocal(); }
+  const meP=state.punters[state.me]; if(meP&&!meP.marketOff){ meP.weights.market=0; meP.marketOff=true; if(meP.settings) meP.settings.trust=meP.settings.trust??0.5; persistLocal(); }
   if(!m && tab!=='load'){ main.innerHTML=meetingSwitcher()+emptyState(); bind(main); return; }
   main.innerHTML = tab==='races'?viewRaces() : tab==='race'?viewRace() : tab==='weights'?viewWeights() : viewLoad();
   bind(main);
@@ -709,6 +720,7 @@ function viewRaces(){
   ${Object.keys(fin.jockeyWins).length?`<span>Riders on the board <b>${Object.entries(fin.jockeyWins).map(([j,w])=>titleCase(j)+(w>1?' x'+w:'')).join(', ')}</b></span>`:''}</div>`;
   const st={...DEFAULT_SETTINGS,...me().settings};
   html+=multiHTML(dayMulti(run,m,st),st);
+  html+=valueBoardHTML(m,run,st);
   html+=`<section class="block" style="margin-top:14px"><div class="rows">`;
   for(const race of m.races){ const p=run.pred[race.no]||[]; const res=race.result; const ep=effectivePick(me(),race,run); const epR=ep.no&&race.runners.find(r=>r.no===ep.no); let right;
     const scored=scoreRace(race,m,run.weights,st,run.dyn[race.no],me().adj); const adv=modelAdvice(scored,st);
@@ -743,7 +755,7 @@ function viewRace(){
     <div class="eyebrow" style="color:var(--panel-ink);opacity:.7;margin-top:12px">Multi</div>
     <p style="margin-top:4px">${leg?`${esc(tR.name)} is a leg of the day's multi (${multi.legs.length} legs, fair $${multi.fair.toFixed(1)}).`:multi?`Not in the multi. Legs are ${multi.legs.map(l=>'R'+l.raceNo).join(', ')}.`:'No multi while fewer than two races are open.'}</p>
     ${ep.override?`<p>You have overridden this race to number ${ep.no}. Tap its Tip button again to go back to the model.</p>`:''}</div>`; }
-  html+=`<section class="block"><div class="eyebrow">Ratings<span class="sl">/</span>our price on every runner at a ${Math.round(st.book*100)}% book, market alongside</div><p class="note" style="margin:6px 0 0">Ours shorter than the market means your model likes it more than the punters do. Tap a name for the reasons, Tip to override the model.</p><div class="rows" style="margin-top:8px">`;
+  html+=`<section class="block"><div class="eyebrow">Ratings<span class="sl">/</span>our price on every runner at a ${Math.round(st.book*100)}% book, market alongside</div><p class="note" style="margin:6px 0 0">Ours shorter than the market means your model likes it more than the punters do. Market is the median fixed-odds price on racing.com${race.frozenAt||race.syncedAt?', read '+esc(fmtTime(race.frozenAt||race.syncedAt)):''}${race.frozenAt?' before the jump':''}. Tap a name for the reasons, Tip to override the model.</p><div class="rows" style="margin-top:8px">`;
   const maxR=Math.max(...scored.map(s=>s.rating)), minR=Math.min(...scored.map(s=>s.rating)); const span=(maxR-minR)||1;
   for(const s of scored){ const r=s.r; const k=runnerKey(race,r); const open=state.ui.open===k; const dynv=s.contrib.formline+s.contrib.manual; const a=my.adj[k]||{adj:0,note:''};
     const chips=[]; if(r.barrier!=null) chips.push(`Bar ${r.barrier}`); if(r.weight!=null) chips.push(`${r.weight}kg`); if(r.form) chips.push(`Form ${esc(r.form)}`);
@@ -803,7 +815,7 @@ function viewWeights(){
     <input type="range" min="0" max="${(met.base*2.5).toFixed(2)}" step="0.05" value="${w}" data-act="weight" data-key="${met.key}"><div class="delta">${Math.abs(w-met.base)>0.01?`${w-met.base>0?'+':''}${(w-met.base).toFixed(2)} against the default ${met.base.toFixed(2)}`:'at default'}${Math.abs(d)>0.005?`, results moved it ${d>0?'+':''}${d.toFixed(2)}`:''}</div></div>`; }
   html+=`</div><div class="actions"><button class="btn" data-act="resetweights">Reset my weights to defaults</button></div>`;
   html+=`<section class="block" style="margin-top:26px"><div class="eyebrow">Proving ground<span class="sl">/</span>your weights against real Saturdays at starting price</div>
-  <p class="note" style="margin:6px 0 8px">Runs your current weights and settings over past metro meetings as the form stood that morning, and settles at the actual starting prices. Change a slider, test again. Small samples swing; treat anything under a few hundred races as a hint, not proof. Baseline with the default weights over 220 races (metro Saturdays 8 Aug to 5 Sep 2026): best bet won 31% at +4% flat-stake return, the market favourite won 33% at -6%. That gap is inside noise. Value calls and roughies both lost. Nobody has shown an edge yet; the sliders are where you try to find one.</p>
+  <p class="note" style="margin:6px 0 8px">Runs your current weights and settings over past metro meetings as the form stood that morning, and settles at the actual starting prices. Change a slider, test again. Small samples swing; treat anything under a few hundred races as a hint, not proof. Baseline over 220 races (metro Saturdays 8 Aug to 5 Sep 2026): with the market switched off the best bet won 26% at +5% flat-stake return; with it on 31% at +4%; the market favourite won 33% at -6%. Those gaps are inside noise. Value calls and roughies both lost. Nobody has shown an edge yet; the sliders are where you try to find one.</p>
   <div class="actions" style="margin:0 0 10px"><button class="btn primary" id="proveBtn" data-act="prove" ${sb?'':'disabled'}>Test these weights</button>${PAST?`<span class="small">${PAST.length} meetings, ${PAST.reduce((a,m)=>a+m.races.length,0)} races loaded</span>`:''}</div>
   <div id="proveOut">${state.ui.prove?provingHTML(state.ui.prove):''}</div></section>`;
   html+=`<section class="block" style="margin-top:26px"><div class="eyebrow">Adaptation<span class="sl">/</span>how far a result may move your model</div><div class="rows" style="margin-top:8px">
@@ -815,7 +827,7 @@ function viewWeights(){
     <div class="wrow"><div class="l"><b>Bank</b><span class="num">${fmtMoney(s.bank)}</span></div><div class="d">What you are prepared to put through the day. Suggested stakes are worked off this.</div><input type="range" min="50" max="2000" step="50" value="${s.bank}" data-act="setting" data-key="bank"></div>
     <div class="wrow"><div class="l"><b>Staking aggression</b><span class="num">${s.kelly.toFixed(2)}</span></div><div class="d">Fraction of the Kelly stake. A quarter is conservative, a half is bold, one is reckless.</div><input type="range" min="0.05" max="1" step="0.05" value="${s.kelly}" data-act="setting" data-key="kelly"></div>
     <div class="wrow"><div class="l"><b>Book percentage</b><span class="num">${Math.round(s.book*100)}%</span></div><div class="d">Our prices are framed as a bookmaker would frame them. 120% is a typical fixed-odds book; 100% shows fair prices.</div><input type="range" min="1" max="1.4" step="0.01" value="${s.book}" data-act="setting" data-key="book"></div>
-    <div class="wrow"><div class="l"><b>How value is judged</b><span></span></div><div class="d">The tip uses the blended rating, market included. Value and stakes use a chance set halfway between the form-only rating and the market, so an uncalibrated disagreement with the market is backed at half strength.</div></div>
+    <div class="wrow"><div class="l"><b>Trust in own rating</b><span class="num">${Math.round(s.trust*100)}%</span></div><div class="d">Value calls and stakes use a chance set between the form-only rating and the market. At 100% the market is ignored and every disagreement is backed in full; at 50% a disagreement is backed at half strength. Over 220 past races full trust lost money, so start conservative.</div><input type="range" min="0.1" max="1" step="0.05" value="${s.trust}" data-act="setting" data-key="trust"></div>
     <div class="wrow"><div class="l"><b>Value threshold</b><span class="num">${(s.valueEdge*100).toFixed(0)} pts</span></div><div class="d">How far the model's chance must beat the market's before a runner is flagged as value.</div><input type="range" min="0.01" max="0.10" step="0.01" value="${s.valueEdge}" data-act="setting" data-key="valueEdge"></div>
     <div class="wrow"><div class="l"><b>Sharpness</b><span class="num">${s.beta.toFixed(2)}</span></div><div class="d">Higher concentrates the percentages on the top few; lower spreads them.</div><input type="range" min="0.8" max="4" step="0.1" value="${s.beta}" data-act="setting" data-key="beta"></div></div></section>`;
   if(run.changes&&run.changes.length){ html+=`<section class="block"><div class="eyebrow">What the results did to your model</div>`; for(const e of [...run.changes].reverse()){ html+=`<div class="logrow"><div class="when">Race ${e.race}</div>${esc(e.text)}${e.items.length?`<ul>${e.items.map(i=>`<li>${esc(i)}</li>`).join('')}</ul>`:''}</div>`; } html+=`</section>`; }
@@ -883,7 +895,7 @@ function bind(root){
   root.querySelectorAll('[data-meta]').forEach(el=>el.addEventListener('change',()=>{ state.meeting[el.dataset.meta]=el.value; state.meeting.updatedAt=Date.now(); save('meeting'); }));
   root.querySelectorAll('[data-act="wrace"]').forEach(el=>el.addEventListener('click',()=>{ state.ui.raceNo=+el.dataset.no; const wt=document.getElementById('wtips'); if(wt){ wt.innerHTML=weightTipsHTML(); bind(wt); } }));
   root.querySelectorAll('[data-act="weight"]').forEach(el=>{ el.addEventListener('input',()=>{ me().weights[el.dataset.key]=+el.value; const sp=el.closest('.wrow').querySelector('.l span'); sp.innerHTML=weightWord(+el.value,+sp.dataset.base); const wt=document.getElementById('wtips'); if(wt){ wt.innerHTML=weightTipsHTML(); bind(wt); } }); el.addEventListener('change',()=>{ state.ui.prove=null; save('punter'); }); });
-  root.querySelectorAll('[data-act="setting"]').forEach(el=>{ const h=()=>{ me().settings[el.dataset.key]= el.type==='checkbox'?el.checked:+el.value; }; el.addEventListener('input',()=>{ h(); const sp=el.closest('.wrow').querySelector('.l span'); if(sp&&el.type!=='checkbox'){ const k=el.dataset.key; sp.textContent= k==='marginProb'?pct(+el.value):k==='marginRank'?el.value:k==='bank'?fmtMoney(+el.value):k==='valueEdge'?(+el.value*100).toFixed(0)+' pts':k==='book'?Math.round(+el.value*100)+'%':(+el.value).toFixed(2); } }); el.addEventListener('change',()=>{ h(); save('punter'); }); });
+  root.querySelectorAll('[data-act="setting"]').forEach(el=>{ const h=()=>{ me().settings[el.dataset.key]= el.type==='checkbox'?el.checked:+el.value; }; el.addEventListener('input',()=>{ h(); const sp=el.closest('.wrow').querySelector('.l span'); if(sp&&el.type!=='checkbox'){ const k=el.dataset.key; sp.textContent= k==='marginProb'?pct(+el.value):k==='marginRank'?el.value:k==='bank'?fmtMoney(+el.value):k==='valueEdge'?(+el.value*100).toFixed(0)+' pts':k==='book'?Math.round(+el.value*100)+'%':k==='trust'?Math.round(+el.value*100)+'%':(+el.value).toFixed(2); } }); el.addEventListener('change',()=>{ h(); save('punter'); }); });
   root.querySelectorAll('[data-act="adj"]').forEach(el=>{ el.addEventListener('input',()=>{ el.nextElementSibling.textContent=(+el.value>0?'+':'')+el.value; }); el.addEventListener('change',()=>{ const a=me().adj[el.dataset.key]||(me().adj[el.dataset.key]={adj:0,note:''}); a.adj=+el.value; save('punter'); }); });
   root.querySelectorAll('[data-act="note"]').forEach(el=>el.addEventListener('change',()=>{ const a=me().adj[el.dataset.key]||(me().adj[el.dataset.key]={adj:0,note:''}); a.note=el.value; save('punter'); }));
   const conv=$('#convertBtn'); if(conv&&sampleFn){ conv.hidden=false; $('#convertNote').hidden=false; }
