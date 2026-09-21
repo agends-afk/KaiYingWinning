@@ -1,5 +1,5 @@
 // Kai Ying Winning edge hunt: one row per runner per race, from racing.com, for every TAB meeting on a date.
-// ?date=YYYY-MM-DD pulls that date. ?next=1 works kyw_runs_queue newest-first until the time budget (?budget= ms, default 60000) is spent.
+// ?date=YYYY-MM-DD pulls that date; &states=VIC,HK restricts to those states. ?next=1 works kyw_runs_queue newest-first until the time budget (?budget= ms, default 60000) is spent.
 // Nothing here touches the live feed tables.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -50,9 +50,9 @@ function mapRace(m: any, r: any) {
   }));
 }
 
-async function pullDate(date: string) {
+async function pullDate(date: string, states: Set<string> | null) {
   const d = await gql(`{ m: GetMeetingByDate(date:"${date}"){ id date venueName state isTab isTrial isJumpOut isPicnic category meetQuality railPosition } }`);
-  const meets = (d.m ?? []).filter((m: any) => m.isTab === 1 && !m.isTrial && !m.isJumpOut && !m.isPicnic);
+  const meets = (d.m ?? []).filter((m: any) => m.isTab === 1 && !m.isTrial && !m.isJumpOut && !m.isPicnic && (!states || states.has(String(m.state ?? "").toUpperCase())));
   const out: any[] = []; let rows = 0; let races = 0;
   // Gentle: one meeting at a time, four races at a time with a pause. racing.com returns 403 when hammered.
   const pause = (ms: number) => new Promise(r => setTimeout(r, ms));
@@ -80,8 +80,9 @@ Deno.serve(async (req) => {
   const t0 = Date.now();
   const json = (b: any, status = 200) => new Response(JSON.stringify(b), { status, headers: { "Content-Type": "application/json" } });
   try {
+    const st = url.searchParams.get("states"); const states = st ? new Set(st.split(",").map(x => x.trim().toUpperCase()).filter(Boolean)) : null;
     const date = url.searchParams.get("date");
-    if (date) return json({ ...(await pullDate(date)), ms: Date.now() - t0 });
+    if (date) return json({ ...(await pullDate(date, states)), ms: Date.now() - t0 });
     if (!url.searchParams.get("next")) return json({ error: "date? or next=1" }, 400);
     // Work the queue, newest date first, until the time budget is spent (Edge wall clock is limited; a date can run past the budget by one date's length).
     const budget = Math.min(90000, +(url.searchParams.get("budget") ?? 60000));
@@ -93,7 +94,7 @@ Deno.serve(async (req) => {
       await sb.from("kyw_runs_queue").update({ status: "running", started_at: new Date().toISOString() }).eq("date", d);
       const t1 = Date.now();
       try {
-        const r = await pullDate(d);
+        const r = await pullDate(d, states);
         const errors = r.detail.filter((x: any) => x.error).length;
         await sb.from("kyw_runs_queue").update({ status: errors ? "partial" : "done", finished_at: new Date().toISOString(), meetings: r.meetings, races: r.races, rows: r.rows, errors, ms: Date.now() - t1 }).eq("date", d);
         done.push({ date: d, meetings: r.meetings, races: r.races, rows: r.rows, errors, ms: Date.now() - t1 });
