@@ -251,14 +251,14 @@ const METRICS = [
   {key:'barrierrec',label:'Record from this gate', base:0.3, desc:'The horse\'s own record from this barrier number, where the feed supplies it.'},
   {key:'weight',    label:'Weight carried',     base:0.4, desc:'Weight relative to the field average.'},
   {key:'fitness',   label:'Freshness',          base:0.5, desc:'Days since last run. Fourteen to twenty-eight is treated as ideal; first-up runs are marked down.'},
-  {key:'market',    label:'Opening market',     base:0.75, desc:'Implied chance from the morning prices, fixed for the day so the tip cannot move with the market. At 0.75 it lifted the return on past races without handing the tip to the favourite; at 1.5 it did. Zero is pure form.'},
+  {key:'market',    label:'Opening market',     base:0.75, desc:'Implied chance from the morning prices, refreshed once about 20 minutes before the race. At 0.75 it lifted the return on past races without handing the tip to the favourite; at 1.5 it did. Zero is pure form.'},
   {key:'formline',  label:'Form lines today',   base:1.0, desc:'Live: horses out of the same last-start race as one that ran above or below expectation today, and riders winning on the day.'},
   {key:'manual',    label:'Your call',          base:1.0, desc:'Your own plus or minus on a runner, set on the race screen.'}
 ];
-const DEFAULT_SETTINGS = { marginRank:3, marginProb:0.12, lr:0.12, formlineGain:0.6, beta:2.2, autoAdapt:false, bank:200, kelly:0.25, valueEdge:0.05, book:1.20, trust:0.5 };
+const DEFAULT_SETTINGS = { marginRank:3, marginProb:0.12, lr:0.12, formlineGain:0.6, beta:2.2, autoAdapt:true, bank:200, kelly:0.25, valueEdge:0.05, book:1.20, trust:0.5 };
 const PUNTER_COLOURS = ['#E8801A','#2F8F5B','#3B6FD4','#C43C2F','#8E5BC6','#D4A72C','#1BA5A5','#D45FA0','#6B7F2E','#8C5A2B'];
 // Web-hosted backend. Filled in once the Supabase project is chosen. Empty url = no shared backend.
-const BUILD='2026-09-21.2';
+const BUILD='2026-09-21.3';
 const SUPABASE = { url:'https://qgomklldlpspwilyjdqx.supabase.co', key:'sb_publishable_nhOXF3eXlHAyys2B0rzxxQ_W_Kb4OZP', flockCode:'pelicans-2026' };
 // The roster. Anyone else can still add a name on the roll call.
 const ROSTER = [
@@ -314,7 +314,7 @@ function titleCase(s){ return s.replace(/\b\w/g,c=>c.toUpperCase()); }
 function cloth(no){ const c=CLOTH[no]||['#DCD5C6','#141A22']; return `<span class="cloth num" style="background:${c[0]};color:${c[1]}">${no}</span>`; }
 function me(){ return state.punters[state.me]; }
 function newPunter(name){ const r=ROSTER.find(x=>x.id===slug(name)); const used=Object.values(state.punters).map(p=>p.colour); const colour=r?r.colour:(PUNTER_COLOURS.find(c=>!used.includes(c))||PUNTER_COLOURS[Object.keys(state.punters).length%PUNTER_COLOURS.length]);
-  return {id:slug(name), name:r?r.name:name.trim(), colour, avatar:r?r.avatar:'plain', weights:Object.fromEntries(METRICS.map(m=>[m.key,m.base])), settings:{...DEFAULT_SETTINGS}, adj:{}, picks:{}, locks:{}, updatedAt:Date.now()}; }
+  return {id:slug(name), name:r?r.name:name.trim(), colour, avatar:r?r.avatar:'plain', weights:Object.fromEntries(METRICS.map(m=>[m.key,m.base])), settings:{...DEFAULT_SETTINGS}, adj:{}, picks:{}, locks:{}, trail:{}, updatedAt:Date.now()}; }
 function ensureRoster(){ for(const r of ROSTER){ if(!state.punters[r.id]) state.punters[r.id]=newPunter(r.name); } }
 function pelChip(p){ return `<span class="pel">${avatarSVG(p.avatar||'plain',p.colour,'sm')}${esc(p.name)}</span>`; }
 function punterByName(n){ return Object.values(state.punters).find(p=>p.name===n)||{name:n,colour:'#7E8794',avatar:'plain'}; }
@@ -341,7 +341,7 @@ function zscores(vals){ const xs=vals.filter(v=>v!=null); if(xs.length<2) return
 function scoreRace(race, meeting, weights, settings, dyn, adj){
   const rs=active(race); const n=rs.length; const cat=condCategory(race.condition||meeting.condition);
   const ws=rs.map(r=>num(r.weight)).filter(v=>v!=null); const meanW=ws.length?ws.reduce((a,b)=>a+b,0)/ws.length:null;
-  const openOf=r=>num(r.openOdds)??num(r.odds); const maxImp=Math.max(...rs.map(r=>{const o=openOf(r); return o>1?1/o:0;}),0);
+  const openOf=r=>num(r.lateOdds)??num(r.openOdds)??num(r.odds); const maxImp=Math.max(...rs.map(r=>{const o=openOf(r); return o>1?1/o:0;}),0);
   const raw={};
   raw.last=rs.map(r=>lastScore(r.last)); raw.form=rs.map(r=>formScore(r.form)); raw.track=rs.map(r=>recScore(rec(r.track))); raw.distance=rs.map(r=>recScore(rec(r.distance)));
   raw.condition=rs.map(r=>recScore(rec(r[cat])||rec(r.cond)||(r.condition&&rec(r.condition[cat])))); raw.career=rs.map(r=>recScore(rec(r.career)));
@@ -427,11 +427,22 @@ function runDay(punter, meeting){
    for that race are written to the punter's locks and used from then on, so later slider moves or data changes cannot rewrite history.
    Only live feed meetings are locked; the example and past meetings used by the proving ground are not. */
 // Reorder a live scoring to a race's locked ranking (rank and chance from the lock), so nothing on screen moves after the jump.
+function trailHTML(race){ const tr=((me().trail||{})[pk(race)]||[]); if(tr.length<2) return ''; const why={morning:'morning tip',result:'after a result landed',scratching:'after a scratching',market:'market refreshed near the jump',weights:'after your weights changed'};
+  const nameOf=no=>{ const r=race.runners.find(x=>x.no===no); return r?esc(r.name):no; };
+  return `<div class="eyebrow" style="color:var(--panel-ink);opacity:.7;margin-top:12px">Tip trail</div><p style="margin-top:4px">${tr.map(t=>`${fmtTime(new Date(t.at).toISOString())} ${cloth(t.no)} ${nameOf(t.no)} <span class="small">(${why[t.why]||t.why})</span>`).join('<br>')}</p>`; }
 function lockedScore(scored, run, race){ if(!run.locked||!run.locked[race.no]) return scored; const ranks=run.pred[race.no]||[]; const byNo=Object.fromEntries(ranks.map(x=>[x.no,x]));
   const out=scored.map(s=>{ const l=byNo[s.r.no]; return l?{...s, rank:l.rank, prob:l.prob!=null?l.prob:s.prob}:{...s, rank:ranks.length+1+s.rank}; }); out.sort((a,b)=>a.rank-b.rank); return out; }
 function applyLocks(punter, meeting, run, settings){
   if(!meeting||meeting.example||!state.meetings||state.meetings[meeting.id]!==meeting) return;
-  punter.locks=punter.locks||{}; let added=false; const now=Date.now();
+  punter.locks=punter.locks||{}; punter.trail=punter.trail||{}; let added=false; const now=Date.now();
+  const resultsIn=meeting.races.filter(r=>r.result&&r.result.positions&&r.result.positions.length).length;
+  // Trail: the tip each race carried through the day and why it changed. Read by the race screen and the card.
+  for(const race of meeting.races){ const k=pk(race); if(punter.locks[k]) continue; const top=(run.pred[race.no]||[])[0]; if(!top) continue;
+    const tr=punter.trail[k]||(punter.trail[k]=[]); const last=tr[tr.length-1];
+    if(!last){ tr.push({at:now,no:top.no,why:'morning'}); added=true; continue; }
+    if(last.no===top.no){ last.results=resultsIn; last.late=!!race.lateAt; continue; }
+    let why='weights'; if(race.lateAt&&!last.late) why='market'; else if(resultsIn>(last.results||0)) why='result'; else if(race.runners.some(x=>x.no===last.no&&x.scratched)) why='scratching';
+    tr.push({at:now,no:top.no,why,results:resultsIn,late:!!race.lateAt}); added=true; }
   for(const race of meeting.races){ const k=pk(race); const past=!!(race.result&&race.result.positions&&race.result.positions.length)||(race.time&&Date.parse(race.time)<now);
     // A lockOverride on the race (set on the server to correct a record) outranks anything on the device. Its ranks list the tip first and
     // the winner's rated position; runners it does not mention keep the model's order after them.
@@ -715,7 +726,7 @@ function viewRaces(){
     <label class="field">Rail<input data-meta="rail" value="${esc(m.rail)}" placeholder="True, +3m"></label></div>`;
   const fin=run.final;
   const overrides=m.races.filter(r=>me().picks[pk(r)]&&me().picks[pk(r)].win).length;
-  html+=`<div class="eyebrow">Model tips<span class="sl">/</span>one per race${overrides?', '+overrides+' overridden by you':''}<span class="sl">/</span>${done} of ${m.races.length} results in</div>${done?`<p class="small" style="margin:4px 0 0">Tips are fixed at the jump. Run races show the winner, where our tip finished (Tip), where the winner sat in our ratings (Wnr), and whether it was our roughie.</p>`:''}
+  html+=`<div class="eyebrow">Model tips<span class="sl">/</span>one per race${overrides?', '+overrides+' overridden by you':''}<span class="sl">/</span>${done} of ${m.races.length} results in</div>${done?`<p class="small" style="margin:4px 0 0">A tip is fixed at the jump. Before that it can move when a result lands, a horse is scratched, or the market is refreshed about 20 minutes out; Moved marks a race where it has, and the race screen shows the trail. Run races show the winner, where our tip finished (Tip), where the winner sat in our ratings (Wnr), and whether it was our roughie.</p>`:''}
   <div class="bias"><span>Barrier bias <b>${Math.abs(fin.barrierBias)>0?(fin.barrierBias>0?'inside':'outside')+' ('+fin.barrierBias.toFixed(2)+')':'none read yet'}</b></span><span>Pace bias <b>${Math.abs(fin.paceBias)>0?(fin.paceBias>0?'on-pace':'backmarkers')+' ('+fin.paceBias.toFixed(2)+')':'none read yet'}</b></span>
   ${Object.keys(fin.jockeyWins).length?`<span>Riders on the board <b>${Object.entries(fin.jockeyWins).map(([j,w])=>titleCase(j)+(w>1?' x'+w:'')).join(', ')}</b></span>`:''}</div>`;
   const st={...DEFAULT_SETTINGS,...me().settings};
@@ -727,7 +738,7 @@ function viewRaces(){
     if(res){ const win=res.positions[0]; const w=race.runners.find(r=>r.no===win); const pr=p.find(x=>x.no===win); const tipIdx=res.positions.indexOf(ep.no); const tipPos=tipIdx>=0?tipIdx+1:null;
       const rNo=run.locked&&run.locked[race.no]?run.roughie[race.no]:(adv&&adv.roughie?adv.roughie.r.no:null); const rough=rNo===win;
       right=`<span class="tag ${tipPos===1?'good':tipPos&&tipPos<=3?'acc':''}">Tip ${tipPos?ordinal(tipPos):'unpl'}</span><span class="tag ${pr&&pr.rank<=st.marginRank?'':'warn'}">Wnr ${pr?ordinal(pr.rank):'-'}</span>${rough?'<span class="tag acc">Roughie</span>':''}<b>${esc(w?w.name:win)}</b>`; }
-    else if(adv){ right=`<span class="tag ${ep.override?'acc':(adv.tier==='Strong'?'good':adv.tier==='Fair'?'':'warn')}">${ep.override?'Your override':adv.tier+' '+pct(adv.top.prob)}</span>${!ep.override&&isValue(adv.top,st)?`<span class="tag acc">Value</span>`:''}<b>${esc(epR?epR.name:'')}</b><span class="small">Ours ${ourPrice(adv.top.prob,st)}${adv.top.r.odds?', mkt $'+adv.top.r.odds:''}</span>${adv.roughie?`<span class="small">Roughie ${adv.roughie.r.no} ${esc(adv.roughie.r.name)} $${adv.roughie.r.odds}</span>`:''}`; }
+    else if(adv){ const trl=(me().trail||{})[pk(race)]||[]; right=`${trl.length>1?`<span class="tag acc" title="Tip has moved today">Moved</span>`:''}<span class="tag ${ep.override?'acc':(adv.tier==='Strong'?'good':adv.tier==='Fair'?'':'warn')}">${ep.override?'Your override':adv.tier+' '+pct(adv.top.prob)}</span>${!ep.override&&isValue(adv.top,st)?`<span class="tag acc">Value</span>`:''}<b>${esc(epR?epR.name:'')}</b><span class="small">Ours ${ourPrice(adv.top.prob,st)}${adv.top.r.odds?', mkt $'+adv.top.r.odds:''}</span>${adv.roughie?`<span class="small">Roughie ${adv.roughie.r.no} ${esc(adv.roughie.r.name)} $${adv.roughie.r.odds}</span>`:''}`; }
     else right='<b>no runners</b>';
     html+=`<button class="row" data-act="openrace" data-no="${race.no}"><span class="idx num">${race.no}</span><span><span class="t">${esc(race.name||'Race '+race.no)}</span><br><span class="s">${race.distance?race.distance+'m':''} ${esc(race.class||'')} ${race.time?'at '+esc(fmtTime(race.time)):''} ${active(race).length} runners${race.raceStatus&&!res?' <span class="small">'+esc(race.raceStatus)+'</span>':''}</span></span><span class="r">${right}</span></button>`; }
   return html+`</div></section>`;
@@ -754,8 +765,8 @@ function viewRace(){
     ${rg?`<p style="margin-top:4px"><b>${cloth(rg.r.no)} ${esc(rg.r.name)}</b> at $${rg.r.odds}, form-only price ${ourPrice(rg.probFree,st)}. Lottery ticket: across 220 past metro races the roughie won about 6% of the time and lost money at flat stakes. Small each way or leave it.</p>`:`<p style="margin-top:4px">Nothing at $8 or better the model can make a case for.</p>`}
     <div class="eyebrow" style="color:var(--panel-ink);opacity:.7;margin-top:12px">Multi</div>
     <p style="margin-top:4px">${leg?`${esc(tR.name)} is a leg of the day's multi (${multi.legs.length} legs, fair $${multi.fair.toFixed(1)}).`:multi?`Not in the multi. Legs are ${multi.legs.map(l=>'R'+l.raceNo).join(', ')}.`:'No multi while fewer than two races are open.'}</p>
-    ${ep.override?`<p>You have overridden this race to number ${ep.no}. Tap its Tip button again to go back to the model.</p>`:''}</div>`; }
-  html+=`<section class="block"><div class="eyebrow">Ratings<span class="sl">/</span>our price on every runner at a ${Math.round(st.book*100)}% book, market alongside</div><p class="note" style="margin:6px 0 0">Ours shorter than the market means your model likes it more than the punters do. The tip uses the morning market, fixed for the day. The price shown is the live median fixed-odds price on racing.com${race.frozenAt||race.syncedAt?', read '+esc(fmtTime(race.frozenAt||race.syncedAt)):''}${race.frozenAt?' before the jump':''}; firmed or drifted marks a move of 15% or more since the morning. Tap a name for the reasons, Tip to override the model.</p><div class="rows" style="margin-top:8px">`;
+    ${ep.override?`<p>You have overridden this race to number ${ep.no}. Tap its Tip button again to go back to the model.</p>`:''}${trailHTML(race)}</div>`; }
+  html+=`<section class="block"><div class="eyebrow">Ratings<span class="sl">/</span>our price on every runner at a ${Math.round(st.book*100)}% book, market alongside</div><p class="note" style="margin:6px 0 0">Ours shorter than the market means your model likes it more than the punters do. The tip uses the morning market, refreshed once about 20 minutes before the race${race.lateAt?' (refreshed '+esc(fmtTime(race.lateAt))+')':''}. The price shown is the live median fixed-odds price on racing.com${race.frozenAt||race.syncedAt?', read '+esc(fmtTime(race.frozenAt||race.syncedAt)):''}${race.frozenAt?' before the jump':''}; firmed or drifted marks a move of 15% or more since the morning. Tap a name for the reasons, Tip to override the model.</p><div class="rows" style="margin-top:8px">`;
   const maxR=Math.max(...scored.map(s=>s.rating)), minR=Math.min(...scored.map(s=>s.rating)); const span=(maxR-minR)||1;
   for(const s of scored){ const r=s.r; const k=runnerKey(race,r); const open=state.ui.open===k; const dynv=s.contrib.formline+s.contrib.manual; const a=my.adj[k]||{adj:0,note:''};
     const chips=[]; if(r.barrier!=null) chips.push(`Bar ${r.barrier}`); if(r.weight!=null) chips.push(`${r.weight}kg`); if(r.form) chips.push(`Form ${esc(r.form)}`);
@@ -819,7 +830,7 @@ function viewWeights(){
   <div class="actions" style="margin:0 0 10px"><button class="btn primary" id="proveBtn" data-act="prove" ${sb?'':'disabled'}>Test these weights</button>${PAST?`<span class="small">${PAST.length} meetings, ${PAST.reduce((a,m)=>a+m.races.length,0)} races loaded</span>`:''}</div>
   <div id="proveOut">${state.ui.prove?provingHTML(state.ui.prove):''}</div></section>`;
   html+=`<section class="block" style="margin-top:26px"><div class="eyebrow">Adaptation<span class="sl">/</span>how far a result may move your model</div><div class="rows" style="margin-top:8px">
-    <div class="wrow"><div class="l"><b>Adapt weights from results</b><span><input type="checkbox" data-act="setting" data-key="autoAdapt" ${s.autoAdapt?'checked':''}></span></div><div class="d">Off by default so a tip does not change through the afternoon. On, each surprising result nudges your weights for the later races, so a race's tip can change when an earlier result lands.</div></div>
+    <div class="wrow"><div class="l"><b>Adapt weights from results</b><span><input type="checkbox" data-act="setting" data-key="autoAdapt" ${s.autoAdapt?'checked':''}></span></div><div class="d">A surprising result nudges your weights for the later races. A tip can move when that happens; the race screen shows when and why.</div></div>
     <div class="wrow"><div class="l"><b>Margin of error: rated position</b><span class="num">${s.marginRank}</span></div><div class="d">A winner rated this position or better is inside the margin and triggers no weight change.</div><input type="range" min="1" max="8" step="1" value="${s.marginRank}" data-act="setting" data-key="marginRank"></div>
     <div class="wrow"><div class="l"><b>Margin of error: rated chance</b><span class="num">${pct(s.marginProb)}</span></div><div class="d">A winner rated under this chance is outside the margin even if it was placed high.</div><input type="range" min="0.02" max="0.3" step="0.01" value="${s.marginProb}" data-act="setting" data-key="marginProb"></div>
     <div class="wrow"><div class="l"><b>Learning rate</b><span class="num">${s.lr.toFixed(2)}</span></div><div class="d">How far each surprising result moves the weights toward the metrics that would have picked it.</div><input type="range" min="0.02" max="0.5" step="0.01" value="${s.lr}" data-act="setting" data-key="lr"></div>

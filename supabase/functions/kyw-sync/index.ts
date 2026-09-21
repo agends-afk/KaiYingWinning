@@ -117,10 +117,15 @@ async function syncMeeting(feed: any, existing: any | null, force: boolean) {
       // The field the app judges a run race by is the last one read before the result: pre-race prices and scratchings, never post-race data.
       // Opening price: the first price seen for the runner today. Kept across re-reads so the tip has a fixed market to work from; the live price keeps moving alongside it.
       const prevByNo: Record<number, any> = {}; for (const x of prev?.runners ?? []) prevByNo[x.no] = x;
-      const freshRunners = runners.map(({ finish, ...rest }: any) => ({ ...rest, openOdds: prevByNo[rest.no]?.openOdds ?? prevByNo[rest.no]?.odds ?? rest.odds ?? null }));
+      // Late market: one refresh of the rating's market about 20 minutes before the jump, taken on the first read inside that window and then held.
+      const t = r.time ? Date.parse(r.time) : null; const minsTo = t != null ? (t - now) / 60000 : null;
+      const lateAt: string | undefined = prev?.lateAt ?? ((minsTo != null && minsTo <= 20 && minsTo > -60) ? new Date().toISOString() : undefined);
+      const freshRunners = runners.map(({ finish, ...rest }: any) => ({ ...rest,
+        openOdds: prevByNo[rest.no]?.openOdds ?? prevByNo[rest.no]?.odds ?? rest.odds ?? null,
+        lateOdds: prev?.lateAt ? (prevByNo[rest.no]?.lateOdds ?? null) : (lateAt ? (rest.odds ?? null) : undefined) }));
       const frozen = (prev?.frozenAt && prev?.runners?.length) ? prev.runners : (positions.length >= 3 && prev?.runners?.length && !prevHasResult ? prev.runners : null);
       race = { no, name: fr.name ?? "", distance: num(fr.distance), class: fr.class ?? "", time: fr.time ?? null, raceStatus: fr.raceStatus ?? "", condition: [fr.trackCondition, fr.trackRating].filter(Boolean).join(" "), prizemoney: fr.totalPrizeMoney ?? null, meetingId: meetId,
-        runners: frozen ?? freshRunners, frozenAt: frozen ? (prev.frozenAt ?? prev.syncedAt) : undefined, lockOverride: prev?.lockOverride, feedResult: positions.length >= 3 ? { positions, at: prev?.feedResult?.at ?? new Date().toISOString() } : null, syncedAt: new Date().toISOString() };
+        runners: frozen ?? freshRunners, frozenAt: frozen ? (prev.frozenAt ?? prev.syncedAt) : undefined, lateAt: frozen ? prev?.lateAt : lateAt, lockOverride: prev?.lockOverride, feedResult: positions.length >= 3 ? { positions, at: prev?.feedResult?.at ?? new Date().toISOString() } : null, syncedAt: new Date().toISOString() };
     } else { race = { ...prev, raceStatus: r.raceStatus ?? prev.raceStatus }; }
     outRaces.push(race);
     if (race.feedResult) results.push({ meeting_id: meetId, race_no: no, positions: race.feedResult.positions, entered_by: "racing.com feed", entered_at: race.feedResult.at });
