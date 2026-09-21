@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="Kai Ying Winning">
 <meta name="color-scheme" content="light">
 <title>Kai Ying Winning</title>
-<meta name="description" content="A form model for Australian and Hong Kong racing. Weight the factors yourself; every price reprices on this device.">
+<meta name="description" content="A calibrated form book for Australian racing. Set the factors yourself; every price reprices on this device.">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Barlow:wght@400;500;600;700&display=swap">
@@ -57,14 +57,15 @@ header.top h1{color:var(--panel-ink)}
 header.top .sub{opacity:.8;font-size:13px;margin-top:4px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 header.top .refresh{background:none;border:1.5px solid rgba(244,239,228,.45);color:var(--panel-ink);border-radius:6px;padding:3px 9px;font-size:12px;font-weight:600;letter-spacing:.6px;cursor:pointer}
 header.top .refresh:active,header.top .refresh.busy{opacity:.55}
-.pullhint{position:fixed;top:0;left:0;right:0;text-align:center;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--panel-ink);background:var(--accent);padding:6px;z-index:30;transform:translateY(-100%);transition:transform .15s}.pullhint.show{transform:none}
+.pullhint{position:fixed;top:0;left:0;right:0;text-align:center;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--panel-ink);background:var(--accent);padding:6px;z-index:30;transform:translateY(-100%);transition:transform .2s}
+.pullhint.show{transform:none}
 .sync{display:inline-flex;align-items:center;gap:6px;font-size:11px;letter-spacing:1.4px;text-transform:uppercase;font-weight:600}
 .sync::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--muted2);display:inline-block}
 .sync.on::before{background:var(--good)} .sync.err::before{background:var(--bad)}
 main{padding:14px 14px 20px}
 section.block{margin-bottom:22px}
 .rows{border-top:3px solid var(--ink)}
-.row{display:grid;grid-template-columns:44px 1fr auto;gap:12px;padding:12px 0;border-bottom:1px solid var(--rule);align-items:center;color:inherit;width:100%;background:none;border-left:0;border-right:0;border-top:0;text-align:left}
+.row{display:grid;grid-template-columns:44px 1fr auto;gap:12px;padding:12px 0;border-bottom:1px solid var(--rule);align-items:center;color:inherit;width:100%;background:none;border-left:0;border-right:0;border-top:0;text-align:left;font:inherit}
 .row .idx{font-family:var(--display);font-weight:900;font-size:26px;color:var(--accent);line-height:1}
 .row .t{font-weight:600}
 .row .s{color:var(--muted);font-size:13px}
@@ -72,11 +73,10 @@ section.block{margin-bottom:22px}
 .row .r b{display:block;color:var(--ink);font-family:var(--display);font-size:22px;font-weight:800;letter-spacing:.3px}
 .btn{border:1.5px solid var(--rule);background:var(--surface);padding:9px 13px;font-size:13.5px;font-weight:600;border-radius:6px}
 .btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
-.btn.ink{background:var(--ink);color:var(--ground);border-color:var(--ink)}
 .btn.danger{color:var(--bad)}
 .btn.on{background:var(--ink);color:var(--ground);border-color:var(--ink)}
 .btn:disabled{opacity:.45;cursor:default}
-.tag{display:inline-block;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;font-weight:700;padding:2px 7px;border:1.5px solid var(--rule);color:var(--muted);border-radius:4px;vertical-align:middle}
+.tag{display:inline-block;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;font-weight:700;padding:2px 7px;border:1.5px solid var(--rule);color:var(--muted);border-radius:4px;vertical-align:middle;margin-left:4px}
 .tag.acc{border-color:var(--accent);color:var(--accent)}
 .tag.good{border-color:var(--good);color:var(--good)}
 .tag.warn{border-color:var(--warn);color:var(--warn)}
@@ -90,23 +90,10 @@ textarea{min-height:150px;resize:vertical;font-family:ui-monospace,SFMono-Regula
 nav.tabs{position:fixed;bottom:0;left:0;right:0;background:var(--panel);color:var(--panel-ink);display:flex;justify-content:space-around;padding:6px 6px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--panel-rule);z-index:5}
 nav.tabs button{background:none;border:0;color:var(--panel-ink);opacity:.62;font-family:var(--display);font-size:16px;letter-spacing:1.2px;text-transform:uppercase;font-weight:800;padding:8px 8px 6px;border-top:3px solid transparent}
 nav.tabs button.on{opacity:1;border-top-color:var(--accent)}
-nav.tabs button:focus-visible,.row:focus-visible,.btn:focus-visible,.cloth:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-/* saddlecloth */
-.cloth{display:inline-flex;align-items:center;justify-content:center;width:38px;height:34px;font-family:var(--display);font-weight:900;font-size:22px;border-radius:5px 5px 9px 9px;box-shadow:inset 0 -3px 0 rgba(0,0,0,.18);flex:none;letter-spacing:0}
+nav.tabs button:focus-visible,.row:focus-visible,.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.cloth{display:inline-flex;align-items:center;justify-content:center;width:38px;height:34px;font-family:var(--display);font-weight:900;font-size:22px;border-radius:5px 5px 9px 9px;box-shadow:inset 0 -3px 0 rgba(0,0,0,.18);vertical-align:middle}
 .runner{border-bottom:1px solid var(--rule);padding:12px 0}
-.runner .top{display:grid;grid-template-columns:1fr 56px;gap:10px;align-items:start}
-.runner .head{display:grid;grid-template-columns:38px 1fr auto;gap:12px;align-items:start;background:none;border:0;padding:0;width:100%;text-align:left;color:inherit;min-width:0}
-.tipbtn{height:56px;border:2px solid var(--rule);background:var(--surface);border-radius:8px;font-family:var(--display);font-weight:800;font-size:15px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:0;line-height:1.05}
-.tipbtn.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-.tipbtn.pl{background:var(--ink);border-color:var(--ink);color:var(--ground)}
-.tipbtn:disabled{opacity:.4}
-.tipsboard{overflow-x:auto}
-.tipsboard table{border-collapse:collapse;width:100%;font-size:13px}
-.tipsboard th,.tipsboard td{padding:6px 6px;border-bottom:1px solid var(--rule);text-align:center;white-space:nowrap}
-.tipsboard th{font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted2)}
-.tipsboard td:first-child{font-family:var(--display);font-weight:800;font-size:18px;color:var(--accent);text-align:left}
-.tipsboard .hit{outline:2px solid var(--good);outline-offset:-2px}
-.tipsboard .cloth{width:30px;height:26px;font-size:16px}
+.runner .head{display:grid;grid-template-columns:38px 1fr auto;gap:12px;align-items:start;background:none;border:0;padding:0;width:100%;text-align:left;color:inherit;min-width:0;font:inherit}
 .runner.scr .nm{text-decoration:line-through;color:var(--muted2)}
 .runner.scr .cloth{opacity:.35}
 .runner .nm{font-weight:700;font-size:16.5px}
@@ -118,11 +105,9 @@ nav.tabs button:focus-visible,.row:focus-visible,.btn:focus-visible,.cloth:focus
 .bar i{position:absolute;left:0;top:0;bottom:0;background:var(--bar)}
 .bar i.dyn{background:var(--bar-dyn)}
 .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
-.chip{font-size:11.5px;padding:2px 7px;border:1.5px solid var(--rule);color:var(--muted);border-radius:4px;font-weight:500}
+.chip{font-size:11.5px;padding:2px 7px;border:1.5px solid var(--rule);color:var(--muted);border-radius:4px;font-weight:500;background:none}
 .chip.up{border-color:var(--good);color:var(--good)} .chip.dn{border-color:var(--bad);color:var(--bad)} .chip.acc{border-color:var(--accent);color:var(--accent)}
-.flock{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
-.pel{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:1px 7px 1px 3px;border-radius:12px;background:var(--surface);border:1.5px solid var(--rule)}
-.pel i{width:14px;height:14px;border-radius:50%;display:inline-block;border:2px solid rgba(0,0,0,.15)}
+.chips button.chip{cursor:pointer}
 .detail{margin-top:12px;padding-top:12px;border-top:1.5px dashed var(--rule)}
 .metrics{display:grid;grid-template-columns:1fr 54px 1fr;gap:5px 10px;font-size:13px;align-items:center}
 .metrics .z{text-align:right}
@@ -134,17 +119,23 @@ nav.tabs button:focus-visible,.row:focus-visible,.btn:focus-visible,.cloth:focus
 .adj input[type=range]{flex:1}
 .adj b{font-family:var(--display);font-size:22px;min-width:36px;text-align:center}
 input[type=range]{accent-color:var(--accent);width:100%}
+.formbook{margin-top:10px;font-size:12.5px;border-top:1px solid var(--rule)}
+.formbook .fl{display:grid;grid-template-columns:46px 1fr auto;gap:8px;padding:5px 0;border-bottom:1px solid var(--rule);align-items:baseline}
+.formbook .fl .pos{font-family:var(--display);font-weight:800;font-size:17px;color:var(--ink)}
+.formbook .fl .pos.w{color:var(--good)} .formbook .fl .pos.t{color:var(--muted2)}
+.formbook .fl .what{color:var(--muted)} .formbook .fl .what b{color:var(--ink);font-weight:600}
+.formbook .fl .sp{font-weight:600;white-space:nowrap}
 .wrow{padding:12px 0;border-bottom:1px solid var(--rule)}
 .wrow .l{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
 .wrow .l b{font-weight:700}
 .wrow .l span{font-family:var(--display);font-size:22px;font-weight:800}
 .wrow .d{font-size:12.5px;color:var(--muted);margin:2px 0 6px}
 .wrow .delta{font-size:12.5px;color:var(--accent);font-weight:600}
+.wrow .fit{font-size:11px;letter-spacing:1px;text-transform:uppercase;font-weight:700;color:var(--muted2);margin-top:4px}
+.wrow .fit.held{color:var(--good)} .wrow .fit.none{color:var(--warn)}
 .wrow .l span small{font-family:var(--body);font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted2)}
 .wtips{margin-top:8px}.wtip{display:grid;grid-template-columns:1fr 54px 56px 52px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--rule);font-size:14px}.wtip .idx{font-family:var(--display);font-weight:800;font-size:16px}.wtip .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.wtip .num{text-align:right;font-weight:700}.wtip .muted{color:var(--muted2);font-weight:500}.wtips.edge .wtip{grid-template-columns:1fr 84px 52px 52px}
-.wtip.hd{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);border-bottom:2px solid var(--rule);padding:4px 0}.wtip.hd .num{font-weight:600}.wtip.scr{opacity:.4;text-decoration:line-through}.chips button.chip{cursor:pointer}
-.result-entry{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
-.result-entry .field{flex:1;min-width:150px}
+.wtip.hd{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);border-bottom:2px solid var(--rule);padding:4px 0}.wtip.hd .num{font-weight:600}.wtip.scr{opacity:.4;text-decoration:line-through}
 .logrow{padding:10px 0;border-bottom:1px solid var(--rule);font-size:13.5px}
 .logrow .when{font-size:11px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase;font-weight:700}
 .logrow ul{margin:6px 0 0;padding-left:18px;color:var(--muted)}
@@ -155,6 +146,9 @@ input[type=range]{accent-color:var(--accent);width:100%}
 .banner{background:var(--panel);color:var(--panel-ink);padding:16px 18px;margin-bottom:16px;border-left:6px solid var(--accent);border-radius:0 8px 8px 0}
 .banner h2{color:var(--panel-ink)}
 .banner p{margin:6px 0 0;font-size:13.5px;opacity:.85}
+.banner ul{margin:8px 0 0;padding-left:18px;font-size:13.5px;opacity:.9}
+.banner li{margin:3px 0}
+.banner details summary{cursor:pointer;font-size:12px;letter-spacing:1.4px;text-transform:uppercase;font-weight:700;opacity:.8;margin-top:8px}
 .toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:var(--ink);color:var(--ground);padding:10px 14px;font-size:13.5px;z-index:9;max-width:90vw;border-radius:8px;border-left:4px solid var(--accent)}
 [hidden]{display:none!important}
 pre.schema{font-size:11px;line-height:1.45;background:var(--surface);border:1.5px solid var(--rule);padding:10px;overflow-x:auto;white-space:pre;border-radius:6px}
@@ -165,35 +159,9 @@ pre.schema{font-size:11px;line-height:1.45;background:var(--surface);border:1.5p
 .racehead .actions{display:flex;flex-wrap:nowrap;gap:6px;flex-shrink:0}
 .bias{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-top:8px}
 .bias b{color:var(--ink)}
-.board{border-top:3px solid var(--ink)}
-.board .brow{display:grid;grid-template-columns:34px 1fr auto auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--rule)}
-.board .brow .pos{font-family:var(--display);font-size:24px;font-weight:900;color:var(--accent)}
-.board .brow .pts{font-family:var(--display);font-size:26px;font-weight:900;text-align:right}
-.board .brow .sub{font-size:12.5px;color:var(--muted)}
-.sheet{position:fixed;inset:0;background:rgba(6,17,30,.7);z-index:20;display:flex;align-items:flex-end;justify-content:center}
-.sheet .card{background:var(--ground);color:var(--ink);width:100%;max-width:560px;padding:20px 18px calc(24px + env(safe-area-inset-bottom));border-radius:16px 16px 0 0;border-top:5px solid var(--accent)}
-.sheet .who{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
-.tipbtns{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
 .switcher{display:flex;gap:6px;overflow-x:auto;padding:0 0 12px;margin:0 0 4px;-webkit-overflow-scrolling:touch}
 .switcher .btn{white-space:nowrap;flex:none;border-radius:999px;padding:7px 14px}
-.avatar{width:40px;height:40px;display:inline-block;vertical-align:middle;flex:none}
-.avatar.sm{width:22px;height:22px}
-.pel .avatar.sm{margin-left:-2px}
-.who .btn{display:flex;align-items:center;gap:8px;padding:8px 12px}
-.comment{padding:8px 0;border-bottom:1px solid var(--rule);font-size:13.5px;display:grid;grid-template-columns:26px 1fr auto;gap:8px;align-items:start}
-.comment .by{font-weight:700}
-.comment .t{color:var(--muted2);font-size:11px}
-.comment button{background:none;border:0;color:var(--muted2);font-size:12px;padding:0}
-.cform{display:flex;gap:8px;margin-top:8px}
-.cform input{flex:1}
-.betform{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px}
-.betform .field{font-size:12px}
-.betrow{display:grid;grid-template-columns:26px 1fr auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--rule);font-size:13.5px}
-.betrow .amt{font-family:var(--display);font-size:20px;font-weight:800;text-align:right;white-space:nowrap}
-.betrow .amt.pos{color:var(--good)} .betrow .amt.neg{color:var(--bad)}
-.betrow .s{font-size:12.5px;color:var(--muted)}
-.club{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
-@media (max-width:420px){h1{font-size:34px}.betform{grid-template-columns:1fr 1fr}}
+@media (max-width:420px){h1{font-size:34px}}
 @media (prefers-reduced-motion:no-preference){.bar i{transition:width .35s cubic-bezier(.16,1,.3,1)}}
 </style>
 </head>
@@ -210,7 +178,7 @@ pre.schema{font-size:11px;line-height:1.45;background:var(--surface);border:1.5p
       <path d="M22 40 Q30 36 38 42" stroke="#DCD5C6" stroke-width="2" fill="none"/>
     </svg>
     <div>
-      <div class="eyebrow">Form model<span class="sl">/</span>Australian and Hong Kong racing<span id="hMe"></span></div>
+      <div class="eyebrow">Form book<span class="sl">/</span>Australian racing</div>
       <h1 id="hMeeting">Kai Ying Winning</h1>
       <div class="sub"><span id="hSub"></span><span class="sync" id="sync">connecting</span><button class="refresh" id="refreshBtn" type="button" aria-label="Refresh">&#8635; Refresh</button></div>
     </div>
@@ -224,66 +192,41 @@ pre.schema{font-size:11px;line-height:1.45;background:var(--surface);border:1.5p
   <button data-tab="load">Feed</button>
 </nav>
 <div class="toast" id="toast" hidden></div>
-<div id="sheet" hidden></div>
-
 <script>
 /* ============================================================
-   Kai Ying Winning: a form model for Australian and Hong Kong racing
-   Shared form and results from the feed. Each visitor keeps their
-   own weights, adjustments and tips, and each model adapts to
-   results on its own margin settings.
+   Kai Ying Winning: a calibrated form book for Australian racing.
+   Form, prices and results come from the feed (read only). The
+   weights, notes and locked tips live on this device.
    ============================================================ */
 
+// The factors the model rates. `base` is the default weight: the set that tested best on past race days (fitted on one
+// month, checked on the next). `fit` says what the data showed for the factor; a slider is still yours to move.
 const METRICS = [
-  {key:'last',      label:'Last start',         base:0.7, desc:'Finishing position, margin and field size last start, adjusted for a rise or drop in class today.'},
-  {key:'form',      label:'Recent form',        base:1.125, desc:'Last five runs, most recent counting most. Spells are skipped.'},
-  {key:'classform', label:'Class of recent runs', base:0.9, desc:'The grade of the last three races and how close the horse got. A narrow defeat in a Group 1 outranks a win in a benchmark race.'},
-  {key:'track',     label:'Track record',       base:0.6, desc:'Win and place rate at this track, shrunk toward average where starts are few.'},
-  {key:'distance',  label:'Distance record',    base:0, desc:'Win and place rate at this distance, shrunk the same way.'},
-  {key:'condition', label:'Track condition',    base:0, desc:'Record on today\'s going, taken from the meeting condition on the Card tab.'},
-  {key:'career',    label:'Career strike rate', base:0.6, desc:'Career win and place percentages.'},
-  {key:'rating',    label:'Handicap rating',    base:0, desc:'Official rating relative to the field, where the feed supplies it. A rough measure of class.'},
-  {key:'jockey',    label:'Jockey',             base:2.1, desc:'Jockey win percentage or rating from the form.'},
-  {key:'trainer',   label:'Trainer',            base:0.563, desc:'Trainer win percentage or rating from the form.'},
-  {key:'barrier',   label:'Barrier',            base:0.45, desc:'Inside draws favoured over short trips, fading with distance. The day\'s barrier bias shifts this.'},
-  {key:'pace',      label:'Run style',          base:0, desc:'Where the horse settles, from its last four runs. On-pace runners get a small edge over short trips; the day\'s results move this as a pattern shows.'},
-  {key:'trackdist', label:'Track and distance', base:0.35, desc:'Record at this track over this distance.'},
-  {key:'barrierrec',label:'Record from this gate', base:0.9, desc:'The horse\'s own record from this barrier number, where the feed supplies it.'},
-  {key:'weight',    label:'Weight carried',     base:0.4, desc:'Weight relative to the field average.'},
-  {key:'fitness',   label:'Freshness',          base:0, desc:'Days since last run. Fourteen to twenty-eight is treated as ideal; first-up runs are marked down.'},
-  {key:'market',    label:'Opening market',     base:0.75, desc:'Implied chance from the morning prices, refreshed once about 20 minutes before the race. At 0.75 it lifted the return on past races without handing the tip to the favourite; at 1.5 it did. Zero is pure form.'},
-  {key:'formline',  label:'Form lines today',   base:1.0, desc:'Live: horses out of the same last-start race as one that ran above or below expectation today, and riders winning on the day.'},
-  {key:'manual',    label:'Your call',          base:1.0, desc:'Your own plus or minus on a runner, set on the race screen.'}
+  {key:'last',      label:'Last start',            base:0.7,   fit:'held', desc:'Finishing position, margin and field size last start, adjusted for a rise or drop in class today.'},
+  {key:'form',      label:'Recent form',           base:1.125, fit:'held', desc:'Last five runs, most recent counting most. Spells are skipped.'},
+  {key:'classform', label:'Class of recent runs',  base:0.9,   fit:'held', desc:'The grade of the last three races and how close the horse got. A narrow defeat in a Group 1 outranks a win in a benchmark race.'},
+  {key:'career',    label:'Career strike rate',    base:0.6,   fit:'held', desc:'Career win and place percentages.'},
+  {key:'track',     label:'Track record',          base:0.6,   fit:'held', desc:'Win and place rate at this track, shrunk toward average where starts are few.'},
+  {key:'trackdist', label:'Track and distance',    base:0.35,  fit:'held', desc:'Record at this track over this distance.'},
+  {key:'condition', label:'Track condition',       base:0,     fit:'none', desc:'Record on today\'s going. Showed no measured effect on the mostly dry days tested; turn it on for a wet track if you believe it matters.'},
+  {key:'jockey',    label:'Jockey',                base:2.1,   fit:'thin', desc:'Jockey win percentage this season. Fitted high on a small sample and probably inflated; treat the default with suspicion.'},
+  {key:'trainer',   label:'Trainer',               base:0.563, fit:'held', desc:'Trainer win percentage this season.'},
+  {key:'barrier',   label:'Barrier',               base:0.45,  fit:'held', desc:'Inside draws favoured over short trips, fading with distance. The day\'s barrier bias, read from results, shifts this.'},
+  {key:'barrierrec',label:'Record from this gate', base:0.9,   fit:'held', desc:'The horse\'s own record from this barrier number.'},
+  {key:'weight',    label:'Weight carried',        base:0.4,   fit:'held', desc:'Weight relative to the field average.'},
+  {key:'market',    label:'Opening market',        base:0.75,  fit:'held', desc:'Implied chance from the morning prices, refreshed once about 20 minutes before the race. At 0.75 it improved the return on past races without handing every tip to the favourite. Zero is pure form.'},
+  {key:'formline',  label:'Form lines today',      base:1.0,   fit:'live', hidden:true, desc:'Horses out of the same last-start race as one that ran above or below expectation today, and riders winning on the day.'},
+  {key:'manual',    label:'Your call',             base:1.0,   fit:'live', hidden:true, desc:'Your own plus or minus on a runner, set on the race screen.'}
 ];
-const DEFAULT_SETTINGS = { marginRank:3, marginProb:0.12, lr:0.12, formlineGain:0.6, beta:2.2, autoAdapt:true, bank:200, kelly:0.25, valueEdge:0.05, book:1.20, trust:0.5 };
-const PUNTER_COLOURS = ['#E8801A','#2F8F5B','#3B6FD4','#C43C2F','#8E5BC6','#D4A72C','#1BA5A5','#D45FA0','#6B7F2E','#8C5A2B'];
-// Web-hosted backend. Filled in once the Supabase project is chosen. Empty url = no shared backend.
-const BUILD='2026-09-21.6';
+const DEFAULT_SETTINGS = { marginRank:3, marginProb:0.12, lr:0.12, formlineGain:0.6, beta:2.2, autoAdapt:true, valueEdge:0.05, book:1.20, trust:0.5 };
+const KELLY=0.25; // fraction of Kelly used by the unit allocator test
+const BUILD='2026-09-22.1';
 const SUPABASE = { url:'https://qgomklldlpspwilyjdqx.supabase.co', key:'sb_publishable_nhOXF3eXlHAyys2B0rzxxQ_W_Kb4OZP', flockCode:'pelicans-2026' };
-// The roster. Anyone else can still add a name on the roll call.
-const ROSTER = [
-  {id:'mick',     name:'Mick',     colour:'#3B6FD4', avatar:'cap'},
-  {id:'wilko',    name:'Wilko',    colour:'#2F8F5B', avatar:'shades'},
-  {id:'big-dog',  name:'Big Dog',  colour:'#8E5BC6', avatar:'crown'},
-  {id:'shirty',   name:'Shirty',   colour:'#E8801A', avatar:'shirty'}
-];
-function avatarSVG(kind, colour, cls){ // a pelican head with an accessory per Pelican
-  const base=`<circle cx="32" cy="32" r="30" fill="${colour}"/><circle cx="28" cy="30" r="14" fill="#F4EFE4"/><path d="M40 27 L62 34 L58 39 L40 34 Z" fill="#E8801A"/><path d="M40 34 L58 39 L46 46 Q40 45 38 38 Z" fill="#F4B36B"/><circle cx="31" cy="26" r="2.4" fill="#141A22"/>`;
-  const acc={
-    bowtie:`<path d="M22 50 L30 54 L22 58 Z M38 50 L30 54 L38 58 Z" fill="#141A22"/><circle cx="30" cy="54" r="2" fill="#F4EFE4"/>`,
-    cap:`<path d="M12 22 Q28 4 44 20 L44 24 L12 24 Z" fill="#141A22"/><path d="M8 22 L20 22 L20 26 L6 27 Z" fill="#141A22"/>`,
-    shades:`<rect x="20" y="22" width="12" height="8" rx="3" fill="#141A22"/><rect x="34" y="23" width="9" height="7" rx="3" fill="#141A22"/><path d="M32 26 L34 26" stroke="#141A22" stroke-width="2"/>`,
-    crown:`<path d="M16 20 L21 8 L28 16 L34 6 L40 16 L46 10 L44 22 Z" fill="#F5C518" stroke="#141A22" stroke-width="1.5"/>`,
-    shirty:`<path d="M18 46 L28 54 L38 46 L34 44 L28 50 L22 44 Z" fill="#F4EFE4" stroke="#141A22" stroke-width="1.5"/><path d="M28 54 L26 62 L30 62 Z" fill="#141A22"/><path d="M24 20 L30 23 M38 21 L34 23" stroke="#141A22" stroke-width="2.4" stroke-linecap="round"/>`,
-    plain:``
-  };
-  return `<svg class="avatar ${cls||''}" viewBox="0 0 64 64" aria-hidden="true">${base}${acc[kind]||''}</svg>`;
-}
 // Standard saddlecloth colours (approximate; cosmetic only)
 const CLOTH = {1:['#D7263D','#fff'],2:['#F7F5EF','#141A22'],3:['#1F4FCC','#fff'],4:['#F5C518','#141A22'],5:['#1E8B4B','#fff'],6:['#141A22','#F5C518'],7:['#F07A1A','#141A22'],8:['#F48FB1','#141A22'],9:['#3CC7C0','#141A22'],10:['#6A2C91','#fff'],11:['#9AA0A6','#B00020'],12:['#B6E51D','#141A22'],13:['#6D4322','#fff'],14:['#7B1F2B','#F5C518'],15:['#8B8455','#141A22'],16:['#B87333','#141A22'],17:['#0F2B46','#fff'],18:['#0F5132','#F5C518'],19:['#C9D6D2','#141A22'],20:['#D91E8B','#F5C518'],21:['#FF7F6E','#141A22'],22:['#E9E9E9','#141A22'],23:['#0F2B46','#F4EFE4'],24:['#D4AF37','#141A22']};
 
-let state = { meetings:{}, meeting:null, punters:{}, me:null, comments:[], bets:[], feed:[], ui:{tab:'races', raceNo:1, open:null, betOn:null, meetingId:null}, updatedAt:0 };
-let db=null, sb=null, saveTimer=null, sampleFn=null;
+let state = { meetings:{}, meeting:null, feed:[], you:null, ui:{tab:'races', raceNo:1, open:null, meetingId:null, about:false}, updatedAt:0 };
+let sb=null;
 
 /* ---------------- helpers ---------------- */
 const $ = s => document.querySelector(s);
@@ -294,7 +237,7 @@ const pct = p => (p*100).toFixed(p>=0.1?0:1)+'%';
 const fmtOdds = p => p>0 ? '$'+(1/p).toFixed(1/p>=10?0:1) : '';
 // the price a bookmaker framing the book at `book` (1.20 = 120%) would show for the model's chance
 const ourPrice = (p,st,book) => { if(!(p>0)) return ''; const b=(book>1?book:null)||((st&&st.book)||1.2); const v=1/(p*b); return '$'+v.toFixed(v>=10?0:1); };
-function toast(msg){ const t=$('#toast'); t.textContent=msg; t.hidden=false; clearTimeout(t._h); t._h=setTimeout(()=>t.hidden=true,2800); }
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.hidden=false; t.style.cursor=''; t.onclick=null; clearTimeout(t._h); t._h=setTimeout(()=>t.hidden=true,2800); }
 function rec(v){ if(!v) return null; if(Array.isArray(v)) return {s:num(v[0])||0,w:num(v[1])||0,p:num(v[2])||0};
   if(typeof v==='string'){ const m=v.split(/[-:/ ]+/).map(num); if(m.length>=3) return {s:m[0]||0,w:m[1]||0,p:m[2]||0}; return null; }
   if(typeof v==='object') return {s:num(v.starts??v.s)||0,w:num(v.wins??v.w)||0,p:num(v.places??v.p)||0}; return null; }
@@ -307,17 +250,14 @@ function meetingsList(){ return Object.values(state.meetings).sort((a,b)=>(a.sor
 function selectMeeting(id){ const m=state.meetings[id]||meetingsList()[0]||null; state.meeting=m; state.ui.meetingId=m?m.id:null; if(m){ for(const r of m.races) r.meetingId=m.id; if(!m.races.some(r=>r.no===state.ui.raceNo)) state.ui.raceNo=m.races[0]?m.races[0].no:1; } }
 function putMeeting(m){ for(const r of m.races) r.meetingId=m.id; state.meetings[m.id]=m; if(!state.meeting||state.meeting.id===m.id) selectMeeting(m.id); }
 function fmtTime(t){ if(!t) return ''; if(/T/.test(String(t))){ const d=new Date(t); if(!isNaN(d)) return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); } return String(t); }
+function fmtDay(d){ if(!d) return ''; const x=new Date(d+'T00:00:00'); if(isNaN(x)) return String(d); return x.toLocaleDateString('en-AU',{day:'numeric',month:'short'}); }
 function shortName(m){ return m?String(m.meeting).replace(/ Gardens| Parks| \(fictional\)/i,''):''; }
 function ordinal(n){ const s=['th','st','nd','rd'], v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); }
 function slug(s){ return String(s).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')||'x'; }
 function titleCase(s){ return s.replace(/\b\w/g,c=>c.toUpperCase()); }
 function cloth(no){ const c=CLOTH[no]||['#DCD5C6','#141A22']; return `<span class="cloth num" style="background:${c[0]};color:${c[1]}">${no}</span>`; }
-function me(){ return state.punters[state.me]; }
-function newPunter(name){ const r=ROSTER.find(x=>x.id===slug(name)); const used=Object.values(state.punters).map(p=>p.colour); const colour=r?r.colour:(PUNTER_COLOURS.find(c=>!used.includes(c))||PUNTER_COLOURS[Object.keys(state.punters).length%PUNTER_COLOURS.length]);
-  return {id:slug(name), name:r?r.name:name.trim(), colour, avatar:r?r.avatar:'plain', weights:Object.fromEntries(METRICS.map(m=>[m.key,m.base])), settings:{...DEFAULT_SETTINGS}, adj:{}, picks:{}, locks:{}, trail:{}, updatedAt:Date.now()}; }
-function ensureRoster(){ for(const r of ROSTER){ if(!state.punters[r.id]) state.punters[r.id]=newPunter(r.name); } }
-function pelChip(p){ return `<span class="pel">${avatarSVG(p.avatar||'plain',p.colour,'sm')}${esc(p.name)}</span>`; }
-function punterByName(n){ return Object.values(state.punters).find(p=>p.name===n)||{name:n,colour:'#7E8794',avatar:'plain'}; }
+function me(){ return state.you; }
+function newYou(){ return {id:'you', name:'You', weights:Object.fromEntries(METRICS.map(m=>[m.key,m.base])), settings:{...DEFAULT_SETTINGS}, adj:{}, locks:{}, trail:{}, updatedAt:Date.now()}; }
 
 /* ---------------- scoring ---------------- */
 function rate(w,s,prior,k){ return (w + prior*k)/(s + k); }
@@ -330,32 +270,31 @@ function lastScore(l){ if(!l||num(l.pos)==null) return null; const pos=num(l.pos
   return clamp(0.5*posS+0.5*marS-0.1*(num(l.classChange)||0),0,1); }
 function classFormScore(r){ const runs=Array.isArray(r.recent)?r.recent.filter(x=>x&&num(x.cls)!=null):[]; if(!runs.length) return null; const ws=[0.5,0.3,0.2]; let tot=0,sw=0;
   runs.slice(0,3).forEach((x,i)=>{ const pos=num(x.pos)||9, margin=num(x.margin)||0; const q=(num(x.cls)||60)/100 + (pos===1?0.15:pos<=3?0.06:0) - Math.min(margin,12)/40; tot+=q*ws[i]; sw+=ws[i]; }); return tot/sw; }
-function fitnessScore(l,r){ const d=l?num(l.days):null; if(d==null) return null; if(d<7) return .55; if(d<14) return .8; if(d<=28) return 1; if(d<=42) return .8; if(d<=90) return .55; const fu=r&&rec(r.firstUp); if(fu&&fu.s>=2){ const q=recScore(fu); if(q!=null) return clamp(0.3+q*0.6,0.3,0.9); } return .4; }
 function distanceFactor(dist){ const d=num(dist)||1400; if(d<=1200) return 1; if(d<=1400) return .8; if(d<=1600) return .6; if(d<=2000) return .45; return .3; }
 function barrierScore(r,race,n,bias){ const b=num(r.barrier); if(b==null||n<2) return null; const rel=clamp((b-1)/(n-1),0,1); const eff=clamp(distanceFactor(race.distance)*0.6+(bias||0),-1,1); return clamp(0.5-(rel-0.5)*eff,0,1); }
 function jockeyScore(r){ const p=num(r.jockeyPct), rp=num(r.jockeyRecentPct); if(p!=null||rp!=null){ const a=p!=null?clamp(p/25,0,1):null, b=rp!=null?clamp(rp/25,0,1):null; return a!=null&&b!=null?0.5*a+0.5*b:(a??b); } const g=num(r.jockeyRating); if(g!=null) return clamp(g/100,0,1); return null; }
-function paceScore(r,race,bias){ const p=num(r.pace); if(p==null) return null; const eff=clamp(0.25*distanceFactor(race.distance)+(bias||0),-1,1); return clamp(0.5+(0.5-p)*eff,0,1); }
 function trainerScore(r){ const p=num(r.trainerPct); if(p!=null) return clamp(p/20,0,1); const g=num(r.trainerRating); if(g!=null) return clamp(g/100,0,1); return null; }
 function zscores(vals){ const xs=vals.filter(v=>v!=null); if(xs.length<2) return vals.map(()=>0); const m=xs.reduce((a,b)=>a+b,0)/xs.length; const sd=Math.sqrt(xs.reduce((a,b)=>a+(b-m)**2,0)/xs.length)||0; if(sd<1e-9) return vals.map(()=>0); return vals.map(v=>v==null?0:clamp((v-m)/sd,-2.5,2.5)); }
+// Records: Free Fields (ra) where the feed carries it, racing.com otherwise.
+function recOf(r,key){ const ra=r.ra&&r.ra.rec; const map={career:'career',track:'track',distance:'dist',trackDistance:'trackDist',good:'good',soft:'soft',heavy:'heavy',firstUp:'firstUp'}; if(ra&&map[key]&&ra[map[key]]) return rec(ra[map[key]]); return rec(r[key]); }
 
 function scoreRace(race, meeting, weights, settings, dyn, adj){
   const rs=active(race); const n=rs.length; const cat=condCategory(race.condition||meeting.condition);
   const ws=rs.map(r=>num(r.weight)).filter(v=>v!=null); const meanW=ws.length?ws.reduce((a,b)=>a+b,0)/ws.length:null;
   const openOf=r=>num(r.lateOdds)??num(r.openOdds)??num(r.odds); const maxImp=Math.max(...rs.map(r=>{const o=openOf(r); return o>1?1/o:0;}),0);
   const raw={};
-  raw.last=rs.map(r=>lastScore(r.last)); raw.form=rs.map(r=>formScore(r.form)); raw.track=rs.map(r=>recScore(rec(r.track))); raw.distance=rs.map(r=>recScore(rec(r.distance)));
-  raw.condition=rs.map(r=>recScore(rec(r[cat])||rec(r.cond)||(r.condition&&rec(r.condition[cat])))); raw.career=rs.map(r=>recScore(rec(r.career)));
-  raw.rating=rs.map(r=>{const v=num(r.rating); return v!=null&&v>0?v:null;});
+  raw.last=rs.map(r=>lastScore(r.last)); raw.form=rs.map(r=>formScore(r.form)); raw.track=rs.map(r=>recScore(recOf(r,'track')));
+  raw.condition=rs.map(r=>recScore(recOf(r,cat)||rec(r.cond)||(r.condition&&rec(r.condition[cat])))); raw.career=rs.map(r=>recScore(recOf(r,'career')));
   raw.jockey=rs.map(jockeyScore); raw.trainer=rs.map(trainerScore); raw.barrier=rs.map(r=>barrierScore(r,race,n,dyn.barrierBias));
-  raw.pace=rs.map(r=>paceScore(r,race,dyn.paceBias)); raw.classform=rs.map(classFormScore); raw.trackdist=rs.map(r=>recScore(rec(r.trackDistance))); raw.barrierrec=rs.map(r=>recScore(rec(r.barrierRec)));
-  raw.weight=rs.map(r=>{const w=num(r.weight); return (w==null||meanW==null)?null:clamp(0.5+(meanW-w)/6,0,1);}); raw.fitness=rs.map(r=>fitnessScore(r.last,r));
+  raw.classform=rs.map(classFormScore); raw.trackdist=rs.map(r=>recScore(recOf(r,'trackDistance'))); raw.barrierrec=rs.map(r=>recScore(rec(r.barrierRec)));
+  raw.weight=rs.map(r=>{const w=num(r.weight); return (w==null||meanW==null)?null:clamp(0.5+(meanW-w)/6,0,1);});
   raw.market=rs.map(r=>{const o=openOf(r); return (o>1&&maxImp>0)?(1/o)/maxImp:null;}); // the morning market, fixed for the day, so the tip does not move with the price
   const z={}; for(const k of Object.keys(raw)) z[k]=zscores(raw[k]);
   z.formline=rs.map(r=>clamp(dyn.formline[runnerKey(race,r)]||0,-2,2));
   z.manual=rs.map(r=>((adj&&adj[runnerKey(race,r)]&&num(adj[runnerKey(race,r)].adj))||0)*0.5);
   const wsum=METRICS.reduce((a,m)=>a+(weights[m.key]||0),0)||1; const wsumFree=wsum-(weights.market||0)||1;
   const scored=rs.map((r,i)=>{ let rating=0, ratingFree=0; const contrib={}; for(const m of METRICS){ const c=(weights[m.key]||0)*(z[m.key][i]||0)/wsum; contrib[m.key]=c; rating+=c; if(m.key!=='market') ratingFree+=(weights[m.key]||0)*(z[m.key][i]||0)/wsumFree; }
-    const missing=['last','form','track','distance','condition','career'].filter(k=>raw[k][i]==null).length;
+    const missing=['last','form','track','career','classform'].filter(k=>raw[k][i]==null).length;
     return {r, z:Object.fromEntries(METRICS.map(m=>[m.key,z[m.key][i]])), contrib, rating, ratingFree, missing}; });
   const beta=settings.beta||2.2; const ex=scored.map(s=>Math.exp(beta*s.rating)); const sum=ex.reduce((a,b)=>a+b,0)||1; scored.forEach((s,i)=>s.prob=ex[i]/sum);
   const exF=scored.map(s=>Math.exp(beta*s.ratingFree)); const sumF=exF.reduce((a,b)=>a+b,0)||1; scored.forEach((s,i)=>s.probFree=exF[i]/sumF);
@@ -367,67 +306,55 @@ function scoreRace(race, meeting, weights, settings, dyn, adj){
 }
 function isValue(s,settings){ return s.edge!=null && s.market>=0.05 && s.probValue>=0.10 && s.edge>=settings.valueEdge && s.probValue/s.market>=1.35; }
 function tier(p){ return p>=0.30?'Strong':p>=0.20?'Fair':'Skinny'; }
-function kellyStake(s, settings){ const o=num(s.r.odds); if(!(o>1)) return 0; const p=s.probValue; const b=o-1, q=1-p; const f=(b*p-q)/b; if(f<=0) return 0; return Math.max(0, Math.round(settings.bank*settings.kelly*f)); }
 function modelAdvice(scored, settings){ const top=scored[0]; if(!top) return null; const second=scored[1];
   const value=[...scored].filter(s=>isValue(s,settings)).sort((a,b)=>b.edge-a.edge);
-  return {top, tier:tier(top.prob), gap:second?top.prob-second.prob:top.prob, value:value[0]||null, valueAll:value, stakeTop:kellyStake(top,settings), stakeValue:value[0]?kellyStake(value[0],settings):0, roughie:bestRoughie(scored,settings)}; }
+  return {top, tier:tier(top.prob), gap:second?top.prob-second.prob:top.prob, value:value[0]||null, valueAll:value, roughie:bestRoughie(scored,settings)}; }
+function bestRoughie(scored, settings){ const cands=scored.filter(s=>num(s.r.odds)>=8&&num(s.r.odds)<=30&&s.probValue>=0.07&&s.rank<=4&&s.rank>1); if(!cands.length) return null;
+  const byEdge=[...cands].filter(s=>s.edge!=null).sort((a,b)=>b.edge-a.edge); return byEdge[0]||[...cands].sort((a,b)=>b.probFree-a.probFree)[0]; }
+function modelPick(race, run){ const p=(run.pred[race.no]||[]).find(x=>x.rank===1); return p?p.no:null; }
 // The edge board: where the form-only rating and the market disagree most, across today's unrun races.
 function valueBoardHTML(m,run,st){ const rows=[];
   for(const race of m.races){ if(race.result||(run.locked&&run.locked[race.no])||active(race).length<5) continue; const sc=scoreRace(race,m,run.weights,st,run.dyn[race.no],me().adj);
     for(const x of sc){ if(x.market==null||x.probFree<0.08||!(num(x.r.odds)>1)) continue; const ratio=x.probFree/x.market; if(ratio<1.25) continue; rows.push({race,x,ratio}); } }
   rows.sort((a,b)=>b.ratio-a.ratio); const top=rows.slice(0,5);
   const read=(()=>{ const t=m.races.map(r=>r.frozenAt||r.syncedAt).filter(Boolean).sort().pop(); return t?fmtTime(t):null; })();
-  return `<section class="block" style="margin-top:14px"><div class="eyebrow">Edge board<span class="sl">/</span>form-only rating against the market${read?', prices read '+esc(read):''}</div>
-  <p class="small" style="margin:4px 0 6px">Market is the median fixed-odds price on racing.com at the last read, not a live price. Rows are where our form rating is at least 25% above the market's chance. Value tags on the card apply your trust setting on top.</p>
+  return `<section class="block" style="margin-top:14px"><div class="eyebrow">Disagreements<span class="sl">/</span>form-only rating against the market${read?', prices read '+esc(read):''}</div>
+  <p class="small" style="margin:4px 0 6px">Where your form rating sits at least 25% above the market's chance. The market is the median fixed price on racing.com at the last read. Past races say these are not profitable on their own; they are where your own view has room to matter.</p>
   ${top.length?`<div class="wtips edge">${top.map(({race,x,ratio})=>`<div class="wtip"><span class="nm"><b>R${race.no}</b> ${cloth(x.r.no)} ${esc(x.r.name)}</span><span class="num">${pct(x.probFree)} v ${pct(x.market)}</span><span class="num">${ourPrice(x.probFree,st,x.book)}</span><span class="num muted">$${x.r.odds}</span></div>`).join('')}</div>`:'<p class="note">No unrun race where the form rating beats the market by 25% or more.</p>'}</section>`; }
-function multiHTML(multi, st){ if(!multi) return ''; return `<div class="banner"><div class="eyebrow" style="color:var(--panel-ink);opacity:.7">Best multi<span class="sl">/</span>${multi.legs.length} legs, model ${pct(multi.prob)}</div>
-  <h2>${multi.legs.map(l=>`R${l.raceNo} ${cloth(l.no)}`).join(' ')}</h2><p>${multi.legs.map(l=>`R${l.raceNo} ${esc(l.name)} (${pct(l.prob)})`).join(', ')}.</p>
-  <p>Our price $${(1/(multi.prob*Math.pow(st.book,multi.legs.length))).toFixed(1)} (fair $${multi.fair.toFixed(1)})${multi.odds?`, market pays about $${multi.odds.toFixed(1)}${multi.odds>multi.fair*1.1?' which is value':multi.odds<multi.fair*0.9?' which is under the odds':''}`:''}. Suggested stake ${fmtMoney(multi.stake)}.</p></div>`; }
-function bestRoughie(scored, settings){ const cands=scored.filter(s=>num(s.r.odds)>=8&&num(s.r.odds)<=30&&s.probValue>=0.07&&s.rank<=4&&s.rank>1); if(!cands.length) return null;
-  const byEdge=[...cands].filter(s=>s.edge!=null).sort((a,b)=>b.edge-a.edge); return byEdge[0]||[...cands].sort((a,b)=>b.probFree-a.probFree)[0]; }
-function dayMulti(run, meeting, settings){ const legs=[]; for(const race of meeting.races){ if(race.result) continue; const top=(run.pred[race.no]||[])[0]&&(run.pred[race.no]||[]).find(x=>x.rank===1); if(!top) continue; const r=race.runners.find(h=>h.no===top.no); legs.push({raceNo:race.no,no:top.no,name:r?r.name:'',prob:top.prob,odds:num(r&&r.odds)}); }
-  if(legs.length<2) return null; let pick=legs.filter(l=>l.prob>=0.28).sort((a,b)=>b.prob-a.prob).slice(0,4); if(pick.length<2) pick=[...legs].sort((a,b)=>b.prob-a.prob).slice(0,2);
-  pick.sort((a,b)=>a.raceNo-b.raceNo); const prob=pick.reduce((a,l)=>a*l.prob,1); const odds=pick.every(l=>l.odds>1)?pick.reduce((a,l)=>a*l.odds,1):null;
-  return {legs:pick, prob, odds, fair:1/prob, stake:Math.max(5,Math.round(settings.bank*0.02/5)*5)}; }
-function effectivePick(punter, race, run){ const k=pk(race); const o=punter.picks&&punter.picks[k]&&punter.picks[k].win; if(o) return {no:o, override:true}; const p=(run.pred[race.no]||[]).find(x=>x.rank===1); return p?{no:p.no, override:false}:{no:null,override:false}; }
 
-/* ---------------- run the day for one punter ----------------
+/* ---------------- run the day ----------------
    Replays results in race order. Returns adapted weights, per-race dynamics,
    the prediction each race carried when it was run, and the change log. */
 function runDay(punter, meeting){
   const races=[...meeting.races].sort((a,b)=>a.no-b.no); const settings={...DEFAULT_SETTINGS,...punter.settings};
-  let w={...punter.weights}; let formline={}, jockeyWins={}, barrierRel=[], paceRel=[]; const dyn={}, pred={}, changes=[];
+  let w={...punter.weights}; let formline={}, jockeyWins={}, barrierRel=[]; const dyn={}, pred={}, changes=[];
   for(const race of races){
     const fl={...formline}; for(const r of active(race)){ const jw=jockeyWins[normKey(r.jockey)]||0; if(jw>0){ const k=runnerKey(race,r); fl[k]=(fl[k]||0)+Math.min(0.4,0.2*jw); } }
-    dyn[race.no]={formline:fl, barrierBias:barrierBiasFrom(barrierRel), paceBias:barrierBiasFrom(paceRel)};
+    dyn[race.no]={formline:fl, barrierBias:barrierBiasFrom(barrierRel)};
     const scored=scoreRace(race,meeting,w,settings,dyn[race.no],punter.adj);
     pred[race.no]=scored.map(s=>({no:s.r.no,rank:s.rank,prob:s.prob}));
     const res=race.result; if(!res||!res.positions||!res.positions.length) continue;
     const pos=res.positions.map(Number); const n=scored.length; const win=scored.find(s=>s.r.no===pos[0]);
-    // form lines, riders and barrier bias for later races
     for(const s of scored){ const idx=pos.indexOf(s.r.no); const actual=idx>=0?idx+1:(pos.length+1+n)/2; let resid=clamp((s.rank-actual)/Math.max(n/2,1),-1,1); if(idx===0) resid=Math.max(resid,0.15);
-      const b=num(s.r.barrier); const pc=num(s.r.pace); if(idx===0){ const j=normKey(s.r.jockey); if(j) jockeyWins[j]=(jockeyWins[j]||0)+1; if(b!=null&&n>1) barrierRel.push({rel:(b-1)/(n-1),w:1}); if(pc!=null) paceRel.push({rel:pc,w:1}); }
-      if(idx===1){ if(b!=null&&n>1) barrierRel.push({rel:(b-1)/(n-1),w:0.5}); if(pc!=null) paceRel.push({rel:pc,w:0.5}); }
+      const b=num(s.r.barrier); if(idx===0){ const j=normKey(s.r.jockey); if(j) jockeyWins[j]=(jockeyWins[j]||0)+1; if(b!=null&&n>1) barrierRel.push({rel:(b-1)/(n-1),w:1}); }
+      if(idx===1){ if(b!=null&&n>1) barrierRel.push({rel:(b-1)/(n-1),w:0.5}); }
       const key=normKey(s.r.last&&s.r.last.race); if(!key||Math.abs(resid)<0.05) continue;
       for(const later of races){ if(later.no<=race.no) continue; for(const q of active(later)){ if(normKey(q.last&&q.last.race)!==key) continue;
         const qp=num(q.last.pos), rp=num(s.r.last.pos), qm=num(q.last.margin)||0, rm=num(s.r.last.margin)||0; let f=1; if(qp!=null&&rp!=null&&qp>rp) f=clamp(1-(qm-rm)/6,0.3,1);
         const k=runnerKey(later,q); formline[k]=clamp((formline[k]||0)+resid*settings.formlineGain*f,-1.5,1.5); } } }
-    // weight adaptation on this punter's margin
     if(!win){ changes.push({race:race.no,text:`Winner ${pos[0]} not among active runners; no adaptation.`,items:[]}); continue; }
     const outside=win.rank>settings.marginRank||win.prob<settings.marginProb;
     const entry={race:race.no,text:`${win.r.name} won, rated ${ordinal(win.rank)} at ${pct(win.prob)}. ${outside?(settings.autoAdapt?'Outside the margin, weights moved.':'Outside the margin, adaptation is off.'):'Inside the margin, weights held.'}`,items:[]};
-    if(outside&&settings.autoAdapt){ const pw=[3,2,1,0.5]; for(const met of METRICS){ if(met.key==='manual'||met.key==='formline') continue; let acc=0,sw=0; pos.slice(0,4).forEach((no,i)=>{ const s=scored.find(x=>x.r.no===no); if(!s) return; acc+=s.z[met.key]*pw[i]; sw+=pw[i]; }); if(!sw) continue;
-      const perf=Math.tanh(acc/sw); const w0=w[met.key]; const w1=clamp(w0*(1+settings.lr*perf),met.base*0.15,met.base*2.5); if(Math.abs(w1-w0)>0.005){ w[met.key]=+w1.toFixed(3); entry.items.push(`${met.label} ${w0.toFixed(2)} to ${w1.toFixed(2)}`); } } }
+    if(outside&&settings.autoAdapt){ const pw=[3,2,1,0.5]; for(const met of METRICS){ if(met.hidden) continue; let acc=0,sw=0; pos.slice(0,4).forEach((no,i)=>{ const s=scored.find(x=>x.r.no===no); if(!s) return; acc+=s.z[met.key]*pw[i]; sw+=pw[i]; }); if(!sw) continue;
+      const perf=Math.tanh(acc/sw); const w0=w[met.key]; const w1=clamp(w0*(1+settings.lr*perf),met.base*0.15,Math.max(1.5,met.base*2.5)); if(Math.abs(w1-w0)>0.005){ w[met.key]=+w1.toFixed(3); entry.items.push(`${met.label} ${w0.toFixed(2)} to ${w1.toFixed(2)}`); } } }
     changes.push(entry);
   }
-  const run={weights:w, dyn, pred, changes, roughie:{}, locked:{}, final:{barrierBias:barrierBiasFrom(barrierRel), paceBias:barrierBiasFrom(paceRel), jockeyWins}};
+  const run={weights:w, dyn, pred, changes, roughie:{}, locked:{}, final:{barrierBias:barrierBiasFrom(barrierRel), jockeyWins}};
   applyLocks(punter, meeting, run, settings);
   return run;
 }
-/* Tips are fixed at the jump. The first time a race is seen past its start time (or with a result in), the model's ranking and roughie
-   for that race are written to the punter's locks and used from then on, so later slider moves or data changes cannot rewrite history.
-   Only live feed meetings are locked; the example and past meetings used by the proving ground are not. */
-// Reorder a live scoring to a race's locked ranking (rank and chance from the lock), so nothing on screen moves after the jump.
+/* Tips are fixed at the jump. The first time a race is seen past its start time (or with a result in), the ranking and roughie are written
+   to this device's locks and used from then on, so later slider moves or data changes cannot rewrite history. The example is never locked. */
 function trailHTML(race){ const tr=((me().trail||{})[pk(race)]||[]); if(tr.length<2) return ''; const why={morning:'morning tip',result:'after a result landed',scratching:'after a scratching',market:'market refreshed near the jump',weights:'after your weights changed'};
   const nameOf=no=>{ const r=race.runners.find(x=>x.no===no); return r?esc(r.name):no; };
   return `<div class="eyebrow" style="color:var(--panel-ink);opacity:.7;margin-top:12px">Tip trail</div><p style="margin-top:4px">${tr.map(t=>`${fmtTime(new Date(t.at).toISOString())} ${cloth(t.no)} ${nameOf(t.no)} <span class="small">(${why[t.why]||t.why})</span>`).join('<br>')}</p>`; }
@@ -437,7 +364,6 @@ function applyLocks(punter, meeting, run, settings){
   if(!meeting||meeting.example||!state.meetings||state.meetings[meeting.id]!==meeting) return;
   punter.locks=punter.locks||{}; punter.trail=punter.trail||{}; let added=false; const now=Date.now();
   const resultsIn=meeting.races.filter(r=>r.result&&r.result.positions&&r.result.positions.length).length;
-  // Trail: the tip each race carried through the day and why it changed. Read by the race screen and the card.
   for(const race of meeting.races){ const k=pk(race); if(punter.locks[k]) continue; const top=(run.pred[race.no]||[])[0]; if(!top) continue;
     const tr=punter.trail[k]||(punter.trail[k]=[]); const last=tr[tr.length-1];
     if(!last){ tr.push({at:now,no:top.no,why:'morning'}); added=true; continue; }
@@ -445,8 +371,6 @@ function applyLocks(punter, meeting, run, settings){
     let why='weights'; if(race.lateAt&&!last.late) why='market'; else if(resultsIn>(last.results||0)) why='result'; else if(race.runners.some(x=>x.no===last.no&&x.scratched)) why='scratching';
     tr.push({at:now,no:top.no,why,results:resultsIn,late:!!race.lateAt}); added=true; }
   for(const race of meeting.races){ const k=pk(race); const past=!!(race.result&&race.result.positions&&race.result.positions.length)||(race.time&&Date.parse(race.time)<now);
-    // A lockOverride on the race (set on the server to correct a record) outranks anything on the device. Its ranks list the tip first and
-    // the winner's rated position; runners it does not mention keep the model's order after them.
     if(race.lockOverride&&race.lockOverride.ranks){ const o=race.lockOverride; const rest=(run.pred[race.no]||[]).filter(x=>!o.ranks.some(y=>y.no===x.no));
       const ranks=[...o.ranks.map((y,i)=>({no:y.no,rank:y.rank||i+1,prob:null})), ...rest.map((x,i)=>({...x,rank:o.ranks.length+i+1}))];
       punter.locks[k]={ranks, roughie:o.roughie??null, at:now, override:true}; run.pred[race.no]=ranks; run.roughie[race.no]=o.roughie??null; run.locked[race.no]=true; continue; }
@@ -460,26 +384,14 @@ function applyLocks(punter, meeting, run, settings){
 }
 function barrierBiasFrom(list){ if(list.length<2) return 0; const sw=list.reduce((a,b)=>a+b.w,0); const mean=list.reduce((a,b)=>a+b.rel*b.w,0)/sw; const dev=0.5-mean; if(Math.abs(dev)<0.12) return 0; return clamp(dev*1.5,-0.6,0.6); }
 
-/* ---------------- tips and leaderboard ---------------- */
-function tipPoints(punter, runs){ let pts=0, wins=0, places=0, tipped=0;
-  for(const meeting of meetingsList()){ const run=runs[meeting.id]||runDay(punter,meeting);
-    for(const race of meeting.races){ if(!race.result) continue; const pos=race.result.positions.map(Number); const ep=effectivePick(punter,race,run); const pick=punter.picks&&punter.picks[pk(race)];
-      if(ep.no){ tipped++; if(pos[0]===ep.no){ pts+=3; wins++; } else if(pos.slice(1,3).includes(ep.no)){ pts+=1; places++; } }
-      for(const p of ((pick&&pick.place)||[])){ if(pos.slice(0,3).includes(p)){ pts+=1; places++; } } } }
-  return {pts,wins,places,tipped}; }
-function modelScore(runs){ let done=0,top=0,top3=0,placed=0;
-  for(const meeting of meetingsList()){ const run=runs[meeting.id]; if(!run) continue; for(const r of meeting.races.filter(r=>r.result)){ done++; const p=run.pred[r.no]||[]; const wp=p.find(x=>x.no===r.result.positions[0]); if(wp&&wp.rank===1) top++; if(wp&&wp.rank<=3) top3++; const t=p.find(x=>x.rank===1); if(t&&r.result.positions.slice(0,3).includes(t.no)) placed++; } }
-  return {done,top,top3,placed}; }
-function runsFor(punter){ const out={}; for(const m of meetingsList()) out[m.id]=runDay(punter,m); return out; }
-
-/* ---------------- proving ground: a punter's model against real past Saturdays ---------------- */
+/* ---------------- proving ground: your model against real past race days ---------------- */
 let PAST=null;
+function pastMeeting(m){ return {...m, condition:m.condition||'Good 4', races:m.races.map(r=>({...r, meetingId:m.id, condition:r.condition||m.condition||'Good 4', runners:r.runners.map(x=>({...x, scratched:!!x.scratched}))}))}; }
 function evaluatePunter(punter, past){
   const st={...DEFAULT_SETTINGS,...punter.settings}; let races=0,topW=0,topPl=0,topRet=0,favW=0,favRet=0,adW=0,adRet=0,valN=0,valW=0,valRet=0,rgN=0,rgW=0,rgRet=0,ll=0,llM=0,n=0;
-  for(const m of past){ const meeting={...m, condition:m.condition||'Good 4', races:m.races.map(r=>({...r, meetingId:m.id, condition:r.condition||m.condition||'Good 4', runners:r.runners.map(x=>({...x, scratched:!!x.scratched}))}))};
-    const run=runDay({...punter, adj:{}, picks:{}}, meeting);
+  for(const m of past){ const meeting=pastMeeting(m); const run=runDay({...punter, adj:{}}, meeting);
     for(const r of meeting.races){ if(!r.result||active(r).length<5) continue; const win=r.result.positions[0]; const placed=r.result.positions.slice(0,3);
-      const sc=scoreRace(r,meeting,punter.weights,st,{formline:{},barrierBias:0,paceBias:0},{}); const scA=scoreRace(r,meeting,run.weights,st,run.dyn[r.no],{});
+      const sc=scoreRace(r,meeting,punter.weights,st,{formline:{},barrierBias:0},{}); const scA=scoreRace(r,meeting,run.weights,st,run.dyn[r.no],{});
       races++; const top=sc[0]; const fav=[...sc].sort((a,b)=>(b.market||0)-(a.market||0))[0];
       if(top.r.no===win){ topW++; topRet+=top.r.odds||0; } if(placed.includes(top.r.no)) topPl++;
       if(fav.r.no===win){ favW++; favRet+=fav.r.odds||0; }
@@ -490,22 +402,19 @@ function evaluatePunter(punter, past){
   return {races, top:{w:topW,pl:topPl,roi:races?(topRet-races)/races:0}, adapt:{w:adW,roi:races?(adRet-races)/races:0}, fav:{w:favW,roi:races?(favRet-races)/races:0}, value:{n:valN,w:valW,roi:valN?(valRet-valN)/valN:0}, rough:{n:rgN,w:rgW,roi:rgN?(rgRet-rgN)/rgN:0}, ll:n?ll/n:null, llM:n?llM/n:null};
 }
 async function loadPast(){ if(PAST) return PAST; if(!sb) return null; const {data,error}=await sb.from('kyw_backtest').select('data').order('created_at'); if(error) throw error; PAST=(data||[]).map(r=>r.data).filter(m=>m&&m.races); return PAST; }
-/* ---------------- unit allocator: a morning plan for a day's program ----------------
-   Candidates: positive edge under the trust blend, inside the price band, one per race. Sized by fractional Kelly on the day's units,
-   whole units, capped per race, trimmed to the budget. planDay works for a live day; testPlan replays it over the archived meetings. */
+/* Unit allocator: a morning plan for a day's program. Candidates: positive edge under the trust blend, inside the price band, one per race.
+   Sized by a quarter of Kelly on the day's units, whole units, capped per race, trimmed to the budget. Tested here; not offered live. */
 function planDay(meetings, punter, opts){ const st={...DEFAULT_SETTINGS,...punter.settings}; const o={units:20,capRace:0.25,maxPrice:30,minPrice:1.8,...opts}; const cands=[];
-  for(const m of meetings){ for(const r of m.races){ if(r.result||active(r).length<5) continue; const sc=scoreRace(r,m,punter.weights,st,{formline:{},barrierBias:0,paceBias:0},{}); let best=null;
+  for(const m of meetings){ for(const r of m.races){ if(r.result||active(r).length<5) continue; const sc=scoreRace(r,m,punter.weights,st,{formline:{},barrierBias:0},{}); let best=null;
     for(const x of sc){ const od=num(x.r.odds); if(!(od>1)||od>o.maxPrice||od<o.minPrice||x.market==null) continue; const p=x.probValue; const edge=p*od-1; if(edge<=0||!isValue(x,st)) continue; const f=(p*od-1)/(od-1); if(!best||edge>best.edge) best={m,r,x,od,p,edge,f}; }
     if(best) cands.push(best); } }
-  let bets=cands.map(c=>({...c,u:Math.round(c.f*st.kelly*o.units)})).filter(b=>b.u>=1); const cap=Math.max(1,Math.floor(o.units*o.capRace)); for(const b of bets) b.u=Math.min(b.u,cap);
+  let bets=cands.map(c=>({...c,u:Math.round(c.f*KELLY*o.units)})).filter(b=>b.u>=1); const cap=Math.max(1,Math.floor(o.units*o.capRace)); for(const b of bets) b.u=Math.min(b.u,cap);
   if(bets.reduce((a,b)=>a+b.u,0)>o.units){ const k=o.units/bets.reduce((a,b)=>a+b.u,0); for(const b of bets) b.u=Math.max(1,Math.floor(b.u*k)); bets.sort((a,b)=>a.edge-b.edge); while(bets.reduce((a,b)=>a+b.u,0)>o.units&&bets.length){ if(bets[0].u>1) bets[0].u--; else bets.shift(); } }
   return bets.sort((a,b)=>b.edge-a.edge); }
-function testPlan(punter, past, units){ const days={}; for(const m of past) (days[m.date]=days[m.date]||[]).push(m); const out={days:0,bets:0,won:0,staked:0,ret:0,losing:0,worst:0,best:0,perDay:[]};
-  for(const d of Object.keys(days).sort()){ const ms=days[d].map(m=>({...m, condition:m.condition||'Good 4', races:m.races.map(r=>({...r, meetingId:m.id, condition:r.condition||m.condition||'Good 4', runners:r.runners.map(x=>({...x, scratched:!!x.scratched}))}))}));
-    const withRes=ms.map(m=>({...m, races:m.races.filter(r=>r.result)})); // plan as if unrun, settle on the stored result
-    const bets=planDay(withRes.map(m=>({...m, races:m.races.map(r=>({...r, result:null, _res:r.result}))})), punter, {units});
-    let staked=0,ret=0,won=0; for(const b of bets){ staked+=b.u; if(b.r._res.positions[0]===b.x.r.no){ ret+=b.u*b.od; won++; } }
-    const pl=ret-staked; out.days++; out.bets+=bets.length; out.won+=won; out.staked+=staked; out.ret+=ret; if(pl<0) out.losing++; out.worst=Math.min(out.worst,pl); out.best=Math.max(out.best,pl); out.perDay.push({d,n:bets.length,u:staked,pl}); }
+function testPlan(punter, past, units){ const days={}; for(const m of past) (days[m.date]=days[m.date]||[]).push(m); const out={days:0,bets:0,won:0,staked:0,ret:0,losing:0,worst:0,best:0};
+  for(const d of Object.keys(days).sort()){ const ms=days[d].map(pastMeeting).map(m=>({...m, races:m.races.filter(r=>r.result).map(r=>({...r, result:null, _res:r.result}))}));
+    const bets=planDay(ms, punter, {units}); let staked=0,ret=0,won=0; for(const b of bets){ staked+=b.u; if(b.r._res.positions[0]===b.x.r.no){ ret+=b.u*b.od; won++; } }
+    const pl=ret-staked; out.days++; out.bets+=bets.length; out.won+=won; out.staked+=staked; out.ret+=ret; if(pl<0) out.losing++; out.worst=Math.min(out.worst,pl); out.best=Math.max(out.best,pl); }
   return out; }
 function planTestHTML(t, units){ if(!t) return ''; const pl=t.ret-t.staked; const roiS=t.staked?Math.round((t.ret-t.staked)/t.staked*100):0; const roiB=Math.round(pl/(t.days*units)*100);
   return `<div class="kpis" style="margin-top:10px"><div class="kpi"><b class="num" style="color:${pl>=0?'var(--good)':'var(--bad)'}">${pl>=0?'+':''}${pl.toFixed(1)}u</b><span>Profit over ${t.days} days</span></div><div class="kpi"><b class="num">${t.won}/${t.bets}</b><span>Bets won</span></div><div class="kpi"><b class="num">${t.losing}/${t.days}</b><span>Losing days</span></div></div>
@@ -516,36 +425,24 @@ function provingHTML(ev){ if(!ev) return ''; const pc=(a,b)=>b?Math.round(100*a/
   Value calls: ${ev.value.n} made, ${ev.value.w} won, ${roi(ev.value.roi)}. Roughies: ${ev.rough.n} named, ${ev.rough.w} won, ${roi(ev.rough.roi)}.
   ${ev.ll!=null?`Calibration (log-loss on the winner, lower is better): your model ${ev.ll.toFixed(2)}, the market ${ev.llM.toFixed(2)}.`:''}</p>`; }
 
-/* ---------------- punters club ---------------- */
-function placeOdds(b){ const po=num(b.placeOdds); if(po&&po>1) return po; const o=num(b.odds)||1; return +(1+(o-1)/4).toFixed(2); } // estimate where no place price entered
-function settleBet(b){ const meeting=state.meetings[b.meetingId]||state.meeting; const race=meeting&&meeting.races.find(r=>r.no===b.raceNo); if(!race||!race.result) return {status:'open', ret:null};
-  const pos=race.result.positions.map(Number); const won=pos[0]===b.runnerNo; const placed=pos.slice(0,3).includes(b.runnerNo); const st=num(b.stake)||0; let ret=0;
-  if(b.type==='win') ret= won? st*(num(b.odds)||1) : 0;
-  else if(b.type==='place') ret= placed? st*placeOdds(b) : 0;
-  else { const half=st/2; ret=(won?half*(num(b.odds)||1):0)+(placed?half*placeOdds(b):0); }
-  return {status: ret>0?'won':'lost', ret:+ret.toFixed(2)}; }
-function clubBook(){ let staked=0, ret=0, open=0; const rows=state.bets.filter(b=>!b.meetingId||state.meetings[b.meetingId]).map(b=>{ const s=settleBet(b); staked+=num(b.stake)||0; if(s.status==='open') open+=num(b.stake)||0; else ret+=s.ret; return {...b, ...s}; });
-  return {rows, staked, ret, open, pl:+(ret-(staked-open)).toFixed(2)}; }
-function fmtMoney(v){ return (v<0?'-':'')+'$'+Math.abs(v).toFixed(Math.abs(v)%1?2:0); }
-
 /* ---------------- persistence ---------------- */
-function persistLocal(){ try{ localStorage.setItem('kyw', JSON.stringify({meetings:state.meetings,meetingId:state.ui.meetingId,punters:state.punters,me:state.me,comments:state.comments,bets:state.bets,feed:state.feed,updatedAt:state.updatedAt})); }catch(e){} }
-function loadLocal(){ try{ const j=JSON.parse(localStorage.getItem('kyw')||'null'); if(j){ state.meetings=j.meetings||(j.meeting?{[j.meeting.id]:j.meeting}:{}); state.feed=j.feed||[]; state.punters=j.punters||{}; state.me=j.me||null; state.comments=j.comments||[]; state.bets=j.bets||[]; state.updatedAt=j.updatedAt||0; selectMeeting(j.meetingId); return true; } }catch(e){} return false; }
+function persistLocal(){ try{ localStorage.setItem('kyw2', JSON.stringify({meetings:state.meetings,meetingId:state.ui.meetingId,you:state.you,feed:state.feed,updatedAt:state.updatedAt})); }catch(e){} }
+function loadLocal(){ try{ const j=JSON.parse(localStorage.getItem('kyw2')||'null'); if(j){ state.meetings=j.meetings||{}; state.feed=j.feed||[]; state.you=j.you||null; state.updatedAt=j.updatedAt||0; selectMeeting(j.meetingId); return true; }
+    // carry weights, calls and locks over from the earlier build
+    const o=JSON.parse(localStorage.getItem('kyw')||'null'); if(o&&o.punters&&o.me&&o.punters[o.me]){ const p=o.punters[o.me]; state.you={...newYou(), weights:{...Object.fromEntries(METRICS.map(m=>[m.key,m.base])), ...Object.fromEntries(Object.entries(p.weights||{}).filter(([k])=>METRICS.some(m=>m.key===k)))}, settings:{...DEFAULT_SETTINGS, ...Object.fromEntries(Object.entries(p.settings||{}).filter(([k])=>k in DEFAULT_SETTINGS))}, adj:p.adj||{}, locks:p.locks||{}, trail:p.trail||{}}; state.meetings=o.meetings||{}; for(const id of Object.keys(state.meetings)) if(state.meetings[id].example) delete state.meetings[id]; selectMeeting(o.meetingId); return true; } }catch(e){} return false; }
 function setSync(cls,txt){ const s=$('#sync'); s.className='sync '+cls; s.textContent=txt; }
-// what = 'meeting' | 'punter' | 'result:<no>' | 'all'
-function save(what){ state.updatedAt=Date.now(); if(me()) me().updatedAt=state.updatedAt; persistLocal(); render(); const w=what||'all';
-  if(sb) sbPush(w); else if(db){ clearTimeout(saveTimer); saveTimer=setTimeout(()=>pushDb(w==='all'?'all':(w.startsWith('result')?'meeting':w)),350); } }
+function save(){ state.updatedAt=Date.now(); if(me()) me().updatedAt=state.updatedAt; persistLocal(); render(); }
 
-/* ---- Supabase backend (web hosted) ---- */
+/* ---- feed (Supabase, read only) ---- */
 async function sbInit(){
   if(!SUPABASE.url||!SUPABASE.key||!window.supabase) return false;
   sb=window.supabase.createClient(SUPABASE.url,SUPABASE.key,{global:{headers:{'x-flock-code':SUPABASE.flockCode}}});
   setSync('on','connecting');
-  try{ await sbPullAll(true); setSync('on','live');
+  try{ await sbPullMeeting(); await sbPullResults(); persistLocal(); render(); setSync('on','live');
     sb.channel('kyw').on('postgres_changes',{event:'*',schema:'public',table:'kyw_meeting'},()=>sbPullMeeting().then(ch=>{ if(ch){ persistLocal(); render(); } }))
       .on('postgres_changes',{event:'*',schema:'public',table:'kyw_results'},()=>sbPullResults().then(ch=>{ if(ch){ persistLocal(); render(); toast('Result in'); } }))
       .subscribe(status=>{ if(status==='SUBSCRIBED') setSync('on','live'); else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT') setSync('err','live off, refresh to catch up'); });
-    return true; }catch(e){ console.error(e); setSync('err','backend unreachable'); return false; }
+    return true; }catch(e){ console.error(e); setSync('err','feed unreachable'); return false; }
 }
 async function sbPullMeeting(){
   const {data:feed}=await sb.from('kyw_feed').select('*').eq('active',true).order('sort'); state.feed=feed||[];
@@ -555,10 +452,10 @@ async function sbPullMeeting(){
     const results=cur?Object.fromEntries(cur.races.filter(r=>r.result).map(r=>[r.no,r.result])):{}; for(const r of m.races){ if(results[r.no]&&!r.result) r.result=results[r.no]; }
     const f=state.feed.find(x=>String(x.meet_id)===String(m.id)); if(f){ m.sort=f.sort; m.meeting=f.name||m.meeting; }
     putMeeting(m); ch=true; }
-  for(const id of Object.keys(state.meetings)){ if(!seen.has(String(id))&&!state.meetings[id].example){ delete state.meetings[id]; ch=true; } }
+  for(const id of Object.keys(state.meetings)){ if(!seen.has(String(id))&&!state.meetings[id].example&&!state.meetings[id].manual){ delete state.meetings[id]; ch=true; } }
   if(!state.meeting||!state.meetings[state.meeting.id]) selectMeeting(state.ui.meetingId); return ch; }
 async function sbPullResults(){ const {data,error}=await sb.from('kyw_results').select('*'); if(error) throw error; let ch=false;
-  for(const m of Object.values(state.meetings)){ for(const race of m.races){ const row=(data||[]).find(x=>String(x.meeting_id)===String(m.id)&&x.race_no===race.no); const cur=race.result;
+  for(const m of Object.values(state.meetings)){ if(m.example||m.manual) continue; for(const race of m.races){ const row=(data||[]).find(x=>String(x.meeting_id)===String(m.id)&&x.race_no===race.no); const cur=race.result;
     if(row){ const res={positions:row.positions,by:row.entered_by,enteredAt:new Date(row.entered_at).getTime()}; if(!cur||JSON.stringify(cur.positions)!==JSON.stringify(res.positions)||cur.by!==res.by){ race.result=res; ch=true; } } else if(cur){ race.result=null; ch=true; } } } return ch; }
 // A home-screen web app can hold on to an old copy of the page for days. Compare the build stamp with the one on the server.
 async function checkForUpdate(){ try{ const r=await fetch('version.txt?t='+Date.now(),{cache:'no-store'}); if(!r.ok) return; const v=(await r.text()).trim(); if(v&&v!==BUILD){ const t=$('#toast'); t.innerHTML=`New version ${esc(v)} available. <b>Tap to update</b>`; t.hidden=false; t.style.cursor='pointer'; t.onclick=()=>{ location.reload(); }; } }catch(e){} }
@@ -566,131 +463,44 @@ async function refreshNow(){ const btn=$('#refreshBtn'); if(btn){ btn.classList.
   try{ if(!sb){ toast('No feed connection'); return; } const a=await sbPullMeeting(); const b=await sbPullResults(); persistLocal(); render(); toast(a||b?'Updated from the feed':'Already up to date'); }
   catch(e){ console.error(e); toast('Refresh failed, check signal'); }
   finally{ if(btn){ btn.classList.remove('busy'); btn.disabled=false; } } }
-// Pull down from the top of the page to refresh (home-screen apps have no browser refresh).
 function bindPullToRefresh(){ let y0=null, armed=false; const hint=document.createElement('div'); hint.className='pullhint'; hint.textContent='Release to refresh'; document.body.appendChild(hint);
   document.addEventListener('touchstart',e=>{ y0=(window.scrollY<=0)?e.touches[0].clientY:null; armed=false; },{passive:true});
   document.addEventListener('touchmove',e=>{ if(y0==null) return; const d=e.touches[0].clientY-y0; armed=d>80; hint.classList.toggle('show',armed); },{passive:true});
   document.addEventListener('touchend',()=>{ hint.classList.remove('show'); if(armed) refreshNow(); y0=null; armed=false; }); }
-async function syncNow(){ if(!SUPABASE.url) { toast('No feed configured'); return; } const btn=$('#syncBtn'); if(btn){ btn.disabled=true; btn.textContent='Syncing...'; }
+async function syncNow(){ const btn=$('#syncBtn'); if(btn){ btn.disabled=true; btn.textContent='Syncing...'; }
   try{ const res=await fetch(SUPABASE.url+'/functions/v1/kyw-sync?force=1', {method:'POST', headers:{'x-flock-code':SUPABASE.flockCode,'Content-Type':'application/json'}, body:'{}'}); const j=await res.json(); if(!res.ok||j.error) throw new Error(j.error||res.status);
     await sbPullMeeting(); await sbPullResults(); persistLocal(); render(); toast('Feed refreshed: '+(j.meetings||[]).map(m=>m.name||m.meetId).join(', ')); }
   catch(e){ console.error(e); toast('Sync failed: '+e.message); if(btn){ btn.disabled=false; btn.textContent='Sync now'; } } }
-async function sbPullPunters(){ const {data,error}=await sb.from('kyw_punters').select('*'); if(error) throw error; let ch=false; for(const row of (data||[])){ const p=row.data; if(p.id===state.me&&state.punters[p.id]&&(state.punters[p.id].updatedAt||0)>=(p.updatedAt||0)) continue; if(!state.punters[p.id]||(p.updatedAt||0)>(state.punters[p.id].updatedAt||0)){ state.punters[p.id]=p; ch=true; } } return ch; }
-async function sbPullComments(){ const {data,error}=await sb.from('kyw_comments').select('*').order('created_at'); if(error) throw error; state.comments=(data||[]).map(r=>({id:r.id,raceNo:r.race_no,by:r.by,text:r.text,ts:new Date(r.created_at).getTime(),meetingId:r.meeting_id})); }
-async function sbPullBets(){ const {data,error}=await sb.from('kyw_bets').select('*').order('created_at'); if(error) throw error; state.bets=(data||[]).map(r=>({id:r.id,raceNo:r.race_no,runnerNo:r.runner_no,type:r.type,stake:+r.stake,odds:r.odds==null?null:+r.odds,placeOdds:r.place_odds==null?null:+r.place_odds,by:r.by,note:r.note||'',ts:new Date(r.created_at).getTime(),meetingId:r.meeting_id})); }
-async function sbPullAll(first){ await sbPullMeeting(); await sbPullResults(); persistLocal(); render(); if(first&&me()) sbPush('punter'); }
-async function sbPush(_what){ return; } // public copy: the page never writes to the shared database
-async function sbPush_disabled(what){ try{ setSync('on','saving');
-    if(what==='all'||what==='meeting'){ if(state.meeting&&!state.meeting.example){ const m={...state.meeting, races:state.meeting.races.map(r=>({...r,result:undefined}))}; const {error}=await sb.from('kyw_meeting').upsert({id:String(m.id),data:m,updated_at:new Date().toISOString()}); if(error) throw error; } }
-    if(what.startsWith('result:')){ const no=+what.split(':')[1]; const race=state.meeting.races.find(r=>r.no===no);
-      if(race.result){ const {error}=await sb.from('kyw_results').upsert({meeting_id:String(state.meeting.id),race_no:no,positions:race.result.positions,entered_by:race.result.by,entered_at:new Date().toISOString()}); if(error) throw error; }
-      else { const {error}=await sb.from('kyw_results').delete().eq('meeting_id',String(state.meeting.id)).eq('race_no',no); if(error) throw error; } }
-    if(what==='all'||what==='punter'){ if(me()){ const {error}=await sb.from('kyw_punters').upsert({id:state.me,data:me(),updated_at:new Date().toISOString()}); if(error) throw error; } }
-    setSync('on','live'); }catch(e){ console.error(e); setSync('err','save failed, check signal'); toast('Could not save to the flock. It is kept on this phone.'); } }
-async function sbAddComment(c){ const {error}=await sb.from('kyw_comments').insert({meeting_id:state.meeting.id,race_no:c.raceNo,by:c.by,text:c.text}); if(error){ toast('Comment not saved'); throw error; } }
-async function sbDeleteComment(id){ await sb.from('kyw_comments').delete().eq('id',id); }
-async function sbAddBet(b){ const {error}=await sb.from('kyw_bets').insert({meeting_id:state.meeting.id,race_no:b.raceNo,runner_no:b.runnerNo,type:b.type,stake:b.stake,odds:b.odds,place_odds:b.placeOdds,by:b.by,note:b.note}); if(error){ toast('Bet not saved'); throw error; } }
-async function sbDeleteBet(id){ await sb.from('kyw_bets').delete().eq('id',id); }
-async function sbClearMeetingData(id){ await sb.from('kyw_results').delete().eq('meeting_id',String(id)); await sb.from('kyw_comments').delete().eq('meeting_id',String(id)); await sb.from('kyw_bets').delete().eq('meeting_id',String(id)); await sb.from('kyw_meeting').delete().eq('id',String(id)); }
 
-/* ---- Artifact db backend (Claude hosted) ---- */
-async function pushDb(what){
-  if(!db) return; try{ setSync('on','saving');
-    if((what==='all'||what==='meeting')&&state.meeting){ const m=state.meeting; const id=m.id||'current'; const meta={...m}; delete meta.races; meta.updatedAt=state.updatedAt;
-      await db.doc('meetings/'+id).set(meta); for(const r of m.races) await db.doc('meetings/'+id+'/races/r'+r.no).set({...r,updatedAt:state.updatedAt});
-      const snap=await db.collection('meetings/'+id+'/races').get(); for(const d of snap.docs){ if(!m.races.some(r=>'r'+r.no===d.id)) await db.doc('meetings/'+id+'/races/'+d.id).delete(); }
-      await db.doc('settings/main').set({meetingId:id, updatedAt:state.updatedAt}); }
-    if((what==='all'||what==='meeting')&&!state.meeting){ await db.doc('settings/main').set({meetingId:null, updatedAt:state.updatedAt}); }
-    if((what==='all'||what==='punter')&&me()) await db.doc('punters/'+state.me).set(me());
-    if(what==='all'||what==='meeting'){ await db.doc('shared/comments').set({items:state.comments}); await db.doc('shared/bets').set({items:state.bets}); }
-    setSync('on','synced'); }catch(e){ console.error(e); setSync('err','sync failed'); } }
-async function pullMeeting(){ const s=await db.doc('settings/main').get(); if(!s.exists) return false; const sd=s.data(); if(!sd.meetingId){ if(state.meeting&&(sd.updatedAt||0)>state.updatedAt){ state.meetings={}; state.meeting=null; return true; } return false; }
-  const md=await db.doc('meetings/'+sd.meetingId).get(); if(!md.exists) return false; const meta=md.data(); if(state.meeting&&(meta.updatedAt||0)<=(state.meeting.updatedAt||0)) return false;
-  const races=(await db.collection('meetings/'+sd.meetingId+'/races').get()).docs.map(d=>d.data()).sort((a,b)=>a.no-b.no); putMeeting({...meta,races}); selectMeeting(meta.id);
-  const c=await db.doc('shared/comments').get(); if(c.exists) state.comments=c.data().items||[]; const b=await db.doc('shared/bets').get(); if(b.exists) state.bets=b.data().items||[]; return true; }
-async function initDb(){
-  if(!window.claude||!window.claude.use) return; try{ db=await window.claude.use('db'); }catch(e){ db=null; }
-  if(!db){ setSync('','this phone only'); return; } setSync('on','connecting');
-  try{
-    const changed=await pullMeeting();
-    const ps=await db.collection('punters').get(); for(const d of ps.docs){ const p=d.data(); if(!state.punters[p.id]||(p.updatedAt||0)>(state.punters[p.id].updatedAt||0)) state.punters[p.id]=p; }
-    ensureRoster(); persistLocal(); render();
-    if(state.meeting&&!changed) pushDb('meeting'); if(me()) pushDb('punter');
-    setSync('on','synced');
-    db.doc('settings/main').onSnapshot(async snap=>{ if(!snap.exists||snap.metadata.hasPendingWrites) return; const c=await pullMeeting(); if(c){ persistLocal(); render(); toast('Form or results updated by another Pelican'); } }, e=>setSync('err','live sync off'));
-    db.collection('punters').onSnapshot(snap=>{ let ch=false; for(const d of snap.docs){ const p=d.data(); if(p.id===state.me) continue; if(!state.punters[p.id]||(p.updatedAt||0)>(state.punters[p.id].updatedAt||0)){ state.punters[p.id]=p; ch=true; } } if(ch){ persistLocal(); render(); } }, e=>{});
-    db.doc('shared/comments').onSnapshot(snap=>{ if(snap.exists&&!snap.metadata.hasPendingWrites){ state.comments=snap.data().items||[]; persistLocal(); render(); } }, e=>{});
-    db.doc('shared/bets').onSnapshot(snap=>{ if(snap.exists&&!snap.metadata.hasPendingWrites){ state.bets=snap.data().items||[]; persistLocal(); render(); } }, e=>{});
-    watchRaces();
-  }catch(e){ console.error(e); setSync('err','sync failed'); }
-}
-let racesUnsub=null, racesWatched=null;
-function watchRaces(){ if(!db||!state.meeting) return; const id=state.meeting.id; if(racesWatched===id) return; if(racesUnsub) racesUnsub(); racesWatched=id;
-  racesUnsub=db.collection('meetings/'+id+'/races').onSnapshot(snap=>{ if(snap.metadata.hasPendingWrites||!state.meeting||state.meeting.id!==id) return; let ch=false;
-    for(const d of snap.docs){ const r=d.data(); const i=state.meeting.races.findIndex(x=>x.no===r.no); if(i>=0&&(r.updatedAt||0)>(state.meeting.races[i].updatedAt||0)){ state.meeting.races[i]=r; ch=true; } }
-    if(ch){ persistLocal(); render(); } }, e=>{}); }
-
-// shared comment and bet actions, routed to whichever backend is live
-async function addComment(raceNo,text){ const c={id:'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),raceNo,by:me().name,text,ts:Date.now(),meetingId:state.meeting.id}; if(sb){ await sbAddComment(c); await sbPullComments(); persistLocal(); render(); } else { state.comments.push(c); save('meeting'); } }
-async function deleteComment(id){ if(sb){ await sbDeleteComment(id); await sbPullComments(); persistLocal(); render(); } else { state.comments=state.comments.filter(c=>c.id!==id); save('meeting'); } }
-async function addBet(b){ b.id='b'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); b.by=me().name; b.ts=Date.now(); b.meetingId=state.meeting.id; if(sb){ await sbAddBet(b); await sbPullBets(); persistLocal(); render(); } else { state.bets.push(b); save('meeting'); } }
-async function deleteBet(id){ if(sb){ await sbDeleteBet(id); await sbPullBets(); persistLocal(); render(); } else { state.bets=state.bets.filter(b=>b.id!==id); save('meeting'); } }
-function removeMeeting(id){ state.comments=state.comments.filter(c=>String(c.meetingId)!==String(id)); state.bets=state.bets.filter(b=>String(b.meetingId)!==String(id)); delete state.meetings[id]; if(sb) sbClearMeetingData(id).catch(()=>{}); selectMeeting(null); }
-
-/* ---------------- ingest ---------------- */
+/* ---------------- ingest (manual fallback) ---------------- */
 function normaliseMeeting(j){
   if(!j||typeof j!=='object') throw new Error('Not an object'); if(Array.isArray(j)) j={races:j}; if(j.runners&&!j.races) j={races:[j]};
   const races=(j.races||[]).map((r,i)=>({ no:num(r.no)||num(r.race)||i+1, name:r.name||'', distance:num(r.distance), class:r.class||r.grade||'', time:r.time||'', result:(r.result&&r.result.positions)?r.result:null,
     runners:(r.runners||[]).map((h,k)=>({ no:num(h.no)||num(h.number)||k+1, name:h.name||('Runner '+(k+1)), barrier:num(h.barrier), weight:num(h.weight), jockey:h.jockey||'', trainer:h.trainer||'', age:h.age||null, sex:h.sex||'',
-      career:rec(h.career), track:rec(h.track), distance:rec(h.distance), good:rec(h.good)||(h.condition&&rec(h.condition.good))||null, soft:rec(h.soft)||(h.condition&&rec(h.condition.soft))||null, heavy:rec(h.heavy)||(h.condition&&rec(h.condition.heavy))||null,
-      form:h.form||'', last:h.last?{pos:num(h.last.pos),field:num(h.last.field),margin:num(h.last.margin),days:num(h.last.days),race:h.last.race||'',classChange:num(h.last.classChange)||0}:null,
-      jockeyPct:num(h.jockeyPct), trainerPct:num(h.trainerPct), jockeyRating:num(h.jockeyRating), trainerRating:num(h.trainerRating), odds:num(h.odds), scratched:!!h.scratched, gear:h.gear||'', comment:h.comment||'' })) })).filter(r=>r.runners.length);
+      career:rec(h.career), track:rec(h.track), distance:rec(h.distance), trackDistance:rec(h.trackDistance), barrierRec:rec(h.barrierRec), good:rec(h.good), soft:rec(h.soft), heavy:rec(h.heavy),
+      form:h.form||'', recent:Array.isArray(h.recent)?h.recent:null, last:h.last?{pos:num(h.last.pos),field:num(h.last.field),margin:num(h.last.margin),days:num(h.last.days),race:h.last.race||'',classChange:num(h.last.classChange)||0}:null,
+      jockeyPct:num(h.jockeyPct), trainerPct:num(h.trainerPct), odds:num(h.odds), scratched:!!h.scratched, gear:h.gear||'', comment:h.comment||'', ra:h.ra||undefined })) })).filter(r=>r.runners.length);
   if(!races.length) throw new Error('No races with runners found');
   const id=j.id||slug((j.meeting||'meeting')+'-'+(j.date||Date.now())); for(const r of races) r.meetingId=id;
-  return { id, meeting:j.meeting||j.track||'Meeting', date:j.date||'', condition:j.condition||'Good 4', rail:j.rail||'', example:!!j.example, manual:!j.example, sort:j.sort||50, races, log:j.log||[], updatedAt:Date.now() };
+  return { id, meeting:j.meeting||j.track||'Meeting', date:j.date||'', condition:j.condition||'Good 4', rail:j.rail||'', example:!!j.example, manual:!j.example, sort:j.sort||50, races, updatedAt:Date.now() };
 }
-function parseCSV(text){ const lines=text.split(/\r?\n/).filter(l=>l.trim()); if(lines.length<2) throw new Error('CSV needs a header row and at least one runner');
-  const split=l=>{ const out=[];let cur='',q=false; for(const ch of l){ if(ch==='"'){q=!q;continue;} if(ch===','&&!q){out.push(cur);cur='';continue;} cur+=ch;} out.push(cur); return out.map(s=>s.trim()); };
-  const H=split(lines[0]).map(h=>h.toLowerCase().replace(/\s+/g,'_')); const races={};
-  for(const l of lines.slice(1)){ const c=split(l); const g=k=>{const i=H.indexOf(k); return i>=0?c[i]:'';}; const rno=num(g('race'))||1;
-    races[rno]=races[rno]||{no:rno,name:g('race_name'),distance:num(g('race_distance')),class:g('race_class'),time:g('race_time'),runners:[]}; if(!races[rno].distance&&g('race_distance')) races[rno].distance=num(g('race_distance'));
-    races[rno].runners.push({no:num(g('no')),name:g('name'),barrier:num(g('barrier')),weight:num(g('weight')),jockey:g('jockey'),trainer:g('trainer'),career:g('career'),track:g('track'),distance:g('distance'),good:g('good'),soft:g('soft'),heavy:g('heavy'),form:g('form'),
-      last:{pos:num(g('last_pos')),field:num(g('last_field')),margin:num(g('last_margin')),days:num(g('days')),race:g('last_race'),classChange:num(g('class_change'))},jockeyPct:num(g('jockey_pct')),trainerPct:num(g('trainer_pct')),odds:num(g('odds')),scratched:/^(y|true|1)/i.test(g('scratched'))}); }
-  return {races:Object.values(races)}; }
-function loadText(text){ text=text.trim(); const j=(text.startsWith('{')||text.startsWith('[')) ? JSON.parse(text) : parseCSV(text); const m=normaliseMeeting(j);
-  putMeeting(m); selectMeeting(m.id); state.ui.tab='races'; racesWatched=null; save('meeting'); watchRaces();
-  const nr=m.races.reduce((a,r)=>a+r.runners.length,0); toast(`Loaded ${m.races.length} race${m.races.length===1?'':'s'}, ${nr} runner${nr===1?'':'s'}. Tips and calls reset.`); }
-function mergeRace(text){ const j=JSON.parse(text.trim()); const one=normaliseMeeting(j.races?j:{races:[j]}); if(!state.meeting){ putMeeting(one); } else { for(const r of one.races){ r.meetingId=state.meeting.id; const i=state.meeting.races.findIndex(x=>x.no===r.no); if(i>=0) state.meeting.races[i]=r; else state.meeting.races.push(r); } state.meeting.races.sort((a,b)=>a.no-b.no); } state.meeting.updatedAt=Date.now(); save('meeting'); toast('Race merged'); }
-
+function loadText(text){ const j=JSON.parse(text.trim()); const m=normaliseMeeting(j); putMeeting(m); selectMeeting(m.id); state.ui.tab='races'; save();
+  const nr=m.races.reduce((a,r)=>a+r.runners.length,0); toast(`Loaded ${m.races.length} race${m.races.length===1?'':'s'}, ${nr} runner${nr===1?'':'s'}.`); }
 const SCHEMA_DOC = `{
   "meeting": "Randwick", "date": "2026-09-12", "condition": "Good 4", "rail": "True",
   "races": [
     { "no": 1, "name": "Race name", "distance": 1200, "class": "BM78", "time": "12:40",
       "runners": [
         { "no": 1, "name": "Horse Name", "barrier": 5, "weight": 58.5,
-          "jockey": "J Smith", "trainer": "T Jones", "age": 4, "sex": "G",
-          "career": [20, 4, 7],  "track": [3, 1, 1],  "distance": [6, 2, 2],
+          "jockey": "J Smith", "trainer": "T Jones",
+          "career": [20, 4, 7],  "track": [3, 1, 1],  "trackDistance": [2, 1, 0],  "barrierRec": [4, 1, 1],
           "good": [10, 3, 4],  "soft": [5, 1, 1],  "heavy": [2, 0, 1],
           "form": "x21431",
-          "last": { "pos": 1, "field": 12, "margin": 0, "days": 21,
-                    "race": "2026-08-22 Rosehill R4", "classChange": 1 },
-          "jockeyPct": 18, "trainerPct": 14, "odds": 4.6,
-          "scratched": false, "gear": "", "comment": "" }
+          "last": { "pos": 1, "field": 12, "margin": 0, "days": 21, "race": "2026-08-22 Rosehill R4", "classChange": 1 },
+          "jockeyPct": 18, "trainerPct": 14, "odds": 4.6, "scratched": false }
       ] }
   ]
 }`;
-const CONVERT_RULES = `Convert the Australian horse racing form guide text into JSON matching this schema exactly. Return only JSON, no commentary.
-Rules:
-- career, track, distance, good, soft, heavy are [starts, wins, placings] where placings = seconds plus thirds. Use null if not shown.
-- form is the last runs with the MOST RECENT RUN LAST (the usual Australian form-guide order). Use x for a spell.
-- last.pos is the finishing position last start, last.field the number of runners, last.margin lengths behind the winner (0 for a win), last.days days since that run.
-- last.race identifies the last-start race as "YYYY-MM-DD Track RN" (for example "2026-08-22 Rosehill R4") so horses out of the same race can be linked. If the date or race number is not shown, use what is shown consistently for every runner.
-- last.classChange is 1 if the horse rises in class today, -1 if it drops, 0 if similar.
-- jockeyPct and trainerPct are season win percentages if shown, otherwise null. odds are decimal win odds if shown, otherwise null.
-- Mark scratched runners with "scratched": true rather than omitting them.
-- Include every race and every runner. Keep names exactly as printed.
-Schema:
-`;
 
 /* ---------------- example meeting (fictional) ---------------- */
 function exampleMeeting(){
@@ -700,130 +510,117 @@ function exampleMeeting(){
   let seed=7; const rnd=()=>{ seed=(seed*9301+49297)%233280; return seed/233280; }; const ri=(a,b)=>a+Math.floor(rnd()*(b-a+1));
   const races=[]; let ni=0; const dists=[1100,1200,1400,1600,1200,2000,1400,1800]; const cls=['BM78','3YO F&M BM72','Open Hcp','G3 Hcp','Listed','BM88','2YO Plate','Open Hcp'];
   const lastRaces=['2026-08-22 Rosehill R4','2026-08-22 Rosehill R7','2026-08-29 Randwick R3','2026-08-29 Randwick R6','2026-08-15 Warwick Farm R5','2026-08-29 Randwick R8','2026-08-22 Rosehill R2'];
+  const venues=['RAND','RHIL','W FM','CANT','KENS','NCLE','GOSF'];
   for(let r=1;r<=8;r++){ const n=ri(9,13); const runners=[]; const bars=[...Array(n).keys()].map(i=>i+1).sort(()=>rnd()-.5);
-    for(let k=1;k<=n;k++){ const name=names[ni++%names.length]; const cs=ri(4,28), cw=ri(0,Math.max(1,Math.floor(cs*0.35))), cp=ri(0,Math.max(1,Math.floor((cs-cw)*0.4))); const ts=ri(0,6), ds=ri(0,8), gs=ri(2,cs); const j=J[ri(0,J.length-1)], t=T[ri(0,T.length-1)];
+    for(let k=1;k<=n;k++){ const name=names[ni++%names.length]; const cs=ri(4,28), cw=ri(0,Math.max(1,Math.floor(cs*0.35))), cp=ri(0,Math.max(1,Math.floor((cs-cw)*0.4))); const ts=ri(0,6), gs=ri(2,cs); const j=J[ri(0,J.length-1)], t=T[ri(0,T.length-1)];
       const lp=ri(1,10), lm=lp===1?0:+(0.2+rnd()*6).toFixed(1); const form=['1','2','3','4','5','6','7','8','0','x'].sort(()=>rnd()-.5).slice(0,ri(3,5)).join('')+lp; const odds=+(2.2+Math.pow(rnd(),2)*38).toFixed(1);
-      runners.push({no:k,name,barrier:bars[k-1],weight:+(53+rnd()*7).toFixed(1),jockey:j[0],trainer:t[0],age:ri(3,7),sex:['G','M','H'][ri(0,2)],career:[cs,cw,cp],track:[ts,ri(0,Math.min(ts,2)),ri(0,Math.min(ts,2))],distance:[ds,ri(0,Math.min(ds,3)),ri(0,Math.min(ds,3))],
-        good:[gs,ri(0,Math.min(gs,cw)),ri(0,Math.min(gs,cp))],soft:[ri(0,5),ri(0,1),ri(0,2)],heavy:[ri(0,3),ri(0,1),ri(0,1)],form,last:{pos:lp,field:ri(Math.max(lp,8),14),margin:lm,days:ri(7,60),race:lastRaces[ri(0,lastRaces.length-1)],classChange:ri(-1,1)},jockeyPct:j[1],trainerPct:t[1],odds,scratched:rnd()<0.06,gear:rnd()<0.15?'Blinkers first time':'',comment:''}); }
+      const runs=[]; let d=new Date(2026,7,29); for(let q=0;q<ri(3,6);q++){ const pos=q===0?lp:ri(1,10); const of=ri(Math.max(pos,7),14); runs.push({t:0,pos,of,v:venues[ri(0,6)],d:d.toISOString().slice(0,10),dist:dists[ri(0,7)],c:['Good4','Soft5','Soft6','Heavy8'][ri(0,3)],cls:cls[ri(0,7)],j:j[0],w:+(54+rnd()*5).toFixed(1),b:ri(1,12),win:pos===1?name:names[ri(0,names.length-1)],time:60+rnd()*60,l600:+(33.5+rnd()*3).toFixed(2),m:pos===1?0:+(0.1+rnd()*6).toFixed(2),p8:ri(1,of),p4:ri(1,of),sp:+(2+rnd()*30).toFixed(1),open:null}); d=new Date(d.getTime()-ri(14,42)*86400000); }
+      runners.push({no:k,name,barrier:bars[k-1],weight:+(53+rnd()*7).toFixed(1),jockey:j[0],trainer:t[0],career:[cs,cw,cp],track:[ts,ri(0,Math.min(ts,2)),ri(0,Math.min(ts,2))],trackDistance:[ri(0,3),ri(0,1),ri(0,1)],barrierRec:[ri(0,5),ri(0,1),ri(0,2)],
+        good:[gs,ri(0,Math.min(gs,cw)),ri(0,Math.min(gs,cp))],soft:[ri(0,5),ri(0,1),ri(0,2)],heavy:[ri(0,3),ri(0,1),ri(0,1)],form,recent:runs.slice(0,3).map(x=>({pos:x.pos,field:x.of,margin:x.m,cls:ri(40,90),date:x.d,venue:x.v})),last:{pos:lp,field:ri(Math.max(lp,8),14),margin:lm,days:ri(7,60),race:lastRaces[ri(0,lastRaces.length-1)],classChange:ri(-1,1)},jockeyPct:j[1],trainerPct:t[1],odds,scratched:rnd()<0.06,gear:rnd()<0.15?'Blinkers first time':'',
+        ra:{gear:rnd()<0.15?'Blinkers FIRST TIME':'',rec:{career:[cs,cw,cp],firstUp:[ri(1,4),ri(0,1),ri(0,1)],track:[ts,ri(0,Math.min(ts,2)),ri(0,Math.min(ts,2))],dist:[ri(0,6),ri(0,2),ri(0,2)],good:[gs,ri(0,Math.min(gs,cw)),ri(0,Math.min(gs,cp))],soft:[ri(0,5),ri(0,1),ri(0,2)],heavy:[ri(0,3),ri(0,1),ri(0,1)]},last10:form,hcp:ri(50,90),runs}}); }
     races.push({no:r,name:['Opening Sprint','Fillies and Mares','Spring Handicap','Mile Stakes','Sprint Stakes','Staying Handicap','Juvenile Plate','Closing Handicap'][r-1],distance:dists[r-1],class:cls[r-1],time:`${11+Math.floor((r+1)/2)}:${(r%2)?'40':'15'}`,runners}); }
   for(const r of races) r.meetingId='example-fictional';
-  return {id:'example-fictional', meeting:'Example (fictional)', date:'', condition:'Good 4', rail:'True', example:true, sort:98, races, log:[], updatedAt:Date.now()};
+  return {id:'example-fictional', meeting:'Example (fictional)', date:'', condition:'Good 4', rail:'True', example:true, sort:98, races, updatedAt:Date.now()};
 }
 
 /* ---------------- rendering ---------------- */
 function render(){
   const m=state.meeting; document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===state.ui.tab));
   $('#hMeeting').textContent = m ? m.meeting : 'Kai Ying Winning';
-  $('#hMe').innerHTML = '';
-  $('#hSub').textContent = m ? [m.date, m.condition, m.rail?('Rail '+m.rail):'', m.syncedAt?('feed '+fmtTime(m.syncedAt)):''].filter(Boolean).join(' / ') : 'No form loaded yet';
+  $('#hSub').textContent = m ? [m.date?fmtDay(m.date):'', m.condition, m.rail?('Rail '+m.rail):'', m.syncedAt?('feed '+fmtTime(m.syncedAt)):''].filter(Boolean).join(' / ') : 'No form loaded yet';
   const main=$('#main'); const tab=state.ui.tab;
-  if(!state.me||!state.punters[state.me]){ const p=newPunter('You'); p.id='you'; state.punters={you:p}; state.me='you'; persistLocal(); }
-  const meP=state.punters[state.me]; if(meP&&meP.marketOff!==2){ meP.weights.market=0.75; meP.marketOff=2; if(meP.settings) meP.settings.trust=meP.settings.trust??0.5; persistLocal(); }
+  if(!state.you){ state.you=newYou(); persistLocal(); }
   if(!m && tab!=='load'){ main.innerHTML=meetingSwitcher()+emptyState(); bind(main); return; }
   main.innerHTML = tab==='races'?viewRaces() : tab==='race'?viewRace() : tab==='weights'?viewWeights() : viewLoad();
   bind(main);
 }
-function showWho(){ ensureRoster(); const sh=$('#sheet'); const others=Object.values(state.punters);
-  sh.innerHTML=`<div class="sheet"><div class="card"><div class="eyebrow">Roll call</div><h2>Which Pelican are you?</h2><p class="note">Your weights, calls and tips are kept under your name. The form and the results are shared with the flock.</p>
-    <div class="who">${others.map(p=>`<button class="btn" data-who="${esc(p.id)}">${avatarSVG(p.avatar||'plain',p.colour)}<b>${esc(p.name)}</b></button>`).join('')}</div>
-    <label class="field">Or a new name<input id="whoIn" placeholder="First name or nickname" autocomplete="off"></label>
-    <div class="actions"><button class="btn primary" id="whoGo">That's me</button></div></div></div>`;
-  sh.hidden=false;
-  sh.querySelectorAll('[data-who]').forEach(b=>b.addEventListener('click',()=>{ state.me=b.dataset.who; sh.hidden=true; save('punter'); }));
-  $('#whoGo').addEventListener('click',()=>{ const v=$('#whoIn').value.trim(); if(!v){ toast('A name, please'); return; } const p=newPunter(v); if(state.punters[p.id]){ state.me=p.id; } else { state.punters[p.id]=p; state.me=p.id; } sh.hidden=true; save('punter'); });
-}
-function emptyState(){ return `<div class="banner"><div class="eyebrow" style="color:var(--panel-ink);opacity:.7">Card</div><h2>No meetings yet</h2><p>The feed fills the card from racing.com. Refresh it on the Feed tab, or open the fictional example to see how the ratings behave.</p></div>
-  <div class="actions"><button class="btn primary" data-act="tab" data-tab="load">Feed</button><button class="btn" data-act="example">Open example</button></div>`; }
+function aboutHTML(){ const open=state.ui.about; return `<div class="banner"><div class="eyebrow" style="color:var(--panel-ink);opacity:.7">What this is</div><h2>A form book with a calibrated model</h2>
+  <p>It rates every runner from the form, prices the field at the race's own book percentage, and fixes each tip at the jump. You set what counts. It does not have an edge on its own: on past race days the defaults trailed the market and every rule tested lost at starting price. The edge, if there is one, is your view, and the proving ground tells you whether it was worth anything.</p>
+  <details ${open?'open':''} data-about><summary>What it does and does not do</summary><ul>
+  <li>Does: rate the field from last start, recent form, class, career and track records, rider, trainer, barrier, weight and the morning market, each weighted by a slider you control.</li>
+  <li>Does: show its price beside the market's, flag where the two disagree, and keep the tip it had at the jump.</li>
+  <li>Does: adapt during the day when a result lands outside your margin, and show you every move and why.</li>
+  <li>Does: test any setting you choose against real past race days at starting price.</li>
+  <li>Does not: beat the market by default, know the track bias before the results show it, see sectionals the feed does not carry, or suggest stakes.</li>
+  <li>Does not: send anything anywhere. Weights, calls and locked tips stay on this device.</li></ul></details></div>`; }
+function emptyState(){ return aboutHTML()+`<div class="actions"><button class="btn primary" data-act="tab" data-tab="load">Feed</button><button class="btn" data-act="example">Open the fictional example</button></div>`; }
 function meetingSwitcher(){ const ms=meetingsList(); if(ms.length<2) return ''; return `<div class="switcher">${ms.map(m=>`<button class="btn ${state.meeting&&m.id===state.meeting.id?'on':''}" data-act="meeting" data-id="${esc(m.id)}">${esc(shortName(m))}${m.races.filter(r=>r.result).length?` <span class="small" style="color:inherit;opacity:.7">${m.races.filter(r=>r.result).length}/${m.races.length}</span>`:''}</button>`).join('')}</div>`; }
 
 function viewRaces(){
   const m=state.meeting; const run=runDay(me(),m); const done=m.races.filter(r=>r.result).length; let html=meetingSwitcher();
-  if(m.example) html+=`<div class="banner"><div class="eyebrow" style="color:var(--panel-ink);opacity:.7">Practice card</div><h2>Example meeting</h2><p>Every horse, rider and result here is fictional. It exists to show the mechanics. Load the real form on the Load tab when it is finalised.</p></div>`;
-  if(m.source==='racing.com') html+=`<p class="note" style="margin:0 0 12px">${esc(m.condition)}${m.rail?', rail '+esc(m.rail):''}${m.weather?', '+esc(String(m.weather).toLowerCase()):''}. ${m.races.filter(r=>r.runners.length).length} of ${m.races.length} fields loaded. Feed last read ${fmtTime(m.syncedAt)}.</p>`;
-  else html+=`<div class="hdr-edit">
-    <label class="field">Meeting<input data-meta="meeting" value="${esc(m.meeting)}"></label>
-    <label class="field">Date<input data-meta="date" value="${esc(m.date)}" placeholder="2026-09-12"></label>
-    <label class="field">Track condition<select data-meta="condition">${['Good 3','Good 4','Soft 5','Soft 6','Soft 7','Heavy 8','Heavy 9','Heavy 10','Synthetic'].map(c=>`<option ${c===m.condition?'selected':''}>${c}</option>`).join('')}</select></label>
-    <label class="field">Rail<input data-meta="rail" value="${esc(m.rail)}" placeholder="True, +3m"></label></div>`;
-  const fin=run.final;
-  const overrides=m.races.filter(r=>me().picks[pk(r)]&&me().picks[pk(r)].win).length;
-  html+=`<div class="eyebrow">Model tips<span class="sl">/</span>one per race${overrides?', '+overrides+' overridden by you':''}<span class="sl">/</span>${done} of ${m.races.length} results in</div>${done?`<p class="small" style="margin:4px 0 0">A tip is fixed at the jump. Before that it can move when a result lands, a horse is scratched, or the market is refreshed about 20 minutes out; Moved marks a race where it has, and the race screen shows the trail. Run races show the winner, where our tip finished (Tip), where the winner sat in our ratings (Wnr), and whether it was our roughie.</p>`:''}
-  <div class="bias"><span>Barrier bias <b>${Math.abs(fin.barrierBias)>0?(fin.barrierBias>0?'inside':'outside')+' ('+fin.barrierBias.toFixed(2)+')':'none read yet'}</b></span><span>Pace bias <b>${Math.abs(fin.paceBias)>0?(fin.paceBias>0?'on-pace':'backmarkers')+' ('+fin.paceBias.toFixed(2)+')':'none read yet'}</b></span>
+  if(!state.ui.seenAbout) html+=aboutHTML();
+  if(m.example) html+=`<div class="banner"><div class="eyebrow" style="color:var(--panel-ink);opacity:.7">Practice card</div><h2>Example meeting</h2><p>Every horse, rider, run and result here is fictional. It exists to show the mechanics.</p></div>`;
+  if(m.source==='racing.com') html+=`<p class="note" style="margin:0 0 12px">${esc(m.condition)}${m.rail?', rail '+esc(m.rail):''}${m.weather?', '+esc(String(m.weather).toLowerCase()):''}. ${m.races.filter(r=>r.runners.length).length} of ${m.races.length} fields loaded${m.raKey?', Free Fields form attached':''}. Feed last read ${fmtTime(m.syncedAt)}.</p>`;
+  const fin=run.final; const st={...DEFAULT_SETTINGS,...me().settings};
+  html+=`<div class="eyebrow">Tips<span class="sl">/</span>one per race<span class="sl">/</span>${done} of ${m.races.length} results in</div>${done?`<p class="small" style="margin:4px 0 0">A tip is fixed at the jump. Before that it can move when a result lands, a horse is scratched, or the market is refreshed about 20 minutes out; Moved marks a race where it has, and the race screen shows the trail. Run races show the winner, where the tip finished (Tip), where the winner sat in the ratings (Wnr), and whether it was the roughie.</p>`:''}
+  <div class="bias"><span>Barrier bias <b>${Math.abs(fin.barrierBias)>0?(fin.barrierBias>0?'inside':'outside')+' ('+fin.barrierBias.toFixed(2)+')':'none read yet'}</b></span>
   ${Object.keys(fin.jockeyWins).length?`<span>Riders on the board <b>${Object.entries(fin.jockeyWins).map(([j,w])=>titleCase(j)+(w>1?' x'+w:'')).join(', ')}</b></span>`:''}</div>`;
-  const st={...DEFAULT_SETTINGS,...me().settings};
-  html+=multiHTML(dayMulti(run,m,st),st);
   html+=valueBoardHTML(m,run,st);
   html+=`<section class="block" style="margin-top:14px"><div class="rows">`;
-  for(const race of m.races){ const p=run.pred[race.no]||[]; const res=race.result; const ep=effectivePick(me(),race,run); const epR=ep.no&&race.runners.find(r=>r.no===ep.no); let right;
+  for(const race of m.races){ const p=run.pred[race.no]||[]; const res=race.result; const tipNo=modelPick(race,run); const tipR=tipNo&&race.runners.find(r=>r.no===tipNo); let right;
     const scored=scoreRace(race,m,run.weights,st,run.dyn[race.no],me().adj); const adv=modelAdvice(scored,st);
-    if(res){ const win=res.positions[0]; const w=race.runners.find(r=>r.no===win); const pr=p.find(x=>x.no===win); const tipIdx=res.positions.indexOf(ep.no); const tipPos=tipIdx>=0?tipIdx+1:null;
+    if(res){ const win=res.positions[0]; const w=race.runners.find(r=>r.no===win); const pr=p.find(x=>x.no===win); const tipIdx=res.positions.indexOf(tipNo); const tipPos=tipIdx>=0?tipIdx+1:null;
       const rNo=run.locked&&run.locked[race.no]?run.roughie[race.no]:(adv&&adv.roughie?adv.roughie.r.no:null); const rough=rNo===win;
       right=`<span class="tag ${tipPos===1?'good':tipPos&&tipPos<=3?'acc':''}">Tip ${tipPos?ordinal(tipPos):'unpl'}</span><span class="tag ${pr&&pr.rank<=st.marginRank?'':'warn'}">Wnr ${pr?ordinal(pr.rank):'-'}</span>${rough?'<span class="tag acc">Roughie</span>':''}<b>${esc(w?w.name:win)}</b>`; }
-    else if(adv){ const trl=(me().trail||{})[pk(race)]||[]; right=`${trl.length>1?`<span class="tag acc" title="Tip has moved today">Moved</span>`:''}<span class="tag ${ep.override?'acc':(adv.tier==='Strong'?'good':adv.tier==='Fair'?'':'warn')}">${ep.override?'Your override':adv.tier+' '+pct(adv.top.prob)}</span>${!ep.override&&isValue(adv.top,st)?`<span class="tag acc">Value</span>`:''}<b>${esc(epR?epR.name:'')}</b><span class="small">Ours ${ourPrice(adv.top.prob,st,adv.top.book)}${adv.top.r.odds?', mkt $'+adv.top.r.odds:''}</span>${adv.roughie?`<span class="small">Roughie ${adv.roughie.r.no} ${esc(adv.roughie.r.name)} $${adv.roughie.r.odds}</span>`:''}`; }
+    else if(adv){ const trl=(me().trail||{})[pk(race)]||[]; right=`${trl.length>1?`<span class="tag acc" title="Tip has moved today">Moved</span>`:''}<span class="tag ${adv.tier==='Strong'?'good':adv.tier==='Fair'?'':'warn'}">${adv.tier} ${pct(adv.top.prob)}</span>${isValue(adv.top,st)?`<span class="tag acc">Value</span>`:''}<b>${esc(tipR?tipR.name:'')}</b><span class="small">Ours ${ourPrice(adv.top.prob,st,adv.top.book)}${adv.top.r.odds?', mkt $'+adv.top.r.odds:''}</span>${adv.roughie?`<span class="small">Roughie ${adv.roughie.r.no} ${esc(adv.roughie.r.name)} $${adv.roughie.r.odds}</span>`:''}`; }
     else right='<b>no runners</b>';
     html+=`<button class="row" data-act="openrace" data-no="${race.no}"><span class="idx num">${race.no}</span><span><span class="t">${esc(race.name||'Race '+race.no)}</span><br><span class="s">${race.distance?race.distance+'m':''} ${esc(race.class||'')} ${race.time?'at '+esc(fmtTime(race.time)):''} ${active(race).length} runners${race.raceStatus&&!res?' <span class="small">'+esc(race.raceStatus)+'</span>':''}</span></span><span class="r">${right}</span></button>`; }
   return html+`</div></section>`;
 }
 
+// Free Fields run lines for one runner, newest first: the form book view.
+function formBookHTML(r){ const ra=r.ra; if(!ra||!Array.isArray(ra.runs)||!ra.runs.length) return '';
+  const runs=[...ra.runs].sort((a,b)=>String(b.d).localeCompare(String(a.d))).slice(0,8);
+  const rows=runs.map(x=>{ const pos=x.pos!=null?`${x.pos}${x.of?'/'+x.of:''}`:'-'; const cls=x.trial?'t':x.pos===1?'w':'';
+    const what=`<b>${esc(x.v||'')}</b> ${fmtDay(x.d)} ${x.dist?x.dist+'m':''} ${esc(x.c||'')} ${esc(x.cls||'')}${x.trial?' trial':''}${x.win&&x.pos!==1?`, won by ${esc(x.win)}`:''}${x.m!=null&&x.pos!==1?`, ${x.m}L`:''}${x.l600?`, 600m ${x.l600}`:''}${x.p8?`, ${ordinal(x.p8)} at the 800`:''}${x.b?`, bar ${x.b}`:''}${x.j?`, ${esc(x.j)}`:''}${x.w?` ${x.w}kg`:''}`;
+    return `<div class="fl"><span class="pos num ${cls}">${x.trial?'T ':''}${pos}</span><span class="what">${what}</span><span class="sp num">${x.sp?'$'+x.sp:''}</span></div>`; }).join('');
+  const rc=ra.rec||{}; const R=v=>{ const q=rec(v); return q?`${q.s}:${q.w}-${q.p}`:'-'; };
+  return `<div class="eyebrow" style="margin-top:12px">Form book<span class="sl">/</span>Free Fields</div><p class="small" style="margin:4px 0 0">Career ${R(rc.career)}, first up ${R(rc.firstUp)}, track ${R(rc.track)}, distance ${R(rc.dist)}, track and distance ${R(rc.trackDist)}. Good ${R(rc.good)}, soft ${R(rc.soft)}, heavy ${R(rc.heavy)}.${ra.hcp?' Rating '+ra.hcp+'.':''}${ra.gear?' Gear: '+esc(ra.gear)+'.':''}</p><div class="formbook">${rows}</div>`; }
+
 function viewRace(){
   const m=state.meeting; const race=m.races.find(r=>r.no===state.ui.raceNo)||m.races[0]; if(!race) return emptyState(); state.ui.raceNo=race.no;
-  const my=me(); const run=runDay(my,m); const scored=lockedScore(scoreRace(race,m,run.weights,{...DEFAULT_SETTINGS,...my.settings},run.dyn[race.no],my.adj), run, race);
-  const idx=m.races.indexOf(race); const prev=m.races[idx-1], next=m.races[idx+1]; const res=race.result; const picks=my.picks[pk(race)]||{win:null,place:[]};
-  const st={...DEFAULT_SETTINGS,...my.settings}; const adv=modelAdvice(scored,st); const ep=effectivePick(my,race,run);
-  // flock: other punters' tips and consensus
-  const others=Object.values(state.punters); const flockProb={}; const tips={};
-  for(const p of others){ const r=p.id===my.id?run:runDay(p,m); for(const x of (r.pred[race.no]||[])) flockProb[x.no]=(flockProb[x.no]||0)+x.prob/others.length; const pick=p.picks&&p.picks[pk(race)]; if(pick&&pick.win){ (tips[pick.win]=tips[pick.win]||[]).push(p); } }
+  const my=me(); const run=runDay(my,m); const st={...DEFAULT_SETTINGS,...my.settings}; const scored=lockedScore(scoreRace(race,m,run.weights,st,run.dyn[race.no],my.adj), run, race);
+  const idx=m.races.indexOf(race); const prev=m.races[idx-1], next=m.races[idx+1]; const res=race.result; const adv=modelAdvice(scored,st); const tipNo=modelPick(race,run);
   let html=`<div class="racehead"><div><button class="back" data-act="tab" data-tab="races">All races</button><h2>${esc(shortName(m))} R${race.no} ${esc(race.name||'')}</h2><div class="s">${race.distance?race.distance+'m':''} ${esc(race.class||'')} ${race.time?'at '+esc(fmtTime(race.time)):''} on ${esc(race.condition||m.condition)}. ${active(race).length} runners.${race.raceStatus?' '+esc(race.raceStatus)+'.':''}</div></div>
     <div class="actions" style="margin:0"><button class="btn" data-act="openrace" data-no="${prev?prev.no:race.no}" ${prev?'':'disabled'}>Prev</button><button class="btn" data-act="openrace" data-no="${next?next.no:race.no}" ${next?'':'disabled'}>Next</button></div></div>`;
   const pr=res&&(run.pred[race.no]||[]).find(x=>x.no===res.positions[0]);
   html+=`<section class="block"><div class="eyebrow">Result<span class="sl">/</span>${res?'in':'not yet run'}</div>
-  ${res?`<p class="note" style="margin-top:8px">${res.positions.slice(0,4).map((n,i)=>ordinal(i+1)+' '+cloth(n)).join(' ')}</p><p class="note">Your model had the winner ${pr?ordinal(pr.rank)+' at '+pct(pr.prob):'unrated'}. ${ep.no===res.positions[0]?(ep.override?'Your override won.':'The model tip won.'):(res.positions.slice(1,3).includes(ep.no)?'The tip ran a place.':'The tip missed.')}</p>`:`<p class="note" style="margin-top:8px">Results arrive from the feed within a few minutes of being declared. Your weights move only when the winner was rated worse than ${ordinal(st.marginRank)} or under ${pct(st.marginProb)}.</p>`}</section>`;
-  if(adv&&!res){ const t=adv.top; const tR=t.r; const mkt=t.r.odds?`market $${t.r.odds}`:'no market price'; const multi=dayMulti(run,m,st); const leg=multi&&multi.legs.find(l=>l.raceNo===race.no); const rg=adv.roughie;
-    html+=`<div class="banner"><div class="eyebrow" style="color:var(--panel-ink);opacity:.7">Best bet<span class="sl">/</span>${adv.tier} ${pct(t.prob)}${adv.gap<0.04?', not much between the top two':''}</div>
-    <h2>${cloth(tR.no)} ${esc(tR.name)}</h2><p>Our price ${ourPrice(t.prob,st,t.book)} at ${t.book?'this race\'s '+Math.round(t.book*100)+'%':'a '+Math.round(st.book*100)+'%'} book (fair ${fmtOdds(t.prob)}), ${mkt}.${t.edge!=null?(isValue(t,st)?` Value: market ${pct(t.market)}, form-only ${pct(t.probFree)}, we back it at ${pct(t.probValue)}.`:` No value at the market price (form-only ${pct(t.probFree)} against market ${pct(t.market)}).`):''}${adv.stakeTop>0?` Stake ${fmtMoney(adv.stakeTop)} win.`:''}</p>
-    ${adv.value&&adv.value.r.no!==tR.no?`<p><b>Value:</b> ${cloth(adv.value.r.no)} ${esc(adv.value.r.name)} at $${adv.value.r.odds}, form-only ${pct(adv.value.probFree)} against market ${pct(adv.value.market)}, backed at ${pct(adv.value.probValue)}.${adv.stakeValue>0?' Stake '+fmtMoney(adv.stakeValue)+'.':''}</p>`:''}
-    <div class="eyebrow" style="color:var(--panel-ink);opacity:.7;margin-top:12px">Best roughie</div>
-    ${rg?`<p style="margin-top:4px"><b>${cloth(rg.r.no)} ${esc(rg.r.name)}</b> at $${rg.r.odds}, form-only price ${ourPrice(rg.probFree,st,rg.book)}. Lottery ticket. Across 377 past races roughies the form liked most won 4% of the time against a market-implied 5%; the rule lost a third of stakes. Leave it or keep it small.</p>`:`<p style="margin-top:4px">Nothing at $8 or better the model can make a case for.</p>`}
-    <div class="eyebrow" style="color:var(--panel-ink);opacity:.7;margin-top:12px">Multi</div>
-    <p style="margin-top:4px">${leg?`${esc(tR.name)} is a leg of the day's multi (${multi.legs.length} legs, fair $${multi.fair.toFixed(1)}).`:multi?`Not in the multi. Legs are ${multi.legs.map(l=>'R'+l.raceNo).join(', ')}.`:'No multi while fewer than two races are open.'}</p>
-    ${ep.override?`<p>You have overridden this race to number ${ep.no}. Tap its Tip button again to go back to the model.</p>`:''}${trailHTML(race)}</div>`; }
-  html+=`<section class="block"><div class="eyebrow">Ratings<span class="sl">/</span>our price on every runner${scored[0]&&scored[0].book?` at this race's ${Math.round(scored[0].book*100)}% book`:` at a ${Math.round(st.book*100)}% book`}, market alongside</div><p class="note" style="margin:6px 0 0">Ours shorter than the market means your model likes it more than the punters do. The tip uses the morning market, refreshed once about 20 minutes before the race${race.lateAt?' (refreshed '+esc(fmtTime(race.lateAt))+')':''}. The price shown is the live median fixed-odds price on racing.com${race.frozenAt||race.syncedAt?', read '+esc(fmtTime(race.frozenAt||race.syncedAt)):''}${race.frozenAt?' before the jump':''}; firmed or drifted marks a move of 15% or more since the morning. Tap a name for the reasons, Tip to override the model.</p><div class="rows" style="margin-top:8px">`;
+  ${res?`<p class="note" style="margin-top:8px">${res.positions.slice(0,4).map((n,i)=>ordinal(i+1)+' '+cloth(n)).join(' ')}</p><p class="note">The model had the winner ${pr?ordinal(pr.rank)+' at '+pct(pr.prob):'unrated'}. ${tipNo===res.positions[0]?'The tip won.':(res.positions.slice(1,3).includes(tipNo)?'The tip ran a place.':'The tip missed.')}</p>`:`<p class="note" style="margin-top:8px">Results arrive from the feed within a few minutes of being declared. Your weights move only when the winner was rated worse than ${ordinal(st.marginRank)} or under ${pct(st.marginProb)}.</p>`}</section>`;
+  if(adv&&!res){ const t=adv.top; const tR=t.r; const mkt=t.r.odds?`market $${t.r.odds}`:'no market price'; const rg=adv.roughie;
+    html+=`<div class="banner"><div class="eyebrow" style="color:var(--panel-ink);opacity:.7">Top rated<span class="sl">/</span>${adv.tier} ${pct(t.prob)}${adv.gap<0.04?', not much between the top two':''}</div>
+    <h2>${cloth(tR.no)} ${esc(tR.name)}</h2><p>Our price ${ourPrice(t.prob,st,t.book)} at ${t.book?'this race\'s '+Math.round(t.book*100)+'%':'a '+Math.round(st.book*100)+'%'} book (fair ${fmtOdds(t.prob)}), ${mkt}.${t.edge!=null?(isValue(t,st)?` Value: market ${pct(t.market)}, form-only ${pct(t.probFree)}, blended at ${pct(t.probValue)}.`:` No value at the market price (form-only ${pct(t.probFree)} against market ${pct(t.market)}).`):''}</p>
+    ${adv.value&&adv.value.r.no!==tR.no?`<p><b>Value:</b> ${cloth(adv.value.r.no)} ${esc(adv.value.r.name)} at $${adv.value.r.odds}, form-only ${pct(adv.value.probFree)} against market ${pct(adv.value.market)}, blended at ${pct(adv.value.probValue)}.</p>`:''}
+    <div class="eyebrow" style="color:var(--panel-ink);opacity:.7;margin-top:12px">Roughie</div>
+    ${rg?`<p style="margin-top:4px"><b>${cloth(rg.r.no)} ${esc(rg.r.name)}</b> at $${rg.r.odds}, form-only price ${ourPrice(rg.probFree,st,rg.book)}. Lottery ticket: across past races roughies the form liked most won 4% of the time against a market-implied 5%.</p>`:`<p style="margin-top:4px">Nothing at $8 or better the model can make a case for.</p>`}
+    ${trailHTML(race)}</div>`; }
+  html+=`<section class="block"><div class="eyebrow">Ratings<span class="sl">/</span>our price on every runner${scored[0]&&scored[0].book?` at this race's ${Math.round(scored[0].book*100)}% book`:` at a ${Math.round(st.book*100)}% book`}, market alongside</div><p class="note" style="margin:6px 0 0">Ours shorter than the market means your settings like it more than the punters do. The rating uses the morning market, refreshed once about 20 minutes before the race${race.lateAt?' (refreshed '+esc(fmtTime(race.lateAt))+')':''}. The price shown is the median fixed price on racing.com${race.frozenAt||race.syncedAt?', read '+esc(fmtTime(race.frozenAt||race.syncedAt)):''}${race.frozenAt?' before the jump':''}. Tap a name for the reasons and the form book.</p><div class="rows" style="margin-top:8px">`;
   const maxR=Math.max(...scored.map(s=>s.rating)), minR=Math.min(...scored.map(s=>s.rating)); const span=(maxR-minR)||1;
   for(const s of scored){ const r=s.r; const k=runnerKey(race,r); const open=state.ui.open===k; const dynv=s.contrib.formline+s.contrib.manual; const a=my.adj[k]||{adj:0,note:''};
     const chips=[]; if(r.barrier!=null) chips.push(`Bar ${r.barrier}`); if(r.weight!=null) chips.push(`${r.weight}kg`); if(r.form) chips.push(`Form ${esc(r.form)}`);
-    if(r.last&&r.last.pos!=null) chips.push(`Last ${r.last.pos}${r.last.field?'/'+r.last.field:''}${r.last.margin!=null&&r.last.pos>1?' '+r.last.margin+'L':''}`); if(r.last&&r.last.days!=null) chips.push(`${r.last.days}d`); if(num(r.pace)!=null) chips.push(num(r.pace)<0.25?'Leads':num(r.pace)<0.5?'On pace':num(r.pace)<0.75?'Midfield':'Back'); if(r.odds){ const o=num(r.openOdds), c=num(r.odds); const mv=(o>1&&c>1&&Math.abs(c-o)/o>=0.15)?(c<o?'firmed':'drifted'):null; chips.push(mv?`<span class="chip ${mv==='firmed'?'up':'dn'}">$${c} ${mv} from $${o}</span>`:`$${c}`); }
+    if(r.last&&r.last.pos!=null) chips.push(`Last ${r.last.pos}${r.last.field?'/'+r.last.field:''}${r.last.margin!=null&&r.last.pos>1?' '+r.last.margin+'L':''}`); if(r.last&&r.last.days!=null) chips.push(`${r.last.days}d`);
+    if(r.odds){ const o=num(r.openOdds), c=num(r.odds); const mv=(o>1&&c>1&&Math.abs(c-o)/o>=0.15)?(c<o?'firmed':'drifted'):null; chips.push(mv?`<span class="chip ${mv==='firmed'?'up':'dn'}">$${c} ${mv} from $${o}</span>`:`$${c}`); }
     if(s.z.formline>0.05) chips.push(`<span class="chip up">Form line +${s.z.formline.toFixed(2)}</span>`); if(s.z.formline<-0.05) chips.push(`<span class="chip dn">Form line ${s.z.formline.toFixed(2)}</span>`);
-    if(a.adj) chips.push(`<span class="chip ${a.adj>0?'up':'dn'}">Your call ${a.adj>0?'+':''}${a.adj}</span>`); if(s.missing>=3) chips.push(`<span class="chip">thin data</span>`);
-    if(others.length>1&&flockProb[r.no]!=null) chips.push(`<span class="chip">Flock ${pct(flockProb[r.no])}</span>`);
-    const resPos=res?res.positions.indexOf(r.no):-1; const isWin=picks.win===r.no, isPl=(picks.place||[]).includes(r.no); const isModel=!ep.override&&ep.no===r.no;
+    if(a.adj) chips.push(`<span class="chip ${a.adj>0?'up':'dn'}">Your call ${a.adj>0?'+':''}${a.adj}</span>`); if(a.note) chips.push(`<span class="chip">Note</span>`); if(s.missing>=3) chips.push(`<span class="chip">thin data</span>`);
+    const gear=(r.ra&&r.ra.gear)||r.gear; if(gear) chips.push(`<span class="chip">${esc(gear)}</span>`);
+    const resPos=res?res.positions.indexOf(r.no):-1; const isTip=tipNo===r.no;
     if(isValue(s,st)) chips.push(`<span class="chip acc">Value +${(s.edge*100).toFixed(0)}pts</span>`);
-    const tipLabel = isWin?'Your<br>tip':isModel?'Model<br>tip':isPl?'Place<br>tip':'Tip';
-    html+=`<div class="runner ${r.scratched?'scr':''}"><div class="top"><button class="head" data-act="toggle" data-key="${k}">${cloth(r.no)}
-      <span><span class="nm">${esc(r.name)}</span>${resPos>=0?` <span class="tag good">${ordinal(resPos+1)}</span>`:''}${isWin?` <span class="tag acc">Your tip</span>`:isModel?` <span class="tag">Model tip</span>`:isPl?` <span class="tag">Place</span>`:''}<div class="meta">${esc(r.jockey)}${r.trainer?' for '+esc(r.trainer):''}</div>
+    html+=`<div class="runner ${r.scratched?'scr':''}"><button class="head" data-act="toggle" data-key="${k}">${cloth(r.no)}
+      <span><span class="nm">${esc(r.name)}</span>${resPos>=0?` <span class="tag good">${ordinal(resPos+1)}</span>`:''}${isTip?` <span class="tag acc">Tip</span>`:''}<div class="meta">${esc(r.jockey)}${r.trainer?' for '+esc(r.trainer):''}</div>
         <div class="bar"><i style="width:${((s.rating-minR)/span*100).toFixed(1)}%"></i>${dynv>0?`<i class="dyn" style="left:${((s.rating-dynv-minR)/span*100).toFixed(1)}%;width:${(dynv/span*100).toFixed(1)}%"></i>`:''}</div>
-        <div class="chips">${chips.map(c=>c.startsWith('<span')?c:`<span class="chip">${c}</span>`).join('')}</div>
-        ${tips[r.no]?`<div class="flock">${tips[r.no].map(p=>pelChip(p)).join('')}</div>`:''}
-</span>
-      <span class="prob"><b class="num">${ourPrice(s.prob,st,s.book)}</b><span>${pct(s.prob)} chance</span><span>${r.odds?`mkt $${r.odds}`:'no mkt'}</span></span></button>
-      <button class="tipbtn ${isWin?'on':isModel?'pl':''}" data-act="tipwin" data-no="${r.no}" ${res||r.scratched?'disabled':''} aria-label="Tip ${esc(r.name)} to win">${tipLabel}</button></div>`;
-    if(open){ html+=`<div class="detail"><div class="tipbtns"><button class="btn ${isWin?'on':''}" data-act="tipwin" data-no="${r.no}" ${res?'disabled':''}>${isWin?'Tipped to win':'Tip to win'}</button><button class="btn ${isPl?'on':''}" data-act="tipplace" data-no="${r.no}" ${res?'disabled':''}>${isPl?'Place tip on':'Tip for a place'}</button><button class="btn ${r.scratched?'primary':''}" data-act="scratch" data-no="${r.no}">${r.scratched?'Reinstate':'Scratch'}</button></div>
-      <div class="adj"><span class="small">Your call</span><input type="range" min="-3" max="3" step="1" value="${a.adj||0}" data-act="adj" data-key="${k}"><b class="num">${a.adj>0?'+':''}${a.adj||0}</b></div>
-      <label class="field" style="margin-top:8px">Note to self<input data-act="note" data-key="${k}" value="${esc(a.note)}" placeholder="Why you moved it"></label>
+        <div class="chips">${chips.map(c=>c.startsWith('<span')?c:`<span class="chip">${c}</span>`).join('')}</div></span>
+      <span class="prob"><b class="num">${ourPrice(s.prob,st,s.book)}</b><span>${pct(s.prob)} chance</span><span>${r.odds?`mkt $${r.odds}`:'no mkt'}</span></span></button>`;
+    if(open){ html+=`<div class="detail"><div class="adj"><span class="small">Your call</span><input type="range" min="-3" max="3" step="1" value="${a.adj||0}" data-act="adj" data-key="${k}"><b class="num">${a.adj>0?'+':''}${a.adj||0}</b></div>
+      <label class="field" style="margin-top:8px">Note<input data-act="note" data-key="${k}" value="${esc(a.note)}" placeholder="Why you moved it, what you saw"></label>
+      <div class="actions"><button class="btn ${r.scratched?'primary':''}" data-act="scratch" data-no="${r.no}">${r.scratched?'Reinstate':'Scratch'}</button></div>
       <div class="metrics" style="margin-top:12px">`;
-      for(const met of METRICS){ const z=s.z[met.key]; const c=s.contrib[met.key]; const w=Math.min(50,Math.abs(z)/2.5*50); html+=`<span>${met.label}<span class="small"> x${(run.weights[met.key]||0).toFixed(2)}</span></span><span class="z num">${c>=0?'+':''}${(c*100).toFixed(1)}</span><span class="zbar"><i class="${z<0?'neg':''}" style="left:${z<0?50-w:50}%;width:${w}%"></i></span>`; }
-      html+=`</div><p class="small" style="margin:10px 0 0">Career ${recStr(r.career)}. Track ${recStr(r.track)}. Distance ${recStr(r.distance)}. ${titleCase(condCategory(m.condition))} ${recStr(r[condCategory(m.condition)])}.${r.last&&r.last.race?' Last start: '+esc(r.last.race)+'.':''}${r.gear?' '+esc(r.gear)+'.':''}${r.comment?' '+esc(r.comment):''}</p></div>`; }
+      for(const met of METRICS){ if(met.hidden&&Math.abs(s.z[met.key])<0.01) continue; const z=s.z[met.key]; const c=s.contrib[met.key]; const w=Math.min(50,Math.abs(z)/2.5*50); html+=`<span>${met.label}<span class="small"> x${(run.weights[met.key]||0).toFixed(2)}</span></span><span class="z num">${c>=0?'+':''}${(c*100).toFixed(1)}</span><span class="zbar"><i class="${z<0?'neg':''}" style="left:${z<0?50-w:50}%;width:${w}%"></i></span>`; }
+      html+=`</div>`;
+      html+=formBookHTML(r)||`<p class="small" style="margin:10px 0 0">Career ${recStr(recOf(r,'career'))}. Track ${recStr(recOf(r,'track'))}. ${titleCase(condCategory(m.condition))} ${recStr(recOf(r,condCategory(m.condition)))}.${r.last&&r.last.race?' Last start: '+esc(r.last.race)+'.':''}${r.gear?' '+esc(r.gear)+'.':''}</p>`;
+      html+=`</div>`; }
     html+=`</div>`; }
   html+=`</div></section>`;
   return html;
 }
-function clubOn(runnerNo,raceNo){ const mid=state.meeting?String(state.meeting.id):''; return state.bets.filter(b=>b.raceNo===raceNo&&b.runnerNo===runnerNo&&String(b.meetingId||mid)===mid); }
-function betForm(race,r){ const open=state.ui.betOn===runnerKey(race,r); const existing=clubOn(r.no,race.no);
-  if(!open) return `<div class="actions" style="margin-top:10px"><button class="btn" data-act="betopen" data-key="${runnerKey(race,r)}" ${race.result?'disabled':''}>Club bet on ${r.no}</button>${existing.length?`<span class="small">${existing.length} already on</span>`:''}</div>`;
-  return `<div class="betform"><label class="field">Type<select id="betType"><option value="win">Win</option><option value="place">Place</option><option value="ew">Each way</option></select></label>
-    <label class="field">Stake $<input id="betStake" inputmode="decimal" placeholder="20"></label><label class="field">Win odds<input id="betOdds" inputmode="decimal" placeholder="${r.odds||''}" value="${r.odds||''}"></label>
-    <label class="field">Place odds<input id="betPlace" inputmode="decimal" placeholder="optional"></label><label class="field" style="grid-column:span 2">Note<input id="betNote" placeholder="Bookie, who is holding the ticket"></label></div>
-    <div class="actions"><button class="btn primary" data-act="betsave" data-no="${r.no}">Record bet</button><button class="btn" data-act="betopen" data-key="">Cancel</button></div>
-    ${existing.length?`<p class="small">Already on this runner: ${existing.map(b=>`${esc(b.by)} ${fmtMoney(b.stake)} ${b.type==='ew'?'each way':b.type}`).join(', ')}.</p>`:''}`; }
 function recStr(v){ const r=rec(v); return r? `${r.s}:${r.w}-${r.p}` : 'n/a'; }
 
 function weightWord(w,base){ const r=base?w/base:(w>0?9:0); const word= w<=0?(base?'off':'default'):base===0?'on':r<0.6?'light':r<1.4?'default':r<2?'heavy':'max'; return `${w.toFixed(2)} <small>${word}</small>`; }
@@ -837,101 +634,62 @@ function weightTipsHTML(){ const m=state.meeting; if(!m) return `<p class="note"
   return `<section class="block" style="margin:0 0 14px"><div class="racehead" style="margin:0 0 6px"><div><div class="eyebrow">Repriced by your weights<span class="sl">/</span>${esc(shortName(m))} R${race.no}</div><div class="s">${esc(race.name||'')} ${race.distance?race.distance+'m':''}${race.result?' (run)':''}</div></div>
     <div class="actions" style="margin:0"><button class="btn" data-act="wrace" data-no="${prev?prev.no:race.no}" ${prev?'':'disabled'}>Prev</button><button class="btn" data-act="wrace" data-no="${next?next.no:race.no}" ${next?'':'disabled'}>Next</button></div></div>
     <div class="wtip hd"><span class="nm">Runner</span><span class="num">Chance</span><span class="num">Ours</span><span class="num muted">Mkt</span></div><div class="wtips">${rows}</div>
-    ${tips?`<div class="eyebrow" style="margin-top:12px">Other races<span class="sl">/</span>your tip and our price</div><div class="chips" style="margin-top:6px">${tips}</div>`:''}</section>`; }
+    ${tips?`<div class="eyebrow" style="margin-top:12px">Other races<span class="sl">/</span>top rated and our price</div><div class="chips" style="margin-top:6px">${tips}</div>`:''}</section>`; }
+const FIT_WORDS={held:'held out of sample',none:'no measured effect',thin:'fitted on a thin sample',live:'live during the day'};
 function viewWeights(){
   const my=me(); const s={...DEFAULT_SETTINGS,...my.settings}; const run=state.meeting?runDay(my,state.meeting):{weights:my.weights,changes:[]};
-  let html=`<div class="eyebrow">${esc(my.name)}'s model<span class="sl">/</span>what each factor counts for</div><p class="note" style="margin:6px 0 8px">Drag a slider and the field below reprices. Zero switches a factor off; the default is what tested best on past Saturdays. Your weights, calls and tips stay on this device.</p>
+  let html=`<div class="eyebrow">Your model<span class="sl">/</span>what each factor counts for</div><p class="note" style="margin:6px 0 8px">Drag a slider and the field below reprices. Zero switches a factor off. The default is the set that tested best on one month of race days and held on the next, so start there and move what you believe in today. Each factor says what the data showed for it. Everything stays on this device.</p>
   <div id="wtips">${weightTipsHTML()}</div><div class="rows">`;
-  for(const met of METRICS){ const w=my.weights[met.key]; const adapted=run.weights[met.key]; const d=adapted-w;
+  for(const met of METRICS){ if(met.hidden) continue; const w=my.weights[met.key]??met.base; const adapted=(run.weights[met.key]??w); const d=adapted-w;
     html+=`<div class="wrow"><div class="l"><b>${met.label}</b><span class="num" data-base="${met.base}">${weightWord(w,met.base)}${Math.abs(d)>0.005?` <span style="color:var(--accent)">${adapted.toFixed(2)}</span>`:''}</span></div><div class="d">${met.desc}</div>
-    <input type="range" min="0" max="${Math.max(1.5,met.base*2.5).toFixed(2)}" step="0.05" value="${w}" data-act="weight" data-key="${met.key}"><div class="delta">${Math.abs(w-met.base)>0.01?`${w-met.base>0?'+':''}${(w-met.base).toFixed(2)} against the default ${met.base.toFixed(2)}`:'at default'}${Math.abs(d)>0.005?`, results moved it ${d>0?'+':''}${d.toFixed(2)}`:''}</div></div>`; }
-  html+=`</div><div class="actions"><button class="btn" data-act="resetweights">Reset my weights to defaults</button></div>`;
-  html+=`<section class="block" style="margin-top:26px"><div class="eyebrow">Proving ground<span class="sl">/</span>your weights against real Saturdays at starting price</div>
-  <p class="note" style="margin:6px 0 8px">Runs your current weights and settings over past metro meetings as the form stood that morning, and settles at the actual starting prices. Change a slider, test again. Small samples swing; treat anything under a few hundred races as a hint, not proof. Defaults were refitted on the August race days and held on the September ones, which the fit never saw: form-only log-loss 2.12 to 2.05 against the market's 1.82, best bet return -28% to -20%. Still short of the market. Adding form on top of the market improved nothing out of sample, and roughies the form liked most did worst. Nobody has shown an edge yet; the sliders are where you try to find one.</p>
-  <div class="actions" style="margin:0 0 10px"><button class="btn primary" id="proveBtn" data-act="prove" ${sb?'':'disabled'}>Test these weights</button>${PAST?`<span class="small">${PAST.length} meetings, ${PAST.reduce((a,m)=>a+m.races.length,0)} races loaded</span>`:''}</div>
+    <input type="range" min="0" max="${Math.max(1.5,met.base*2.5).toFixed(2)}" step="0.05" value="${w}" data-act="weight" data-key="${met.key}"><div class="delta">${Math.abs(w-met.base)>0.01?`${w-met.base>0?'+':''}${(w-met.base).toFixed(2)} against the default ${met.base.toFixed(2)}`:'at default'}${Math.abs(d)>0.005?`, results moved it ${d>0?'+':''}${d.toFixed(2)}`:''}</div><div class="fit ${met.fit}">${FIT_WORDS[met.fit]||''}</div></div>`; }
+  html+=`</div><div class="actions"><button class="btn" data-act="resetweights">Reset to the fitted defaults</button></div>`;
+  html+=`<section class="block" style="margin-top:26px"><div class="eyebrow">Proving ground<span class="sl">/</span>your settings against real race days at starting price</div>
+  <p class="note" style="margin:6px 0 8px">Runs your current weights and settings over the archived meetings as the form stood that morning, and settles at the actual starting prices. Change a slider, test again. Small samples swing; treat anything under a few hundred races as a hint, not proof. The defaults trail the market: form-only log-loss 2.05 against the market's 1.82 on the held-out month, best bet return -20%. Nobody has shown an edge here yet. This is where you find out whether your view has one.</p>
+  <div class="actions" style="margin:0 0 10px"><button class="btn primary" id="proveBtn" data-act="prove" ${sb?'':'disabled'}>Test these settings</button>${PAST?`<span class="small">${PAST.length} meetings, ${PAST.reduce((a,m)=>a+m.races.length,0)} races loaded</span>`:''}</div>
   <div id="proveOut">${state.ui.prove?provingHTML(state.ui.prove):''}</div>
-  <div class="actions" style="margin:14px 0 6px"><button class="btn" id="planBtn" data-act="plantest" ${sb?'':'disabled'}>Test a 20-unit day plan</button><span class="small">The unit allocator, run as a morning plan on each archived race day with your weights, trust and staking.</span></div><div id="planOut">${state.ui.plan?planTestHTML(state.ui.plan,20):''}</div></section>`;
-  html+=`<section class="block" style="margin-top:26px"><div class="eyebrow">Adaptation<span class="sl">/</span>how far a result may move your model</div><div class="rows" style="margin-top:8px">
+  <div class="actions" style="margin:14px 0 6px"><button class="btn" id="planBtn" data-act="plantest" ${sb?'':'disabled'}>Test a 20-unit day plan</button><span class="small">A morning plan of 20 units across each archived day, one bet per race where your blended chance beats the market, sized at a quarter of Kelly.</span></div><div id="planOut">${state.ui.plan?planTestHTML(state.ui.plan,20):''}</div></section>`;
+  html+=`<section class="block" style="margin-top:26px"><div class="eyebrow">Settings<span class="sl">/</span>adaptation, value and pricing</div><div class="rows" style="margin-top:8px">
     <div class="wrow"><div class="l"><b>Adapt weights from results</b><span><input type="checkbox" data-act="setting" data-key="autoAdapt" ${s.autoAdapt?'checked':''}></span></div><div class="d">A surprising result nudges your weights for the later races. A tip can move when that happens; the race screen shows when and why.</div></div>
     <div class="wrow"><div class="l"><b>Margin of error: rated position</b><span class="num">${s.marginRank}</span></div><div class="d">A winner rated this position or better is inside the margin and triggers no weight change.</div><input type="range" min="1" max="8" step="1" value="${s.marginRank}" data-act="setting" data-key="marginRank"></div>
     <div class="wrow"><div class="l"><b>Margin of error: rated chance</b><span class="num">${pct(s.marginProb)}</span></div><div class="d">A winner rated under this chance is outside the margin even if it was placed high.</div><input type="range" min="0.02" max="0.3" step="0.01" value="${s.marginProb}" data-act="setting" data-key="marginProb"></div>
-    <div class="wrow"><div class="l"><b>Learning rate</b><span class="num">${s.lr.toFixed(2)}</span></div><div class="d">How far each surprising result moves the weights toward the metrics that would have picked it.</div><input type="range" min="0.02" max="0.5" step="0.01" value="${s.lr}" data-act="setting" data-key="lr"></div>
+    <div class="wrow"><div class="l"><b>Learning rate</b><span class="num">${s.lr.toFixed(2)}</span></div><div class="d">How far each surprising result moves the weights toward the factors that would have picked it.</div><input type="range" min="0.02" max="0.5" step="0.01" value="${s.lr}" data-act="setting" data-key="lr"></div>
     <div class="wrow"><div class="l"><b>Form line gain</b><span class="num">${s.formlineGain.toFixed(2)}</span></div><div class="d">How strongly a horse's run today carries to horses out of the same last-start race.</div><input type="range" min="0" max="1.5" step="0.05" value="${s.formlineGain}" data-act="setting" data-key="formlineGain"></div>
-    <div class="wrow"><div class="l"><b>Bank</b><span class="num">${fmtMoney(s.bank)}</span></div><div class="d">What you are prepared to put through the day. Suggested stakes are worked off this.</div><input type="range" min="50" max="2000" step="50" value="${s.bank}" data-act="setting" data-key="bank"></div>
-    <div class="wrow"><div class="l"><b>Staking aggression</b><span class="num">${s.kelly.toFixed(2)}</span></div><div class="d">Fraction of the Kelly stake. A quarter is conservative, a half is bold, one is reckless.</div><input type="range" min="0.05" max="1" step="0.05" value="${s.kelly}" data-act="setting" data-key="kelly"></div>
-    <div class="wrow"><div class="l"><b>Book percentage when no market</b><span class="num">${Math.round(s.book*100)}%</span></div><div class="d">Our prices are framed at the race's own book percentage, worked out from the live fixed prices, so ours and the board compare like for like. This setting applies only when a race has no prices yet. 100% shows fair prices.</div><input type="range" min="1" max="1.4" step="0.01" value="${s.book}" data-act="setting" data-key="book"></div>
-    <div class="wrow"><div class="l"><b>Trust in own rating</b><span class="num">${Math.round(s.trust*100)}%</span></div><div class="d">Value calls and stakes use a chance set between the form-only rating and the market. At 100% the market is ignored and every disagreement is backed in full; at 50% a disagreement is backed at half strength. Over 220 past races full trust lost money, so start conservative.</div><input type="range" min="0.1" max="1" step="0.05" value="${s.trust}" data-act="setting" data-key="trust"></div>
-    <div class="wrow"><div class="l"><b>Value threshold</b><span class="num">${(s.valueEdge*100).toFixed(0)} pts</span></div><div class="d">How far the model's chance must beat the market's before a runner is flagged as value.</div><input type="range" min="0.01" max="0.10" step="0.01" value="${s.valueEdge}" data-act="setting" data-key="valueEdge"></div>
-    <div class="wrow"><div class="l"><b>Sharpness</b><span class="num">${s.beta.toFixed(2)}</span></div><div class="d">Higher concentrates the percentages on the top few; lower spreads them.</div><input type="range" min="0.8" max="4" step="0.1" value="${s.beta}" data-act="setting" data-key="beta"></div></div></section>`;
+    <div class="wrow"><div class="l"><b>Trust in own rating</b><span class="num">${Math.round(s.trust*100)}%</span></div><div class="d">Value calls use a chance set between the form-only rating and the market. At 100% the market is ignored; at 50% a disagreement counts at half strength. Full trust lost money on past races, so start conservative.</div><input type="range" min="0.1" max="1" step="0.05" value="${s.trust}" data-act="setting" data-key="trust"></div>
+    <div class="wrow"><div class="l"><b>Value threshold</b><span class="num">${(s.valueEdge*100).toFixed(0)} pts</span></div><div class="d">How far the blended chance must beat the market's before a runner is flagged as value.</div><input type="range" min="0.01" max="0.10" step="0.01" value="${s.valueEdge}" data-act="setting" data-key="valueEdge"></div>
+    <div class="wrow"><div class="l"><b>Sharpness</b><span class="num">${s.beta.toFixed(2)}</span></div><div class="d">Higher concentrates the percentages on the top few; lower spreads them. The default was the best calibrated on past races.</div><input type="range" min="0.8" max="4" step="0.1" value="${s.beta}" data-act="setting" data-key="beta"></div>
+    <div class="wrow"><div class="l"><b>Book percentage when no market</b><span class="num">${Math.round(s.book*100)}%</span></div><div class="d">Our prices are framed at the race's own book percentage from the live prices. This applies only when a race has no prices yet. 100% shows fair prices.</div><input type="range" min="1" max="1.4" step="0.01" value="${s.book}" data-act="setting" data-key="book"></div></div></section>`;
   if(run.changes&&run.changes.length){ html+=`<section class="block"><div class="eyebrow">What the results did to your model</div>`; for(const e of [...run.changes].reverse()){ html+=`<div class="logrow"><div class="when">Race ${e.race}</div>${esc(e.text)}${e.items.length?`<ul>${e.items.map(i=>`<li>${esc(i)}</li>`).join('')}</ul>`:''}</div>`; } html+=`</section>`; }
   return html;
 }
 
-function viewFlock(){
-  const m=state.meeting; const ps=Object.values(state.punters);
-  const runs={}; for(const p of ps) runs[p.id]=runsFor(p);
-  const bookAll=clubBook(); const plBy={}; for(const b of bookAll.rows){ if(b.status==='open') continue; plBy[b.by]=(plBy[b.by]||0)+(b.ret-(num(b.stake)||0)); }
-  const rows=ps.map(p=>({p, tips:tipPoints(p,runs[p.id]), model:modelScore(runs[p.id]), pl:plBy[p.name]||0})).sort((a,b)=>b.pl-a.pl||b.tips.pts-a.tips.pts);
-  let html=`<div class="eyebrow">Who won what<span class="sl">/</span>${ps.length} Pelican${ps.length===1?'':'s'}</div><p class="note" style="margin:6px 0 10px">Settled club bets by the Pelican who put them on. Tip points alongside: three for a winner, one for a place, on each Pelican's model tip or override.</p><div class="board">`;
-  rows.forEach((r,i)=>{ html+=`<div class="brow"><span class="pos num">${i+1}</span><span>${pelChip(r.p)}${r.p.id===state.me?' <span class="tag acc">you</span>':''}<div class="sub">${r.tips.wins} winner${r.tips.wins===1?'':'s'}, ${r.tips.places} placed from ${r.tips.tipped} tips, ${r.tips.pts} pts</div></span><span class="sub num">model ${r.model.top}/${r.model.done}</span><span class="pts num" style="color:${r.pl>0?'var(--good)':r.pl<0?'var(--bad)':'inherit'}">${r.pl?fmtMoney(r.pl):'-'}</span></div>`; });
-  html+=`</div>`;
-  html+=meetingSwitcher()+`<section class="block" style="margin-top:12px"><div class="eyebrow">Tips board<span class="sl">/</span>${esc(shortName(m))}, ringed orange where overridden</div><div class="tipsboard" style="margin-top:8px"><table><thead><tr><th style="text-align:left">Race</th>${ps.map(p=>`<th>${avatarSVG(p.avatar||'plain',p.colour,'sm')}<br>${esc(p.name)}</th>`).join('')}<th>Result</th></tr></thead><tbody>`;
-  for(const r of m.races){ const win=r.result&&r.result.positions[0]; html+=`<tr><td>${r.no}</td>${ps.map(p=>{const e=effectivePick(p,r,runs[p.id][m.id]); const t=e.no; return `<td>${t?`<span class="${win===t?'hit':''}" style="display:inline-block;border-radius:6px;${e.override?'outline:2px solid var(--accent);outline-offset:-2px':''}">${cloth(t)}</span>`:'<span class="small">-</span>'}</td>`;}).join('')}<td>${win?cloth(win):'<span class="small">-</span>'}</td></tr>`; }
-  html+=`</tbody></table></div></section>`;
-  const done=[]; for(const mm of meetingsList()) for(const r of mm.races) if(r.result) done.push({r,mm}); done.sort((a,b)=>(b.r.result.enteredAt||0)-(a.r.result.enteredAt||0));
-  html+=`<section class="block" style="margin-top:22px"><div class="eyebrow">Results<span class="sl">/</span>all meetings, newest first</div>`;
-  if(!done.length) html+=`<p class="note">Nothing in yet.</p>`;
-  for(const {r,mm} of done){ const w=r.runners.find(h=>h.no===r.result.positions[0]); const tippers=ps.filter(p=>effectivePick(p,r,runs[p.id][mm.id]).no===r.result.positions[0]);
-    html+=`<div class="logrow"><div class="when">${esc(shortName(mm))} R${r.no}${r.result.by?' via '+esc(r.result.by):''}</div>${cloth(r.result.positions[0])} <b>${esc(w?w.name:'')}</b> from ${r.result.positions.slice(1).join(', ')}.${tippers.length?`<div class="flock" style="margin-top:6px">${tippers.map(p=>pelChip(p)).join('')} <span class="small">tipped it</span></div>`:''}</div>`; }
-  html+=`</section>`;
-  const book=clubBook();
-  html+=`<section class="block"><div class="eyebrow">Punters club<span class="sl">/</span>${book.rows.length} bet${book.rows.length===1?'':'s'}</div>
-  <div class="kpis" style="margin-top:8px"><div class="kpi"><b class="num">${fmtMoney(book.staked)}</b><span>Staked</span></div><div class="kpi"><b class="num">${fmtMoney(book.ret)}</b><span>Returned</span></div><div class="kpi"><b class="num" style="color:${book.pl>0?'var(--good)':book.pl<0?'var(--bad)':'inherit'}">${fmtMoney(book.pl)}</b><span>Settled P&amp;L</span></div></div>`;
-  if(book.open>0) html+=`<p class="small" style="margin-top:6px">${fmtMoney(book.open)} still running.</p>`;
-  const byP={}; for(const b of book.rows){ byP[b.by]=(byP[b.by]||0)+(num(b.stake)||0); } const contrib=Object.entries(byP); const silent=ps.filter(p=>!byP[p.name]);
-  if(contrib.length) html+=`<div class="flock" style="margin:8px 0">${contrib.map(([n,v])=>{const p=punterByName(n);return `<span class="pel">${avatarSVG(p.avatar||'plain',p.colour,'sm')}${esc(n)} ${fmtMoney(v)}</span>`;}).join('')}</div>`;
-  if(silent.length&&book.rows.length) html+=`<p class="small">Yet to put anything on: ${silent.map(p=>esc(p.name)).join(', ')}.</p>`;
-  for(const b of [...book.rows].reverse()){ const bm=state.meetings[b.meetingId]||m; const race=bm.races.find(r=>r.no===b.raceNo); const h=race&&race.runners.find(x=>x.no===b.runnerNo); const p=punterByName(b.by);
-    const amt= b.status==='open'? fmtMoney(b.stake) : (b.ret>0? '+'+fmtMoney(b.ret-b.stake) : '-'+fmtMoney(b.stake));
-    html+=`<div class="betrow">${avatarSVG(p.avatar||'plain',p.colour,'sm')}<span><b>${esc(shortName(bm))} R${b.raceNo}</b> ${cloth(b.runnerNo)} ${esc(h?h.name:'')} <span class="s">${b.type==='ew'?'each way':b.type} ${fmtMoney(b.stake)}${b.odds?' @ '+b.odds:''}${b.type!=='win'?' (place '+placeOdds(b)+(b.placeOdds?'':' est.')+')':''} by ${esc(b.by)}${b.note?', '+esc(b.note):''}</span></span><span class="amt num ${b.status==='won'?'pos':b.status==='lost'?'neg':''}">${amt}${b.status==='open'&&b.by===me().name?` <button class="btn" style="padding:2px 8px;font-size:11px" data-act="delbet" data-id="${esc(b.id)}">x</button>`:''}</span></div>`; }
-  if(!book.rows.length) html+=`<p class="note">No club bets recorded. Open a runner on the race screen to put one on the book.</p>`;
-  html+=`<p class="small" style="margin-top:8px">Place returns use the place price you enter, or a quarter of the win odds where none is given, so treat those as estimates.</p></section>`;
-  html+=`<div class="actions"><button class="btn" data-act="switch">Switch Pelican</button></div>`;
-  return html;
-}
-
 function viewLoad(){
-  const ms=meetingsList().filter(x=>!x.example); const live=!!SUPABASE.url;
-  let html=`<div class="eyebrow">Feed<span class="sl">/</span>racing.com, refreshed on race days<span class="sl">/</span>build ${BUILD}</div>
-  <p class="note" style="margin:8px 0 12px">${live?'Fields, form, fixed odds, scratchings and results for the meetings below come from racing.com: every metro meeting on Wednesdays and Saturdays, the richest card in each of NSW, Victoria, Queensland, the ACT and WA every day, and Hong Kong on Wednesdays and Sundays. Fields, prices and results refresh every ten minutes during racing hours. Ratings are computed here from your weights.':'This copy has no server feed. Load form by hand below.'}</p>
+  const ms=meetingsList().filter(x=>!x.example);
+  let html=`<div class="eyebrow">Feed<span class="sl">/</span>racing.com and Racing Australia<span class="sl">/</span>build ${BUILD}</div>
+  <p class="note" style="margin:8px 0 12px">Fields, fixed prices, scratchings and results come from racing.com for the meetings below: every metro meeting on Wednesdays and Saturdays, the richest card in each of NSW, Victoria, Queensland, the ACT and WA every day, and Hong Kong on Wednesdays and Sundays. Once a day the Racing Australia Free Fields form for each Australian meeting is read and attached to every runner: full career records and run-by-run lines with 600m times and in-running positions. Prices and results refresh every ten minutes during racing hours. Ratings are computed here from your weights.</p>
   <div class="rows">`;
-  for(const m of ms){ const loaded=m.races.filter(r=>r.runners&&r.runners.length).length; const done=m.races.filter(r=>r.result).length;
-    html+=`<button class="row" data-act="meeting" data-id="${esc(m.id)}" data-go="races"><span class="idx num">${m.sort&&m.sort<90?m.sort:''}</span><span><span class="t">${esc(m.meeting)}</span><br><span class="s">${esc(m.date||'')} ${esc(m.state||'')} ${esc(m.condition||'')}${m.rail?', rail '+esc(m.rail):''}. ${loaded}/${m.races.length} fields, ${done} results.${m.syncedAt?' Read '+fmtTime(m.syncedAt)+'.':''}${m.manual?' Loaded by hand.':''}</span></span><span class="r"><b>${m.races.length}</b>races</span></button>`; }
+  for(const m of ms){ const loaded=m.races.filter(r=>r.runners&&r.runners.length).length; const done=m.races.filter(r=>r.result).length; const withRa=m.races.reduce((a,r)=>a+r.runners.filter(x=>x.ra&&x.ra.runs).length,0);
+    html+=`<button class="row" data-act="meeting" data-id="${esc(m.id)}" data-go="races"><span class="idx num">${m.sort&&m.sort<90?m.sort:''}</span><span><span class="t">${esc(m.meeting)}</span><br><span class="s">${esc(m.date?fmtDay(m.date):'')} ${esc(m.state||'')} ${esc(m.condition||'')}${m.rail?', rail '+esc(m.rail):''}. ${loaded}/${m.races.length} fields, ${done} results${withRa?', Free Fields form on '+withRa+' runners':''}.${m.syncedAt?' Read '+fmtTime(m.syncedAt)+'.':''}${m.manual?' Loaded by hand.':''}</span></span><span class="r"><b>${m.races.length}</b>races</span></button>`; }
   if(!ms.length) html+=`<p class="note" style="padding:10px 0">No meetings on the feed yet.</p>`;
-  html+=`</div>`;
-  html+=`<details style="margin-top:26px"><summary class="eyebrow" style="cursor:pointer">Manual load<span class="sl">/</span>JSON or CSV, fallback only</summary>
-  <p class="note" style="margin:8px 0 12px">Paste form as JSON in the schema below, or CSV with the listed columns. It is added as its own meeting alongside the feed and stays on this device only.</p>
-  <label class="field">Form data<textarea id="loadIn" placeholder="Paste JSON or CSV here"></textarea></label>
-  <div class="actions"><button class="btn primary" data-act="load">Load as a meeting</button><button class="btn" data-act="mergerace">Add or replace one race in the current meeting</button><button class="btn" id="convertBtn" data-act="convert" hidden>Convert raw form text with Claude</button></div>
-  <p class="small" id="convertNote" hidden>Converting sends the pasted text to Claude from this page and asks for JSON in the schema.</p>
-  <div class="actions"><button class="btn" data-act="copyprompt">Copy conversion prompt for Claude</button><button class="btn" data-act="copyjson" ${state.meeting?'':'disabled'}>Copy current meeting as JSON</button><button class="btn" data-act="example">Load fictional example</button><button class="btn danger" data-act="clear" ${state.meeting&&(state.meeting.manual||state.meeting.example)?'':'disabled'}>Remove current manual meeting</button></div>
+  html+=`</div><div class="actions"><button class="btn" id="syncBtn" data-act="sync">Sync now</button><button class="btn" data-act="example">Open the fictional example</button></div>`;
+  html+=`<details style="margin-top:26px"><summary class="eyebrow" style="cursor:pointer">Manual load<span class="sl">/</span>JSON, fallback only</summary>
+  <p class="note" style="margin:8px 0 12px">Paste a meeting as JSON in the schema below. It is added alongside the feed and stays on this device only.</p>
+  <label class="field">Form data<textarea id="loadIn" placeholder="Paste JSON here"></textarea></label>
+  <div class="actions"><button class="btn primary" data-act="load">Load as a meeting</button><button class="btn" data-act="copyjson" ${state.meeting?'':'disabled'}>Copy current meeting as JSON</button><button class="btn danger" data-act="clear" ${state.meeting&&(state.meeting.manual||state.meeting.example)?'':'disabled'}>Remove current manual meeting</button></div>
   <pre class="schema" style="margin-top:12px">${esc(SCHEMA_DOC)}</pre>
-  <p class="small">Records are [starts, wins, placings]. Form reads oldest to newest with the most recent run last.</p>
-  <pre class="schema">race, race_name, race_distance, race_class, race_time, no, name, barrier, weight, jockey, trainer,
-career, track, distance, good, soft, heavy   (each as 20-4-7 for starts-wins-placings)
-form, last_pos, last_field, last_margin, days, last_race, class_change, jockey_pct, trainer_pct, odds, scratched</pre></details>`;
+  <p class="small">Records are [starts, wins, placings]. Form reads oldest to newest with the most recent run last.</p></details>`;
+  html+=`<p class="small" style="margin-top:26px">Planned: a notes page, so the whole thing reads like a form book you have written in.</p>`;
   return html;
 }
 
 /* ---------------- events ---------------- */
 function bind(root){
-  root.querySelectorAll('[data-meta]').forEach(el=>el.addEventListener('change',()=>{ state.meeting[el.dataset.meta]=el.value; state.meeting.updatedAt=Date.now(); save('meeting'); }));
   root.querySelectorAll('[data-act="wrace"]').forEach(el=>el.addEventListener('click',()=>{ state.ui.raceNo=+el.dataset.no; const wt=document.getElementById('wtips'); if(wt){ wt.innerHTML=weightTipsHTML(); bind(wt); } }));
-  root.querySelectorAll('[data-act="weight"]').forEach(el=>{ el.addEventListener('input',()=>{ me().weights[el.dataset.key]=+el.value; const sp=el.closest('.wrow').querySelector('.l span'); sp.innerHTML=weightWord(+el.value,+sp.dataset.base); const wt=document.getElementById('wtips'); if(wt){ wt.innerHTML=weightTipsHTML(); bind(wt); } }); el.addEventListener('change',()=>{ state.ui.prove=null; state.ui.plan=null; save('punter'); }); });
-  root.querySelectorAll('[data-act="setting"]').forEach(el=>{ const h=()=>{ me().settings[el.dataset.key]= el.type==='checkbox'?el.checked:+el.value; }; el.addEventListener('input',()=>{ h(); const sp=el.closest('.wrow').querySelector('.l span'); if(sp&&el.type!=='checkbox'){ const k=el.dataset.key; sp.textContent= k==='marginProb'?pct(+el.value):k==='marginRank'?el.value:k==='bank'?fmtMoney(+el.value):k==='valueEdge'?(+el.value*100).toFixed(0)+' pts':k==='book'?Math.round(+el.value*100)+'%':k==='trust'?Math.round(+el.value*100)+'%':(+el.value).toFixed(2); } }); el.addEventListener('change',()=>{ h(); save('punter'); }); });
-  root.querySelectorAll('[data-act="adj"]').forEach(el=>{ el.addEventListener('input',()=>{ el.nextElementSibling.textContent=(+el.value>0?'+':'')+el.value; }); el.addEventListener('change',()=>{ const a=me().adj[el.dataset.key]||(me().adj[el.dataset.key]={adj:0,note:''}); a.adj=+el.value; save('punter'); }); });
-  root.querySelectorAll('[data-act="note"]').forEach(el=>el.addEventListener('change',()=>{ const a=me().adj[el.dataset.key]||(me().adj[el.dataset.key]={adj:0,note:''}); a.note=el.value; save('punter'); }));
-  const conv=$('#convertBtn'); if(conv&&sampleFn){ conv.hidden=false; $('#convertNote').hidden=false; }
+  root.querySelectorAll('[data-act="weight"]').forEach(el=>{ el.addEventListener('input',()=>{ me().weights[el.dataset.key]=+el.value; const sp=el.closest('.wrow').querySelector('.l span'); sp.innerHTML=weightWord(+el.value,+sp.dataset.base); const wt=document.getElementById('wtips'); if(wt){ wt.innerHTML=weightTipsHTML(); bind(wt); } }); el.addEventListener('change',()=>{ state.ui.prove=null; state.ui.plan=null; save(); }); });
+  root.querySelectorAll('[data-act="setting"]').forEach(el=>{ const h=()=>{ me().settings[el.dataset.key]= el.type==='checkbox'?el.checked:+el.value; }; el.addEventListener('input',()=>{ h(); const sp=el.closest('.wrow').querySelector('.l span'); if(sp&&el.type!=='checkbox'){ const k=el.dataset.key; sp.textContent= k==='marginProb'?pct(+el.value):k==='marginRank'?el.value:k==='valueEdge'?(+el.value*100).toFixed(0)+' pts':k==='book'?Math.round(+el.value*100)+'%':k==='trust'?Math.round(+el.value*100)+'%':(+el.value).toFixed(2); } }); el.addEventListener('change',()=>{ h(); state.ui.prove=null; state.ui.plan=null; save(); }); });
+  root.querySelectorAll('[data-act="adj"]').forEach(el=>{ el.addEventListener('input',()=>{ el.nextElementSibling.textContent=(+el.value>0?'+':'')+el.value; }); el.addEventListener('change',()=>{ const a=me().adj[el.dataset.key]||(me().adj[el.dataset.key]={adj:0,note:''}); a.adj=+el.value; save(); }); });
+  root.querySelectorAll('[data-act="note"]').forEach(el=>el.addEventListener('change',()=>{ const a=me().adj[el.dataset.key]||(me().adj[el.dataset.key]={adj:0,note:''}); a.note=el.value; save(); }));
+  root.querySelectorAll('[data-about]').forEach(el=>el.addEventListener('toggle',()=>{ state.ui.about=el.open; }));
 }
 function currentRace(){ return state.meeting.races.find(r=>r.no===state.ui.raceNo)||state.meeting.races[0]; }
 document.addEventListener('click', async e=>{
@@ -939,53 +697,25 @@ document.addEventListener('click', async e=>{
   if(act==='tab'){ state.ui.tab=b.dataset.tab; render(); }
   else if(act==='openrace'){ state.ui.raceNo=+b.dataset.no; state.ui.tab='race'; state.ui.open=null; render(); window.scrollTo(0,0); }
   else if(act==='toggle'){ state.ui.open= state.ui.open===b.dataset.key?null:b.dataset.key; render(); }
-  else if(act==='scratch'){ const r=currentRace().runners.find(x=>x.no===+b.dataset.no); r.scratched=!r.scratched; currentRace().updatedAt=Date.now(); save('meeting'); }
-  else if(act==='tipwin'){ const race=currentRace(); const run=runDay(me(),state.meeting); const model=effectivePick({...me(),picks:{}},race,run).no; const key=pk(race); const pick=me().picks[key]||(me().picks[key]={win:null,place:[]}); const no=+b.dataset.no;
-    if(pick.win===no||no===model){ const was=pick.win; pick.win=null; toast(no===model&&was!==no?'That is the model tip already':'Back to the model tip'); } else { pick.win=no; toast('Override set. Tap again to go back to the model.'); } pick.place=(pick.place||[]).filter(n=>n!==pick.win); save('punter'); }
-  else if(act==='tipplace'){ const race=currentRace(); const key=pk(race); const pick=me().picks[key]||(me().picks[key]={win:null,place:[]}); const no=+b.dataset.no; pick.place=pick.place||[]; if(pick.place.includes(no)) pick.place=pick.place.filter(n=>n!==no); else { if(pick.place.length>=2){ toast('Two place tips per race'); return; } if(pick.win===no) pick.win=null; pick.place.push(no); } save('punter'); }
-  else if(act==='result'){ const v=$('#resIn').value.trim(); const pos=v.split(/[^0-9]+/).filter(Boolean).map(Number); if(!pos.length){ toast('Enter the finishing order first'); return; } if(new Set(pos).size!==pos.length){ toast('A number is repeated'); return; }
-    const race=currentRace(); const known=new Set(active(race).map(r=>r.no)); const bad=pos.filter(n=>!known.has(n)); if(bad.length){ toast('Not in this field: '+bad.join(', ')); return; }
-    race.result={positions:pos, enteredAt:Date.now(), by:me().name}; race.updatedAt=Date.now(); state.meeting.updatedAt=Date.now(); save('result:'+race.no); toast('Result in. Every model on the card has been updated.'); }
-  else if(act==='clearresult'){ const race=currentRace(); race.result=null; race.updatedAt=Date.now(); state.meeting.updatedAt=Date.now(); save('result:'+race.no); }
-  else if(act==='resetweights'){ me().weights=Object.fromEntries(METRICS.map(m=>[m.key,m.base])); save('punter'); }
+  else if(act==='scratch'){ const r=currentRace().runners.find(x=>x.no===+b.dataset.no); r.scratched=!r.scratched; save(); }
+  else if(act==='resetweights'){ me().weights=Object.fromEntries(METRICS.map(m=>[m.key,m.base])); state.ui.prove=null; state.ui.plan=null; save(); }
   else if(act==='load'){ try{ loadText($('#loadIn').value); }catch(err){ toast('Could not read that: '+err.message); } }
-  else if(act==='mergerace'){ try{ mergeRace($('#loadIn').value); }catch(err){ toast('Could not read that: '+err.message); } }
-  else if(act==='example'){ const ex=exampleMeeting(); putMeeting(ex); selectMeeting(ex.id); state.ui.tab='races'; racesWatched=null; persistLocal(); render(); }
+  else if(act==='example'){ const ex=exampleMeeting(); putMeeting(ex); selectMeeting(ex.id); state.ui.tab='races'; persistLocal(); render(); }
   else if(act==='meeting'){ selectMeeting(b.dataset.id); state.ui.open=null; if(b.dataset.go) state.ui.tab=b.dataset.go; persistLocal(); render(); }
   else if(act==='sync'){ await syncNow(); }
   else if(act==='plantest'){ const btn=$('#planBtn'); if(btn){ btn.disabled=true; btn.textContent='Running...'; } try{ const past=await loadPast(); if(!past||!past.length){ toast('No past meetings stored yet'); } else { state.ui.plan=testPlan(me(),past,20); } }catch(e){ console.error(e); toast('Test failed'); } render(); }
   else if(act==='prove'){ const btn=$('#proveBtn'); if(btn){ btn.disabled=true; btn.textContent='Running...'; } try{ const past=await loadPast(); if(!past||!past.length){ toast('No past meetings stored yet'); } else { state.ui.prove=evaluatePunter(me(),past); } }catch(e){ console.error(e); toast('Could not load past meetings'); } render(); }
-  else if(act==='clear'){ if(!state.meeting||!(state.meeting.manual||state.meeting.example)) return; if(!confirm('Remove this meeting, its results, comments and club bets for every Pelican?')) return; removeMeeting(state.meeting.id); persistLocal(); render(); }
-  else if(act==='copyprompt'){ await copy(CONVERT_RULES+SCHEMA_DOC); toast('Conversion prompt copied'); }
+  else if(act==='clear'){ if(!state.meeting||!(state.meeting.manual||state.meeting.example)) return; if(!confirm('Remove this meeting from this device?')) return; delete state.meetings[state.meeting.id]; selectMeeting(null); persistLocal(); render(); }
   else if(act==='copyjson'){ await copy(JSON.stringify(state.meeting,null,1)); toast('Meeting JSON copied'); }
-  else if(act==='convert'){ await convertWithClaude(); }
-  else if(act==='switch'){ state.me=null; persistLocal(); render(); }
-  else if(act==='comment'){ const t=$('#commentIn').value.trim(); if(!t) return; try{ await addComment(state.ui.raceNo,t); }catch(e){} }
-  else if(act==='delcomment'){ await deleteComment(b.dataset.id); }
-  else if(act==='betopen'){ state.ui.betOn=b.dataset.key||null; render(); }
-  else if(act==='betsave'){ const race=currentRace(); const runnerNo=+b.dataset.no; const type=$('#betType').value; const stake=num($('#betStake').value); const odds=num($('#betOdds').value); const placeOddsV=num($('#betPlace').value); const note=$('#betNote').value.trim();
-    if(!stake||stake<=0){ toast('Stake first'); return; } if(type!=='place'&&(!odds||odds<=1)){ toast('Win odds needed for a win or each way bet'); return; }
-    const dup=clubOn(runnerNo,race.no).filter(x=>x.type===type); if(dup.length&&!confirm(`${dup.map(d=>d.by+' has '+fmtMoney(d.stake)).join(', ')} already ${type==='ew'?'each way':type} on this runner. Record another?`)) return;
-    try{ await addBet({raceNo:race.no,runnerNo,type,stake,odds,placeOdds:placeOddsV,note}); state.ui.betOn=null; render(); toast('On the book'); }catch(e){} }
-  else if(act==='delbet'){ if(!confirm('Take this bet off the book?')) return; await deleteBet(b.dataset.id); }
 });
-document.getElementById('tabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; state.ui.tab=b.dataset.tab; render(); window.scrollTo(0,0); });
+document.getElementById('tabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; state.ui.tab=b.dataset.tab; if(b.dataset.tab==='races') state.ui.seenAbout=true; render(); window.scrollTo(0,0); });
 async function copy(text){ try{ await navigator.clipboard.writeText(text); }catch(e){ const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); } }
-
-/* ---------------- Claude conversion (sample capability) ---------------- */
-async function convertWithClaude(){
-  const raw=$('#loadIn').value.trim(); if(!raw){ toast('Paste the raw form text first'); return; } if(!sampleFn){ toast('Conversion is not available in this view'); return; }
-  const btn=$('#convertBtn'); btn.disabled=true; btn.textContent='Converting...';
-  try{ const out=await sampleFn.json(CONVERT_RULES+SCHEMA_DOC+'\n\nForm guide text:\n'+raw,{modelTier:'complex'}); $('#loadIn').value=JSON.stringify(out,null,1); toast('Converted. Check it over, then load it.'); }
-  catch(err){ toast('Conversion failed: '+(err&&err.message||err.code||'unknown')); }
-  finally{ btn.disabled=false; btn.textContent='Convert raw form text with Claude'; }
-}
 
 /* ---------------- boot ---------------- */
 (async function boot(){
-  loadLocal(); ensureRoster(); let seen=false; try{ seen=!!localStorage.getItem('kyw_seen'); localStorage.setItem('kyw_seen','1'); }catch(e){} if(!state.meeting&&!seen&&!SUPABASE.url){ const ex=exampleMeeting(); putMeeting(ex); selectMeeting(ex.id); }
-  render(); const rb=$('#refreshBtn'); if(rb) rb.addEventListener('click',refreshNow); bindPullToRefresh(); checkForUpdate(); const web=await sbInit(); if(!web) initDb();
-  if(window.claude&&window.claude.use){ window.claude.use('sample').then(s=>{ sampleFn=s; if(s&&state.ui.tab==='load') render(); }).catch(()=>{}); }
+  loadLocal(); if(!state.you) state.you=newYou();
+  render(); const rb=$('#refreshBtn'); if(rb) rb.addEventListener('click',refreshNow); bindPullToRefresh(); checkForUpdate(); await sbInit();
+  if(!sb) setSync('','this device only');
 })();
 </script>
 </body>
