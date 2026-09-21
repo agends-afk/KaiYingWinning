@@ -158,7 +158,7 @@ async function syncMeeting(feed: any, existing: any | null, force: boolean) {
         lateOdds: prev?.lateAt ? (prevByNo[rest.no]?.lateOdds ?? null) : (lateAt ? (rest.odds ?? null) : undefined) }));
       const frozen = (prev?.frozenAt && prev?.runners?.length) ? prev.runners : (positions.length >= 3 && prev?.runners?.length && !prevHasResult ? prev.runners : null);
       race = { no, name: fr.name ?? "", distance: num(fr.distance), class: fr.class ?? "", time: fr.time ?? null, raceStatus: fr.raceStatus ?? "", condition: [fr.trackCondition, fr.trackRating].filter(Boolean).join(" "), prizemoney: fr.totalPrizeMoney ?? null, meetingId: meetId,
-        runners: frozen ?? freshRunners, frozenAt: frozen ? (prev.frozenAt ?? prev.syncedAt) : undefined, lateAt: frozen ? prev?.lateAt : lateAt, lockOverride: prev?.lockOverride, feedResult: positions.length >= 3 ? { positions, at: prev?.feedResult?.at ?? new Date().toISOString() } : null, syncedAt: new Date().toISOString() };
+        runners: frozen ? frozen.map((x: any) => x.ra ? x : ({ ...x, ra: raRunner(ra, x.name) })) : freshRunners, frozenAt: frozen ? (prev.frozenAt ?? prev.syncedAt) : undefined, lateAt: frozen ? prev?.lateAt : lateAt, lockOverride: prev?.lockOverride, feedResult: positions.length >= 3 ? { positions, at: prev?.feedResult?.at ?? new Date().toISOString() } : null, syncedAt: new Date().toISOString() };
     } else { race = { ...prev, raceStatus: r.raceStatus ?? prev.raceStatus }; }
     outRaces.push(race);
     if (race.feedResult) results.push({ meeting_id: meetId, race_no: no, positions: race.feedResult.positions, entered_by: "racing.com feed", entered_at: race.feedResult.at });
