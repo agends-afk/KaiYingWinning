@@ -8,8 +8,9 @@ const num = (v) => { if (v == null) return null; const n = parseFloat(String(v).
 const rec = (s) => { const m = /(\d+):(\d+)-(\d+)-(\d+)/.exec(s || ""); return m ? [+m[1], +m[2], +m[3] + +m[4]] : null; };
 const isoDate = (d) => { const m = /(\d{1,2})([A-Z][a-z]{2})(\d{2})/.exec(d || ""); if (!m) return null; return `20${m[3]}-${String(MONTHS[m[2]] || 0).padStart(2, "0")}-${m[1].padStart(2, "0")}`; };
 
-function parseKey(key) { const m = /^(\d{4})([A-Z][a-z]{2})(\d{2}),([A-Z]+),(.+)$/.exec(decodeURIComponent(key || "").replace(/\+/g, " ")); if (!m) return null;
-  return { date: `${m[1]}-${String(MONTHS[m[2]] || 0).padStart(2, "0")}-${m[3]}`, state: m[4], venue: m[5].trim() }; }
+// "2026Sep21,NSW,Grafton" or "2026Sep21,NSW,Grafton,Trial": a fourth segment flags a trial or picnic meeting.
+function parseKey(key) { const m = /^(\d{4})([A-Z][a-z]{2})(\d{2}),([A-Z]+),([^,]+)(?:,(.+))?$/.exec(decodeURIComponent(key || "").replace(/\+/g, " ")); if (!m) return null;
+  return { date: `${m[1]}-${String(MONTHS[m[2]] || 0).padStart(2, "0")}-${m[3]}`, state: m[4], venue: m[5].trim(), flag: m[6] ? m[6].trim() : null }; }
 
 // One form line: "<b>KENS 14Jan26</b> 1150m Soft5 SUPER MDN-SW  $100,000 ($9,750) Tim Clark 57kg (cd 55kg) Barrier 5<br>1st Gorgeous 55.5kg, 2nd Let's Go Barbie 54kg 1:07.88 (600m 34.95), 0.65L, 2nd@800m, 2nd@400m, $4.80/$4.40/$4.20/$4"
 function parseRun(posHtml, remainHtml) {
@@ -67,7 +68,7 @@ export function parseForm(html, key) {
 // Pick the Form.aspx key for a racing.com meeting from a Free Fields calendar page: same date, best venue-name overlap.
 export function matchKey(calendarHtml, date, venueSlug) {
   const want = String(date).replace(/-/g, ""); const iso = (k) => { const p = parseKey(k); return p ? p.date.replace(/-/g, "") : null; };
-  const keys = [...new Set([...calendarHtml.matchAll(/Form\.aspx\?Key=([^"'&]+)/g)].map(m => decodeURIComponent(m[1])))].filter(k => iso(k) === want);
+  const keys = [...new Set([...calendarHtml.matchAll(/Form\.aspx\?Key=([^"'&]+)/g)].map(m => decodeURIComponent(m[1])))].filter(k => iso(k) === want && !parseKey(k).flag);
   const toks = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, " ").split(" ").filter(t => t && !["park", "racecourse", "the", "racing", "club", "gardens", "royal"].includes(t));
   const vt = toks(venueSlug.replace(/-/g, " ")); let best = null, bestScore = 0;
   for (const k of keys) { const p = parseKey(k); const kt = toks(p.venue); const score = vt.filter(t => kt.includes(t)).length + kt.filter(t => vt.includes(t)).length; if (score > bestScore) { best = k; bestScore = score; } }
