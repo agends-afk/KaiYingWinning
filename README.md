@@ -86,6 +86,20 @@ The weights were refitted by coordinate descent on the August archive and tested
 
 Best roughie is the weakest corner, not the strongest. Across the 377 archived races the roughies the form liked most won 4.3% of the time against a market-implied 5.4%, a flat return of about -29%. The app's roughie rule ran -33% and an alternative definition -34%. The market prices the longshots the form fancies too generously, not too meanly. The roughie stays on the Card labelled as a lottery ticket.
 
+### Edge hunt on a year of Victorian racing
+
+A separate function (`kyw-runs`) pulled every Victorian TAB meeting from 20 September 2025 to 20 September 2026 from racing.com: 51,438 runner rows with starting price, opening price and two price moves, finish, margin, in-running positions, and sectional times where Victoria publishes them, plus 25,255 earlier runs (any state) for the horses involved. Every angle was bucketed and judged on actual wins against market-implied wins and flat-stake return at SP, separately on the first and second halves of the year so nothing is judged on the data it was found in.
+
+No bucket of any angle returned a profit at SP in either half. The stable findings are all on the market's side or negative:
+
+- Favourite-longshot bias: horses under $5 win about 8% more often than their price implies in both halves (return -10%); horses at $31 and over win 35% to 40% less often than implied (return -55%). The market is sharpest at the short end and too generous at the long end, which is why the roughie rule loses.
+- Drifters lose: a horse whose price drifted more than 25% from opening to SP wins 15% less often than its SP implies (return -43% in both halves). Firmers only match their price.
+- Poor last starts are overbet: beaten 6 lengths or more, or finishing 7th or worse, wins 10% to 15% less often than implied in both halves. A last-start winner wins 4% to 11% more often than implied but still returns -12% to -17%.
+- Sectionals: the fastest last-600 metres at the previous start matched the market in one half and beat it by 5% in the other. Not a betting angle at SP.
+- Barrier, field size, going, days since last run, weight change, distance change, jockey change and gear change all sit within noise of the market in both halves.
+
+The instrument is calibrated against this. The edge, if any, is the person's, and the proving ground is where it shows.
+
 ## Limitations
 
 Hong Kong meetings carry fields, prices and results from racing.com but no Free Fields form. Sectional times come only from the Free Fields run lines and racing.com's Victorian timing; there is no live sectional or in-running feed. Track condition and rail are as racing.com and Racing Australia publish them on the morning. The example meeting is fictional throughout.
