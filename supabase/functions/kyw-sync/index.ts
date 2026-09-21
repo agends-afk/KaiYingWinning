@@ -3,6 +3,7 @@
 // Racing.com is the raw data source only. Ratings are computed in the app from each Pelican's weights.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { parseForm, matchKey } from "./ra.js";
 
 const GQL = "https://graphql.rmdprod.racing.com/";
 const GQL_KEY = "da2-6nsi4ztsynar3l3frgxf77q5fe"; // racing.com's public site key, taken from their config.js
@@ -92,6 +93,37 @@ fragment E on RaceEntryItem { id raceEntryNumber barrierNumber liveBarrierNumber
     horse { id name age sex careerStats lastTen goodStats softStats heavyStats firstUpStats secondUpStats rating horseForm { date venue distance position starters margin raceClass raceCode isTrial isJumpOut positionAt800 positionAt400 } }
     jockey { fullName winPercent recentWinPercent apprentice weightClaim } trainer { fullName winPercent recentWinPercent } odds { providerCode oddsWin } startingPrice }`;
 
+
+/* ---- Racing Australia Free Fields: one form page per followed meeting per day, cached in kyw_ra ----
+   Adds each runner's full career record and run-by-run lines (with 600m times and in-running positions for every state) to the racing.com field.
+   Fetched once at the morning roll or on the first sync of the day; a miss is retried after two hours; nothing is fetched during the 10-minute cycle otherwise. */
+const RA = "https://racingaustralia.horse";
+const RA_HEADERS = { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15", "Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8", "Accept-Language": "en-AU,en;q=0.9" };
+const raCal: Record<string, string> = {};
+async function raFetch(path: string) { const res = await fetch(RA + path, { headers: RA_HEADERS, redirect: "follow" }); if (!res.ok) throw new Error(`racingaustralia ${res.status}`); return await res.text(); }
+const nameKey = (s: any) => String(s ?? "").toUpperCase().replace(/\(.*?\)/g, "").replace(/[^A-Z0-9]/g, "");
+function compactRA(parsed: any) { const out: Record<string, any> = {};
+  for (const race of parsed.races) for (const r of race.runners) { if (!r.name) continue;
+    out[nameKey(r.name)] = { race: race.no, no: r.no, gear: r.gear || "", rec: r.rec, last10: r.last10 || "", hcp: r.hcp ?? null,
+      runs: (r.runs ?? []).slice(0, 10).map((x: any) => ({ t: x.trial ? 1 : 0, pos: x.pos, of: x.of, v: x.venue, d: x.date, dist: x.distance, c: x.cond, cls: x.cls, j: x.jockey, w: x.weight, b: x.barrier, win: x.first, time: x.time, l600: x.l600, m: x.margin, p8: x.p800, p4: x.p400, sp: x.sp, open: x.prices ? x.prices[0] : null })) }; }
+  return out; }
+async function raForMeeting(meetId: string, meetDate: string, state: string, venueSlug: string): Promise<any | null> {
+  const { data: row } = await sb.from("kyw_ra").select("*").eq("meet_id", meetId).maybeSingle();
+  if (row && String(row.date) === meetDate) { if (row.status === "ok") return row.data; if (Date.now() - Date.parse(row.fetched_at) < 2 * 3600e3) return null; }
+  let status = "miss", key: string | null = null, data: any = null;
+  try {
+    if (!/^(NSW|VIC|QLD|SA|WA|TAS|ACT|NT)$/.test(state)) throw new Error("no Free Fields for " + state);
+    const cal = raCal[state] ?? (raCal[state] = await raFetch(`/FreeFields/Calendar.aspx?State=${state}`));
+    key = matchKey(cal, meetDate, venueSlug); if (!key) throw new Error("no Free Fields meeting matched " + venueSlug);
+    const html = await raFetch(`/FreeFields/Form.aspx?Key=${encodeURIComponent(key)}`); const parsed = parseForm(html, key);
+    if (!parsed.races.length) throw new Error("Free Fields page had no races");
+    data = { key, condition: parsed.condition, rail: parsed.rail, weather: parsed.weather, races: parsed.races.map((r: any) => ({ no: r.no, conditions: r.conditions, prize: r.prize })), runners: compactRA(parsed) }; status = "ok";
+  } catch (e) { data = { error: String(e).slice(0, 200) }; }
+  await sb.from("kyw_ra").upsert({ meet_id: meetId, key, date: meetDate, fetched_at: new Date().toISOString(), status, data });
+  return status === "ok" ? data : null;
+}
+const raRunner = (ra: any, name: string) => { if (!ra?.runners) return undefined; const x = ra.runners[nameKey(name)]; if (!x) return undefined; const { race, no, ...rest } = x; return rest; };
+
 async function syncMeeting(feed: any, existing: any | null, force: boolean) {
   const meetId = String(feed.meet_id);
   const d = await gql(`{ m: getMeeting(id:"${meetId}"){ id date meetingName venueName state trackCondition trackRating railPosition weather racesCount status }
@@ -100,6 +132,7 @@ async function syncMeeting(feed: any, existing: any | null, force: boolean) {
   const meetDate = m.date ?? feed.date; const now = Date.now();
   const stored: any = existing?.data ?? null; const storedRaces: Record<number, any> = {}; for (const r of stored?.races ?? []) storedRaces[r.no] = r;
   const outRaces: any[] = []; const results: any[] = []; let fetched = 0;
+  let ra: any = null; try { ra = await raForMeeting(meetId, String(meetDate), String(m.state ?? ""), String(m.venueName ?? "")); } catch (e) { console.error("ra", e); }
   for (const r of races) {
     const no = r.raceNumber; const prev = storedRaces[no];
     const finished = !!(r.hasResults || (r.resultsString && r.resultsString.trim()));
@@ -120,7 +153,7 @@ async function syncMeeting(feed: any, existing: any | null, force: boolean) {
       // Late market: one refresh of the rating's market about 20 minutes before the jump, taken on the first read inside that window and then held.
       const t = r.time ? Date.parse(r.time) : null; const minsTo = t != null ? (t - now) / 60000 : null;
       const lateAt: string | undefined = prev?.lateAt ?? ((minsTo != null && minsTo <= 20 && minsTo > -60) ? new Date().toISOString() : undefined);
-      const freshRunners = runners.map(({ finish, ...rest }: any) => ({ ...rest,
+      const freshRunners = runners.map(({ finish, ...rest }: any) => ({ ...rest, ra: raRunner(ra, rest.name) ?? prevByNo[rest.no]?.ra,
         openOdds: prevByNo[rest.no]?.openOdds ?? prevByNo[rest.no]?.odds ?? rest.odds ?? null,
         lateOdds: prev?.lateAt ? (prevByNo[rest.no]?.lateOdds ?? null) : (lateAt ? (rest.odds ?? null) : undefined) }));
       const frozen = (prev?.frozenAt && prev?.runners?.length) ? prev.runners : (positions.length >= 3 && prev?.runners?.length && !prevHasResult ? prev.runners : null);
@@ -131,7 +164,7 @@ async function syncMeeting(feed: any, existing: any | null, force: boolean) {
     if (race.feedResult) results.push({ meeting_id: meetId, race_no: no, positions: race.feedResult.positions, entered_by: "racing.com feed", entered_at: race.feedResult.at });
   }
   const meeting = { id: meetId, meeting: feed.name ?? m.venueName ?? m.meetingName, venue: m.venueName ?? "", state: m.state ?? "", date: meetDate, condition: [m.trackCondition, m.trackRating].filter(Boolean).join(" ") || (stored?.condition ?? "Good 4"), rail: m.railPosition ?? "", weather: m.weather ?? "", status: m.status ?? "", sort: feed.sort ?? 99,
-    races: outRaces, source: "racing.com", syncedAt: stored?.syncedAt ?? new Date().toISOString(), updatedAt: stored?.updatedAt ?? Date.now() };
+    races: outRaces, source: "racing.com", raKey: ra?.key ?? stored?.raKey ?? null, syncedAt: stored?.syncedAt ?? new Date().toISOString(), updatedAt: stored?.updatedAt ?? Date.now() };
   // Write only when something other than the timestamps differs.
   // Postgres returns jsonb with its own key order, so compare a key-sorted rendering.
   const canon = (v: any): string => Array.isArray(v) ? "[" + v.map(canon).join(",") + "]" : (v && typeof v === "object") ? "{" + Object.keys(v).sort().map(k => JSON.stringify(k) + ":" + canon(v[k])).join(",") + "}" : JSON.stringify(v ?? null);
@@ -171,14 +204,14 @@ async function selectMeetings(date: string) {
   const all = (data.m ?? []).filter((m: any) => m.isTab === 1 && !m.isTrial && !m.isJumpOut);
   const picks: any[] = []; const taken = new Set<string>();
   if (metroDay) for (const m of all) { const slug = String(m.venueName ?? "").toLowerCase(); const hit = METRO.find(([re]) => re.test(slug)); if (!hit) continue;
-    picks.push({ meet_id: String(m.id), name: hit[1], state: hit[2], date, sort: STATE_ORDER[hit[2]] ?? 9 }); taken.add(hit[2]); }
+    picks.push({ meet_id: String(m.id), name: hit[1], state: hit[2], venue: slug, date, sort: STATE_ORDER[hit[2]] ?? 9 }); taken.add(hit[2]); }
   for (const st of TOP_STATES) { if (taken.has(st)) continue; const cands = all.filter((m: any) => m.state === st); if (!cands.length) continue;
     let best: any = null, bestPrize = -1;
     for (const c of cands) { let prize = 0; try { const r = await gql(`{ races: getRacesForMeet(meetCode:"${c.id}"){ totalPrizeMoney } }`); prize = (r.races ?? []).reduce((a: number, x: any) => a + (num(x.totalPrizeMoney) ?? 0), 0); } catch { prize = 0; }
       if (prize > bestPrize) { bestPrize = prize; best = c; } }
-    if (best) { const slug = String(best.venueName ?? "").toLowerCase(); const hit = METRO.find(([re]) => re.test(slug)); picks.push({ meet_id: String(best.id), name: hit ? hit[1] : prettyVenue(slug), state: st, date, sort: STATE_ORDER[st] ?? 9 }); taken.add(st); } }
+    if (best) { const slug = String(best.venueName ?? "").toLowerCase(); const hit = METRO.find(([re]) => re.test(slug)); picks.push({ meet_id: String(best.id), name: hit ? hit[1] : prettyVenue(slug), state: st, venue: slug, date, sort: STATE_ORDER[st] ?? 9 }); taken.add(st); } }
   if (hkDay) for (const m of all) { if (m.state !== "HK") continue; const slug = String(m.venueName ?? "").toLowerCase(); const hit = HK_VENUES.find(([re]) => re.test(slug));
-    picks.push({ meet_id: String(m.id), name: hit ? hit[1] : prettyVenue(slug), state: "HK", date, sort: STATE_ORDER.HK }); }
+    picks.push({ meet_id: String(m.id), name: hit ? hit[1] : prettyVenue(slug), state: "HK", venue: slug, date, sort: STATE_ORDER.HK }); }
   return picks;
 }
 
@@ -192,7 +225,9 @@ async function dailyRoll(): Promise<{ date: string; picks: any[]; archived: any[
   for (const f of oldFeeds ?? []) { if (String(f.date) >= date) continue; try { archived.push(await backtest(String(f.meet_id))); } catch (e) { archived.push({ meetId: f.meet_id, error: String(e).slice(0, 200) }); } }
   if (picks.length) {
     await sb.from("kyw_feed").update({ active: false }).eq("active", true);
-    await sb.from("kyw_feed").upsert(picks.map(({ state, ...f }) => ({ ...f, active: true, first_at: null, last_at: null })), { onConflict: "meet_id" });
+    await sb.from("kyw_feed").upsert(picks.map(({ state, venue, ...f }) => ({ ...f, active: true, first_at: null, last_at: null })), { onConflict: "meet_id" });
+    // Read the day's Free Fields form once, now, so the first sync carries it.
+    for (const p of picks) { try { await raForMeeting(p.meet_id, date, p.state, p.venue); } catch (e) { console.error("ra roll", e); } }
     const keep = picks.map(f => f.meet_id);
     const { data: olds } = await sb.from("kyw_meeting").select("id"); for (const o of olds ?? []) { if (!keep.includes(String(o.id))) { await sb.from("kyw_meeting").delete().eq("id", o.id); await sb.from("kyw_results").delete().eq("meeting_id", o.id); } }
     await sb.from("kyw_feed").delete().eq("active", false).lt("date", aestDate(-14));
@@ -236,6 +271,13 @@ Deno.serve(async (req) => {
   if (code !== FLOCK) return new Response(JSON.stringify({ error: "not the flock" }), { status: 401, headers: { "Content-Type": "application/json", ...CORS } });
   const force = url.searchParams.get("force") === "1";
   const only = url.searchParams.get("meet");
+  const raq = url.searchParams.get("ra");
+  if (raq) { try { const d = await gql(`{ m: getMeeting(id:"${raq}"){ id date venueName state } }`); if (force) await sb.from("kyw_ra").delete().eq("meet_id", raq);
+      const ra = await raForMeeting(raq, String(d.m?.date ?? ""), String(d.m?.state ?? ""), String(d.m?.venueName ?? ""));
+      const { data: row } = await sb.from("kyw_ra").select("status,key,fetched_at,data").eq("meet_id", raq).maybeSingle();
+      const names = Object.keys(ra?.runners ?? {}); const first = names[0] ? ra.runners[names[0]] : null;
+      return new Response(JSON.stringify({ meet: d.m, status: row?.status, key: row?.key, error: row?.data?.error, runners: names.length, condition: ra?.condition, rail: ra?.rail, sample: first ? { name: names[0], runs: first.runs.length, gear: first.gear, rec: first.rec.career, firstRun: first.runs[0] } : null }), { headers: { "Content-Type": "application/json", ...CORS } }); }
+    catch (e) { return new Response(JSON.stringify({ error: String(e).slice(0, 400) }), { status: 500, headers: { "Content-Type": "application/json", ...CORS } }); } }
   const bt = url.searchParams.get("backtest"); const btd = url.searchParams.get("backtestdate");
   if (btd) { try { const r = await backtestDate(btd); return new Response(JSON.stringify(r), { headers: { "Content-Type": "application/json", ...CORS } }); } catch (e) { return new Response(JSON.stringify({ error: String(e).slice(0, 400) }), { status: 500, headers: { "Content-Type": "application/json", ...CORS } }); } }
   if (bt) { try { const r = await backtest(bt); return new Response(JSON.stringify(r), { headers: { "Content-Type": "application/json", ...CORS } }); } catch (e) { return new Response(JSON.stringify({ error: String(e).slice(0, 400) }), { status: 500, headers: { "Content-Type": "application/json", ...CORS } }); } }
