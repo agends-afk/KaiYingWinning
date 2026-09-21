@@ -64,6 +64,24 @@ The model was run over 220 metro Saturday races (8 August to 5 September 2026) w
 
 Log-loss on the winner was 1.99 for the model against 1.85 for the market, so the market's probabilities were better calibrated than ours. The best-bet gap to the favourite is inside noise on a sample this size. No edge has been demonstrated. The proving ground on the Model tab lets each Pelican test their own weights against the same races.
 
+
+### Unit allocator test
+
+The proving ground also runs the unit allocator as a morning plan over each archived race day: candidates with positive edge under the trust setting, one per race, sized by fractional Kelly on 20 units, whole units, capped per race. Over the first 10 archived days (43 meetings, 377 races, settled at SP) it lost money under every setting tried: trust 35% to 100%, tenth to half Kelly, tighter and looser edge, price caps. Default settings placed 20 units, won 1 bet, lost 16.8 units, 7 losing days of 10.
+
+The calibration table explains why. Grouping runners by how far the form rating sits above or below the market:
+
+| Our chance / market chance | Runners | Actually won | Model said | Market said | Flat return |
+| --- | --- | --- | --- | --- | --- |
+| under 0.8 | 1179 | 17.0% | 8.4% | 16.5% | -17% |
+| 0.8 to 1.0 | 431 | 10.9% | 11.0% | 12.3% | -28% |
+| 1.0 to 1.25 | 431 | 11.1% | 11.1% | 10.0% | -23% |
+| 1.25 to 1.6 | 427 | 9.4% | 11.5% | 8.2% | -14% |
+| 1.6 to 2.5 | 657 | 5.0% | 10.5% | 5.4% | -41% |
+| over 2.5 | 727 | 1.2% | 8.9% | 2.3% | -51% |
+
+Where the rating disagrees most with the market, actual results track the market, not the rating. The form rating spreads chance too evenly: it under-rates the horses the market likes and over-rates the ones it does not. Until that changes, the allocator has nothing to allocate.
+
 ## Limitations
 
 Results are entered by hand. There is no live results feed, no sectional or in-running data, and no automatic scratchings or track condition updates. The example meeting is fictional throughout.

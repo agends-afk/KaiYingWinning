@@ -258,7 +258,7 @@ const METRICS = [
 const DEFAULT_SETTINGS = { marginRank:3, marginProb:0.12, lr:0.12, formlineGain:0.6, beta:2.2, autoAdapt:true, bank:200, kelly:0.25, valueEdge:0.05, book:1.20, trust:0.5 };
 const PUNTER_COLOURS = ['#E8801A','#2F8F5B','#3B6FD4','#C43C2F','#8E5BC6','#D4A72C','#1BA5A5','#D45FA0','#6B7F2E','#8C5A2B'];
 // Web-hosted backend. Filled in once the Supabase project is chosen. Empty url = no shared backend.
-const BUILD='2026-09-21.4';
+const BUILD='2026-09-21.5';
 const SUPABASE = { url:'https://qgomklldlpspwilyjdqx.supabase.co', key:'sb_publishable_nhOXF3eXlHAyys2B0rzxxQ_W_Kb4OZP', flockCode:'pelicans-2026' };
 // The roster. Anyone else can still add a name on the roll call.
 const ROSTER = [
@@ -490,6 +490,26 @@ function evaluatePunter(punter, past){
   return {races, top:{w:topW,pl:topPl,roi:races?(topRet-races)/races:0}, adapt:{w:adW,roi:races?(adRet-races)/races:0}, fav:{w:favW,roi:races?(favRet-races)/races:0}, value:{n:valN,w:valW,roi:valN?(valRet-valN)/valN:0}, rough:{n:rgN,w:rgW,roi:rgN?(rgRet-rgN)/rgN:0}, ll:n?ll/n:null, llM:n?llM/n:null};
 }
 async function loadPast(){ if(PAST) return PAST; if(!sb) return null; const {data,error}=await sb.from('kyw_backtest').select('data').order('created_at'); if(error) throw error; PAST=(data||[]).map(r=>r.data).filter(m=>m&&m.races); return PAST; }
+/* ---------------- unit allocator: a morning plan for a day's program ----------------
+   Candidates: positive edge under the trust blend, inside the price band, one per race. Sized by fractional Kelly on the day's units,
+   whole units, capped per race, trimmed to the budget. planDay works for a live day; testPlan replays it over the archived meetings. */
+function planDay(meetings, punter, opts){ const st={...DEFAULT_SETTINGS,...punter.settings}; const o={units:20,capRace:0.25,maxPrice:30,minPrice:1.8,...opts}; const cands=[];
+  for(const m of meetings){ for(const r of m.races){ if(r.result||active(r).length<5) continue; const sc=scoreRace(r,m,punter.weights,st,{formline:{},barrierBias:0,paceBias:0},{}); let best=null;
+    for(const x of sc){ const od=num(x.r.odds); if(!(od>1)||od>o.maxPrice||od<o.minPrice||x.market==null) continue; const p=x.probValue; const edge=p*od-1; if(edge<=0||!isValue(x,st)) continue; const f=(p*od-1)/(od-1); if(!best||edge>best.edge) best={m,r,x,od,p,edge,f}; }
+    if(best) cands.push(best); } }
+  let bets=cands.map(c=>({...c,u:Math.round(c.f*st.kelly*o.units)})).filter(b=>b.u>=1); const cap=Math.max(1,Math.floor(o.units*o.capRace)); for(const b of bets) b.u=Math.min(b.u,cap);
+  if(bets.reduce((a,b)=>a+b.u,0)>o.units){ const k=o.units/bets.reduce((a,b)=>a+b.u,0); for(const b of bets) b.u=Math.max(1,Math.floor(b.u*k)); bets.sort((a,b)=>a.edge-b.edge); while(bets.reduce((a,b)=>a+b.u,0)>o.units&&bets.length){ if(bets[0].u>1) bets[0].u--; else bets.shift(); } }
+  return bets.sort((a,b)=>b.edge-a.edge); }
+function testPlan(punter, past, units){ const days={}; for(const m of past) (days[m.date]=days[m.date]||[]).push(m); const out={days:0,bets:0,won:0,staked:0,ret:0,losing:0,worst:0,best:0,perDay:[]};
+  for(const d of Object.keys(days).sort()){ const ms=days[d].map(m=>({...m, condition:m.condition||'Good 4', races:m.races.map(r=>({...r, meetingId:m.id, condition:r.condition||m.condition||'Good 4', runners:r.runners.map(x=>({...x, scratched:!!x.scratched}))}))}));
+    const withRes=ms.map(m=>({...m, races:m.races.filter(r=>r.result)})); // plan as if unrun, settle on the stored result
+    const bets=planDay(withRes.map(m=>({...m, races:m.races.map(r=>({...r, result:null, _res:r.result}))})), punter, {units});
+    let staked=0,ret=0,won=0; for(const b of bets){ staked+=b.u; if(b.r._res.positions[0]===b.x.r.no){ ret+=b.u*b.od; won++; } }
+    const pl=ret-staked; out.days++; out.bets+=bets.length; out.won+=won; out.staked+=staked; out.ret+=ret; if(pl<0) out.losing++; out.worst=Math.min(out.worst,pl); out.best=Math.max(out.best,pl); out.perDay.push({d,n:bets.length,u:staked,pl}); }
+  return out; }
+function planTestHTML(t, units){ if(!t) return ''; const pl=t.ret-t.staked; const roiS=t.staked?Math.round((t.ret-t.staked)/t.staked*100):0; const roiB=Math.round(pl/(t.days*units)*100);
+  return `<div class="kpis" style="margin-top:10px"><div class="kpi"><b class="num" style="color:${pl>=0?'var(--good)':'var(--bad)'}">${pl>=0?'+':''}${pl.toFixed(1)}u</b><span>Profit over ${t.days} days</span></div><div class="kpi"><b class="num">${t.won}/${t.bets}</b><span>Bets won</span></div><div class="kpi"><b class="num">${t.losing}/${t.days}</b><span>Losing days</span></div></div>
+  <p class="note" style="margin-top:8px">Morning plan of ${units} units a day, settled at SP. Placed ${t.staked} of ${t.days*units} units; return ${roiS}% on units placed, ${roiB}% on the daily budget. Worst day ${t.worst.toFixed(1)}u, best day +${t.best.toFixed(1)}u.</p>`; }
 function provingHTML(ev){ if(!ev) return ''; const pc=(a,b)=>b?Math.round(100*a/b)+'%':'-'; const roi=v=>(v>=0?'+':'')+Math.round(v*100)+'%';
   return `<div class="kpis"><div class="kpi"><b class="num">${pc(ev.top.w,ev.races)}</b><span>Best bet won</span></div><div class="kpi"><b class="num" style="color:${ev.top.roi>0?'var(--good)':'var(--bad)'}">${roi(ev.top.roi)}</b><span>Best bet ROI at SP</span></div><div class="kpi"><b class="num">${pc(ev.fav.w,ev.races)}</b><span>Favourite won</span></div></div>
   <p class="note" style="margin-top:8px">${ev.races} races. Best bet placed ${pc(ev.top.pl,ev.races)}. With the day's adaptation running, best bet won ${pc(ev.adapt.w,ev.races)} for ${roi(ev.adapt.roi)}. Favourites returned ${roi(ev.fav.roi)}.
@@ -829,7 +849,8 @@ function viewWeights(){
   html+=`<section class="block" style="margin-top:26px"><div class="eyebrow">Proving ground<span class="sl">/</span>your weights against real Saturdays at starting price</div>
   <p class="note" style="margin:6px 0 8px">Runs your current weights and settings over past metro meetings as the form stood that morning, and settles at the actual starting prices. Change a slider, test again. Small samples swing; treat anything under a few hundred races as a hint, not proof. Baseline over 220 races (metro Saturdays 8 Aug to 5 Sep 2026): with the market switched off the best bet won 26% at +5% flat-stake return; with it on 31% at +4%; the market favourite won 33% at -6%. Those gaps are inside noise. Value calls and roughies both lost. Nobody has shown an edge yet; the sliders are where you try to find one.</p>
   <div class="actions" style="margin:0 0 10px"><button class="btn primary" id="proveBtn" data-act="prove" ${sb?'':'disabled'}>Test these weights</button>${PAST?`<span class="small">${PAST.length} meetings, ${PAST.reduce((a,m)=>a+m.races.length,0)} races loaded</span>`:''}</div>
-  <div id="proveOut">${state.ui.prove?provingHTML(state.ui.prove):''}</div></section>`;
+  <div id="proveOut">${state.ui.prove?provingHTML(state.ui.prove):''}</div>
+  <div class="actions" style="margin:14px 0 6px"><button class="btn" id="planBtn" data-act="plantest" ${sb?'':'disabled'}>Test a 20-unit day plan</button><span class="small">The unit allocator, run as a morning plan on each archived race day with your weights, trust and staking.</span></div><div id="planOut">${state.ui.plan?planTestHTML(state.ui.plan,20):''}</div></section>`;
   html+=`<section class="block" style="margin-top:26px"><div class="eyebrow">Adaptation<span class="sl">/</span>how far a result may move your model</div><div class="rows" style="margin-top:8px">
     <div class="wrow"><div class="l"><b>Adapt weights from results</b><span><input type="checkbox" data-act="setting" data-key="autoAdapt" ${s.autoAdapt?'checked':''}></span></div><div class="d">A surprising result nudges your weights for the later races. A tip can move when that happens; the race screen shows when and why.</div></div>
     <div class="wrow"><div class="l"><b>Margin of error: rated position</b><span class="num">${s.marginRank}</span></div><div class="d">A winner rated this position or better is inside the margin and triggers no weight change.</div><input type="range" min="1" max="8" step="1" value="${s.marginRank}" data-act="setting" data-key="marginRank"></div>
@@ -906,7 +927,7 @@ form, last_pos, last_field, last_margin, days, last_race, class_change, jockey_p
 function bind(root){
   root.querySelectorAll('[data-meta]').forEach(el=>el.addEventListener('change',()=>{ state.meeting[el.dataset.meta]=el.value; state.meeting.updatedAt=Date.now(); save('meeting'); }));
   root.querySelectorAll('[data-act="wrace"]').forEach(el=>el.addEventListener('click',()=>{ state.ui.raceNo=+el.dataset.no; const wt=document.getElementById('wtips'); if(wt){ wt.innerHTML=weightTipsHTML(); bind(wt); } }));
-  root.querySelectorAll('[data-act="weight"]').forEach(el=>{ el.addEventListener('input',()=>{ me().weights[el.dataset.key]=+el.value; const sp=el.closest('.wrow').querySelector('.l span'); sp.innerHTML=weightWord(+el.value,+sp.dataset.base); const wt=document.getElementById('wtips'); if(wt){ wt.innerHTML=weightTipsHTML(); bind(wt); } }); el.addEventListener('change',()=>{ state.ui.prove=null; save('punter'); }); });
+  root.querySelectorAll('[data-act="weight"]').forEach(el=>{ el.addEventListener('input',()=>{ me().weights[el.dataset.key]=+el.value; const sp=el.closest('.wrow').querySelector('.l span'); sp.innerHTML=weightWord(+el.value,+sp.dataset.base); const wt=document.getElementById('wtips'); if(wt){ wt.innerHTML=weightTipsHTML(); bind(wt); } }); el.addEventListener('change',()=>{ state.ui.prove=null; state.ui.plan=null; save('punter'); }); });
   root.querySelectorAll('[data-act="setting"]').forEach(el=>{ const h=()=>{ me().settings[el.dataset.key]= el.type==='checkbox'?el.checked:+el.value; }; el.addEventListener('input',()=>{ h(); const sp=el.closest('.wrow').querySelector('.l span'); if(sp&&el.type!=='checkbox'){ const k=el.dataset.key; sp.textContent= k==='marginProb'?pct(+el.value):k==='marginRank'?el.value:k==='bank'?fmtMoney(+el.value):k==='valueEdge'?(+el.value*100).toFixed(0)+' pts':k==='book'?Math.round(+el.value*100)+'%':k==='trust'?Math.round(+el.value*100)+'%':(+el.value).toFixed(2); } }); el.addEventListener('change',()=>{ h(); save('punter'); }); });
   root.querySelectorAll('[data-act="adj"]').forEach(el=>{ el.addEventListener('input',()=>{ el.nextElementSibling.textContent=(+el.value>0?'+':'')+el.value; }); el.addEventListener('change',()=>{ const a=me().adj[el.dataset.key]||(me().adj[el.dataset.key]={adj:0,note:''}); a.adj=+el.value; save('punter'); }); });
   root.querySelectorAll('[data-act="note"]').forEach(el=>el.addEventListener('change',()=>{ const a=me().adj[el.dataset.key]||(me().adj[el.dataset.key]={adj:0,note:''}); a.note=el.value; save('punter'); }));
@@ -932,6 +953,7 @@ document.addEventListener('click', async e=>{
   else if(act==='example'){ const ex=exampleMeeting(); putMeeting(ex); selectMeeting(ex.id); state.ui.tab='races'; racesWatched=null; persistLocal(); render(); }
   else if(act==='meeting'){ selectMeeting(b.dataset.id); state.ui.open=null; if(b.dataset.go) state.ui.tab=b.dataset.go; persistLocal(); render(); }
   else if(act==='sync'){ await syncNow(); }
+  else if(act==='plantest'){ const btn=$('#planBtn'); if(btn){ btn.disabled=true; btn.textContent='Running...'; } try{ const past=await loadPast(); if(!past||!past.length){ toast('No past meetings stored yet'); } else { state.ui.plan=testPlan(me(),past,20); } }catch(e){ console.error(e); toast('Test failed'); } render(); }
   else if(act==='prove'){ const btn=$('#proveBtn'); if(btn){ btn.disabled=true; btn.textContent='Running...'; } try{ const past=await loadPast(); if(!past||!past.length){ toast('No past meetings stored yet'); } else { state.ui.prove=evaluatePunter(me(),past); } }catch(e){ console.error(e); toast('Could not load past meetings'); } render(); }
   else if(act==='clear'){ if(!state.meeting||!(state.meeting.manual||state.meeting.example)) return; if(!confirm('Remove this meeting, its results, comments and club bets for every Pelican?')) return; removeMeeting(state.meeting.id); persistLocal(); render(); }
   else if(act==='copyprompt'){ await copy(CONVERT_RULES+SCHEMA_DOC); toast('Conversion prompt copied'); }
