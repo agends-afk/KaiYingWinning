@@ -235,22 +235,22 @@ pre.schema{font-size:11px;line-height:1.45;background:var(--surface);border:1.5p
    ============================================================ */
 
 const METRICS = [
-  {key:'last',      label:'Last start',         base:1.4, desc:'Finishing position, margin and field size last start, adjusted for a rise or drop in class today.'},
-  {key:'form',      label:'Recent form',        base:1.0, desc:'Last five runs, most recent counting most. Spells are skipped.'},
-  {key:'classform', label:'Class of recent runs', base:1.2, desc:'The grade of the last three races and how close the horse got. A narrow defeat in a Group 1 outranks a win in a benchmark race.'},
-  {key:'track',     label:'Track record',       base:0.8, desc:'Win and place rate at this track, shrunk toward average where starts are few.'},
-  {key:'distance',  label:'Distance record',    base:0.9, desc:'Win and place rate at this distance, shrunk the same way.'},
-  {key:'condition', label:'Track condition',    base:0.9, desc:'Record on today\'s going, taken from the meeting condition on the Card tab.'},
+  {key:'last',      label:'Last start',         base:0.7, desc:'Finishing position, margin and field size last start, adjusted for a rise or drop in class today.'},
+  {key:'form',      label:'Recent form',        base:1.125, desc:'Last five runs, most recent counting most. Spells are skipped.'},
+  {key:'classform', label:'Class of recent runs', base:0.9, desc:'The grade of the last three races and how close the horse got. A narrow defeat in a Group 1 outranks a win in a benchmark race.'},
+  {key:'track',     label:'Track record',       base:0.6, desc:'Win and place rate at this track, shrunk toward average where starts are few.'},
+  {key:'distance',  label:'Distance record',    base:0, desc:'Win and place rate at this distance, shrunk the same way.'},
+  {key:'condition', label:'Track condition',    base:0, desc:'Record on today\'s going, taken from the meeting condition on the Card tab.'},
   {key:'career',    label:'Career strike rate', base:0.6, desc:'Career win and place percentages.'},
-  {key:'rating',    label:'Handicap rating',    base:0.9, desc:'Official rating relative to the field, where the feed supplies it. A rough measure of class.'},
-  {key:'jockey',    label:'Jockey',             base:0.7, desc:'Jockey win percentage or rating from the form.'},
-  {key:'trainer',   label:'Trainer',            base:0.5, desc:'Trainer win percentage or rating from the form.'},
-  {key:'barrier',   label:'Barrier',            base:0.6, desc:'Inside draws favoured over short trips, fading with distance. The day\'s barrier bias shifts this.'},
-  {key:'pace',      label:'Run style',          base:0.5, desc:'Where the horse settles, from its last four runs. On-pace runners get a small edge over short trips; the day\'s results move this as a pattern shows.'},
-  {key:'trackdist', label:'Track and distance', base:0.7, desc:'Record at this track over this distance.'},
-  {key:'barrierrec',label:'Record from this gate', base:0.3, desc:'The horse\'s own record from this barrier number, where the feed supplies it.'},
+  {key:'rating',    label:'Handicap rating',    base:0, desc:'Official rating relative to the field, where the feed supplies it. A rough measure of class.'},
+  {key:'jockey',    label:'Jockey',             base:2.1, desc:'Jockey win percentage or rating from the form.'},
+  {key:'trainer',   label:'Trainer',            base:0.563, desc:'Trainer win percentage or rating from the form.'},
+  {key:'barrier',   label:'Barrier',            base:0.45, desc:'Inside draws favoured over short trips, fading with distance. The day\'s barrier bias shifts this.'},
+  {key:'pace',      label:'Run style',          base:0, desc:'Where the horse settles, from its last four runs. On-pace runners get a small edge over short trips; the day\'s results move this as a pattern shows.'},
+  {key:'trackdist', label:'Track and distance', base:0.35, desc:'Record at this track over this distance.'},
+  {key:'barrierrec',label:'Record from this gate', base:0.9, desc:'The horse\'s own record from this barrier number, where the feed supplies it.'},
   {key:'weight',    label:'Weight carried',     base:0.4, desc:'Weight relative to the field average.'},
-  {key:'fitness',   label:'Freshness',          base:0.5, desc:'Days since last run. Fourteen to twenty-eight is treated as ideal; first-up runs are marked down.'},
+  {key:'fitness',   label:'Freshness',          base:0, desc:'Days since last run. Fourteen to twenty-eight is treated as ideal; first-up runs are marked down.'},
   {key:'market',    label:'Opening market',     base:0.75, desc:'Implied chance from the morning prices, refreshed once about 20 minutes before the race. At 0.75 it lifted the return on past races without handing the tip to the favourite; at 1.5 it did. Zero is pure form.'},
   {key:'formline',  label:'Form lines today',   base:1.0, desc:'Live: horses out of the same last-start race as one that ran above or below expectation today, and riders winning on the day.'},
   {key:'manual',    label:'Your call',          base:1.0, desc:'Your own plus or minus on a runner, set on the race screen.'}
@@ -258,7 +258,7 @@ const METRICS = [
 const DEFAULT_SETTINGS = { marginRank:3, marginProb:0.12, lr:0.12, formlineGain:0.6, beta:2.2, autoAdapt:true, bank:200, kelly:0.25, valueEdge:0.05, book:1.20, trust:0.5 };
 const PUNTER_COLOURS = ['#E8801A','#2F8F5B','#3B6FD4','#C43C2F','#8E5BC6','#D4A72C','#1BA5A5','#D45FA0','#6B7F2E','#8C5A2B'];
 // Web-hosted backend. Filled in once the Supabase project is chosen. Empty url = no shared backend.
-const BUILD='2026-09-21.5';
+const BUILD='2026-09-21.6';
 const SUPABASE = { url:'https://qgomklldlpspwilyjdqx.supabase.co', key:'sb_publishable_nhOXF3eXlHAyys2B0rzxxQ_W_Kb4OZP', flockCode:'pelicans-2026' };
 // The roster. Anyone else can still add a name on the roll call.
 const ROSTER = [
@@ -783,7 +783,7 @@ function viewRace(){
     <h2>${cloth(tR.no)} ${esc(tR.name)}</h2><p>Our price ${ourPrice(t.prob,st,t.book)} at ${t.book?'this race\'s '+Math.round(t.book*100)+'%':'a '+Math.round(st.book*100)+'%'} book (fair ${fmtOdds(t.prob)}), ${mkt}.${t.edge!=null?(isValue(t,st)?` Value: market ${pct(t.market)}, form-only ${pct(t.probFree)}, we back it at ${pct(t.probValue)}.`:` No value at the market price (form-only ${pct(t.probFree)} against market ${pct(t.market)}).`):''}${adv.stakeTop>0?` Stake ${fmtMoney(adv.stakeTop)} win.`:''}</p>
     ${adv.value&&adv.value.r.no!==tR.no?`<p><b>Value:</b> ${cloth(adv.value.r.no)} ${esc(adv.value.r.name)} at $${adv.value.r.odds}, form-only ${pct(adv.value.probFree)} against market ${pct(adv.value.market)}, backed at ${pct(adv.value.probValue)}.${adv.stakeValue>0?' Stake '+fmtMoney(adv.stakeValue)+'.':''}</p>`:''}
     <div class="eyebrow" style="color:var(--panel-ink);opacity:.7;margin-top:12px">Best roughie</div>
-    ${rg?`<p style="margin-top:4px"><b>${cloth(rg.r.no)} ${esc(rg.r.name)}</b> at $${rg.r.odds}, form-only price ${ourPrice(rg.probFree,st,rg.book)}. Lottery ticket: across 220 past metro races the roughie won about 6% of the time and lost money at flat stakes. Small each way or leave it.</p>`:`<p style="margin-top:4px">Nothing at $8 or better the model can make a case for.</p>`}
+    ${rg?`<p style="margin-top:4px"><b>${cloth(rg.r.no)} ${esc(rg.r.name)}</b> at $${rg.r.odds}, form-only price ${ourPrice(rg.probFree,st,rg.book)}. Lottery ticket. Across 377 past races roughies the form liked most won 4% of the time against a market-implied 5%; the rule lost a third of stakes. Leave it or keep it small.</p>`:`<p style="margin-top:4px">Nothing at $8 or better the model can make a case for.</p>`}
     <div class="eyebrow" style="color:var(--panel-ink);opacity:.7;margin-top:12px">Multi</div>
     <p style="margin-top:4px">${leg?`${esc(tR.name)} is a leg of the day's multi (${multi.legs.length} legs, fair $${multi.fair.toFixed(1)}).`:multi?`Not in the multi. Legs are ${multi.legs.map(l=>'R'+l.raceNo).join(', ')}.`:'No multi while fewer than two races are open.'}</p>
     ${ep.override?`<p>You have overridden this race to number ${ep.no}. Tap its Tip button again to go back to the model.</p>`:''}${trailHTML(race)}</div>`; }
@@ -826,7 +826,7 @@ function betForm(race,r){ const open=state.ui.betOn===runnerKey(race,r); const e
     ${existing.length?`<p class="small">Already on this runner: ${existing.map(b=>`${esc(b.by)} ${fmtMoney(b.stake)} ${b.type==='ew'?'each way':b.type}`).join(', ')}.</p>`:''}`; }
 function recStr(v){ const r=rec(v); return r? `${r.s}:${r.w}-${r.p}` : 'n/a'; }
 
-function weightWord(w,base){ const r=base?w/base:0; const word= w<=0?'off':r<0.6?'light':r<1.4?'default':r<2?'heavy':'max'; return `${w.toFixed(2)} <small>${word}</small>`; }
+function weightWord(w,base){ const r=base?w/base:(w>0?9:0); const word= w<=0?(base?'off':'default'):base===0?'on':r<0.6?'light':r<1.4?'default':r<2?'heavy':'max'; return `${w.toFixed(2)} <small>${word}</small>`; }
 function weightTipsHTML(){ const m=state.meeting; if(!m) return `<p class="note">Load a meeting and the field will reprice here as you drag.</p>`; const my=me(); const st={...DEFAULT_SETTINGS,...my.settings}; const run=runDay(my,m);
   const race=m.races.find(r=>r.no===state.ui.raceNo)||m.races.find(r=>!r.result&&active(r).length>=2)||m.races[0]; if(!race) return ''; state.ui.raceNo=race.no;
   if(run.locked&&run.locked[race.no]) return `<section class="block" style="margin:0 0 14px"><div class="eyebrow">Repriced by your weights<span class="sl">/</span>${esc(shortName(m))} R${race.no}</div><p class="note" style="margin-top:6px">This race has jumped. Its tip is fixed and no longer moves with the sliders. Pick an unrun race on the Card to see the field reprice.</p></section>`;
@@ -844,10 +844,10 @@ function viewWeights(){
   <div id="wtips">${weightTipsHTML()}</div><div class="rows">`;
   for(const met of METRICS){ const w=my.weights[met.key]; const adapted=run.weights[met.key]; const d=adapted-w;
     html+=`<div class="wrow"><div class="l"><b>${met.label}</b><span class="num" data-base="${met.base}">${weightWord(w,met.base)}${Math.abs(d)>0.005?` <span style="color:var(--accent)">${adapted.toFixed(2)}</span>`:''}</span></div><div class="d">${met.desc}</div>
-    <input type="range" min="0" max="${(met.base*2.5).toFixed(2)}" step="0.05" value="${w}" data-act="weight" data-key="${met.key}"><div class="delta">${Math.abs(w-met.base)>0.01?`${w-met.base>0?'+':''}${(w-met.base).toFixed(2)} against the default ${met.base.toFixed(2)}`:'at default'}${Math.abs(d)>0.005?`, results moved it ${d>0?'+':''}${d.toFixed(2)}`:''}</div></div>`; }
+    <input type="range" min="0" max="${Math.max(1.5,met.base*2.5).toFixed(2)}" step="0.05" value="${w}" data-act="weight" data-key="${met.key}"><div class="delta">${Math.abs(w-met.base)>0.01?`${w-met.base>0?'+':''}${(w-met.base).toFixed(2)} against the default ${met.base.toFixed(2)}`:'at default'}${Math.abs(d)>0.005?`, results moved it ${d>0?'+':''}${d.toFixed(2)}`:''}</div></div>`; }
   html+=`</div><div class="actions"><button class="btn" data-act="resetweights">Reset my weights to defaults</button></div>`;
   html+=`<section class="block" style="margin-top:26px"><div class="eyebrow">Proving ground<span class="sl">/</span>your weights against real Saturdays at starting price</div>
-  <p class="note" style="margin:6px 0 8px">Runs your current weights and settings over past metro meetings as the form stood that morning, and settles at the actual starting prices. Change a slider, test again. Small samples swing; treat anything under a few hundred races as a hint, not proof. Baseline over 220 races (metro Saturdays 8 Aug to 5 Sep 2026): with the market switched off the best bet won 26% at +5% flat-stake return; with it on 31% at +4%; the market favourite won 33% at -6%. Those gaps are inside noise. Value calls and roughies both lost. Nobody has shown an edge yet; the sliders are where you try to find one.</p>
+  <p class="note" style="margin:6px 0 8px">Runs your current weights and settings over past metro meetings as the form stood that morning, and settles at the actual starting prices. Change a slider, test again. Small samples swing; treat anything under a few hundred races as a hint, not proof. Defaults were refitted on the August race days and held on the September ones, which the fit never saw: form-only log-loss 2.12 to 2.05 against the market's 1.82, best bet return -28% to -20%. Still short of the market. Adding form on top of the market improved nothing out of sample, and roughies the form liked most did worst. Nobody has shown an edge yet; the sliders are where you try to find one.</p>
   <div class="actions" style="margin:0 0 10px"><button class="btn primary" id="proveBtn" data-act="prove" ${sb?'':'disabled'}>Test these weights</button>${PAST?`<span class="small">${PAST.length} meetings, ${PAST.reduce((a,m)=>a+m.races.length,0)} races loaded</span>`:''}</div>
   <div id="proveOut">${state.ui.prove?provingHTML(state.ui.prove):''}</div>
   <div class="actions" style="margin:14px 0 6px"><button class="btn" id="planBtn" data-act="plantest" ${sb?'':'disabled'}>Test a 20-unit day plan</button><span class="small">The unit allocator, run as a morning plan on each archived race day with your weights, trust and staking.</span></div><div id="planOut">${state.ui.plan?planTestHTML(state.ui.plan,20):''}</div></section>`;

@@ -82,6 +82,12 @@ The calibration table explains why. Grouping runners by how far the form rating 
 
 Where the rating disagrees most with the market, actual results track the market, not the rating. The form rating spreads chance too evenly: it under-rates the horses the market likes and over-rates the ones it does not. Until that changes, the allocator has nothing to allocate.
 
+### Calibration and the roughie question
+
+The weights were refitted by coordinate descent on the August archive and tested on September. The fit held out of sample and is now the default: jockey, form and class carry most of the weight; distance, condition, rating, pace and fitness dropped to zero. Form-only log-loss on the test races moved from 2.12 to 2.05 against the market's 1.82, and the best-bet flat return from -28% to -20%. Layering the form rating on top of the market improved log-loss by at most 0.002, so form adds nothing the market has not already priced.
+
+Best roughie is the weakest corner, not the strongest. Across the 377 archived races the roughies the form liked most won 4.3% of the time against a market-implied 5.4%, a flat return of about -29%. The app's roughie rule ran -33% and an alternative definition -34%. The market prices the longshots the form fancies too generously, not too meanly. The roughie stays on the Card labelled as a lottery ticket.
+
 ## Limitations
 
 Results are entered by hand. There is no live results feed, no sectional or in-running data, and no automatic scratchings or track condition updates. The example meeting is fictional throughout.
