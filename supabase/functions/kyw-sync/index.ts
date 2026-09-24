@@ -122,7 +122,6 @@ async function raForMeeting(meetId: string, meetDate: string, state: string, ven
   await sb.from("kyw_ra").upsert({ meet_id: meetId, key, date: meetDate, fetched_at: new Date().toISOString(), status, data });
   return status === "ok" ? data : null;
 }
-const raRunner = (ra: any, name: string) => { if (!ra?.runners) return undefined; const x = ra.runners[nameKey(name)]; if (!x) return undefined; const { race, no, ...rest } = x; return rest; };
 
 async function syncMeeting(feed: any, existing: any | null, force: boolean) {
   const meetId = String(feed.meet_id);
@@ -153,12 +152,12 @@ async function syncMeeting(feed: any, existing: any | null, force: boolean) {
       // Late market: one refresh of the rating's market about 20 minutes before the jump, taken on the first read inside that window and then held.
       const t = r.time ? Date.parse(r.time) : null; const minsTo = t != null ? (t - now) / 60000 : null;
       const lateAt: string | undefined = prev?.lateAt ?? ((minsTo != null && minsTo <= 20 && minsTo > -60) ? new Date().toISOString() : undefined);
-      const freshRunners = runners.map(({ finish, ...rest }: any) => ({ ...rest, ra: raRunner(ra, rest.name) ?? prevByNo[rest.no]?.ra,
+      const freshRunners = runners.map(({ finish, ...rest }: any) => ({ ...rest,
         openOdds: prevByNo[rest.no]?.openOdds ?? prevByNo[rest.no]?.odds ?? rest.odds ?? null,
         lateOdds: prev?.lateAt ? (prevByNo[rest.no]?.lateOdds ?? null) : (lateAt ? (rest.odds ?? null) : undefined) }));
       const frozen = (prev?.frozenAt && prev?.runners?.length) ? prev.runners : (positions.length >= 3 && prev?.runners?.length && !prevHasResult ? prev.runners : null);
       race = { no, name: fr.name ?? "", distance: num(fr.distance), class: fr.class ?? "", time: fr.time ?? null, raceStatus: fr.raceStatus ?? "", condition: [fr.trackCondition, fr.trackRating].filter(Boolean).join(" "), prizemoney: fr.totalPrizeMoney ?? null, meetingId: meetId,
-        runners: frozen ? frozen.map((x: any) => x.ra ? x : ({ ...x, ra: raRunner(ra, x.name) })) : freshRunners, frozenAt: frozen ? (prev.frozenAt ?? prev.syncedAt) : undefined, lateAt: frozen ? prev?.lateAt : lateAt, lockOverride: prev?.lockOverride, feedResult: positions.length >= 3 ? { positions, at: prev?.feedResult?.at ?? new Date().toISOString() } : null, syncedAt: new Date().toISOString() };
+        runners: frozen ? frozen.map(({ ra, ...x }: any) => x) : freshRunners, frozenAt: frozen ? (prev.frozenAt ?? prev.syncedAt) : undefined, lateAt: frozen ? prev?.lateAt : lateAt, lockOverride: prev?.lockOverride, feedResult: positions.length >= 3 ? { positions, at: prev?.feedResult?.at ?? new Date().toISOString() } : null, syncedAt: new Date().toISOString() };
     } else { race = { ...prev, raceStatus: r.raceStatus ?? prev.raceStatus }; }
     outRaces.push(race);
     if (race.feedResult) results.push({ meeting_id: meetId, race_no: no, positions: race.feedResult.positions, entered_by: "racing.com feed", entered_at: race.feedResult.at });
@@ -168,9 +167,14 @@ async function syncMeeting(feed: any, existing: any | null, force: boolean) {
   // Write only when something other than the timestamps differs.
   // Postgres returns jsonb with its own key order, so compare a key-sorted rendering.
   const canon = (v: any): string => Array.isArray(v) ? "[" + v.map(canon).join(",") + "]" : (v && typeof v === "object") ? "{" + Object.keys(v).sort().map(k => JSON.stringify(k) + ":" + canon(v[k])).join(",") + "}" : JSON.stringify(v ?? null);
-  const sig = (x: any) => canon({ ...x, syncedAt: 0, updatedAt: 0, races: (x.races ?? []).map((r: any) => ({ ...r, syncedAt: 0, feedResult: r.feedResult ? { positions: r.feedResult.positions } : null })) });
+  // Live prices change every read, so they live in kyw_prices (a few kB) and are left out of the meeting's change signature.
+  // A race's runners keep the odds they carried at the last meeting write; frozen (pre-result) fields therefore hold their pre-jump prices.
+  const prices: Record<string, Record<string, number | null>> = {};
+  for (const r of outRaces) { if (r.frozenAt) continue; prices[r.no] = {}; for (const x of r.runners ?? []) prices[r.no][x.no] = x.odds ?? null; }
+  const sig = (x: any) => canon({ ...x, syncedAt: 0, updatedAt: 0, races: (x.races ?? []).map((r: any) => ({ ...r, syncedAt: 0, feedResult: r.feedResult ? { positions: r.feedResult.positions } : null, runners: r.frozenAt ? r.runners : (r.runners ?? []).map((q: any) => ({ ...q, odds: null })) })) });
   const changed = !stored || sig(meeting) !== sig(stored);
   if (changed) { meeting.syncedAt = new Date().toISOString(); meeting.updatedAt = Date.now(); const { error } = await sb.from("kyw_meeting").upsert({ id: meetId, data: meeting, updated_at: new Date().toISOString() }); if (error) throw error; }
+  if (Object.keys(prices).length) { const { error: e3 } = await sb.from("kyw_prices").upsert({ meet_id: meetId, data: { at: new Date().toISOString(), races: prices }, updated_at: new Date().toISOString() }); if (e3) throw e3; }
   const newResults = results.filter(r => !(storedRaces[r.race_no]?.feedResult));
   if (newResults.length) { const { error: e2 } = await sb.from("kyw_results").upsert(newResults, { onConflict: "meeting_id,race_no", ignoreDuplicates: true }); if (e2) throw e2; }
   // Keep the feed row's race window current so the scheduler knows when to run.
@@ -229,7 +233,8 @@ async function dailyRoll(): Promise<{ date: string; picks: any[]; archived: any[
     // Read the day's Free Fields form once, now, so the first sync carries it.
     for (const p of picks) { try { await raForMeeting(p.meet_id, date, p.state, p.venue); } catch (e) { console.error("ra roll", e); } }
     const keep = picks.map(f => f.meet_id);
-    const { data: olds } = await sb.from("kyw_meeting").select("id"); for (const o of olds ?? []) { if (!keep.includes(String(o.id))) { await sb.from("kyw_meeting").delete().eq("id", o.id); await sb.from("kyw_results").delete().eq("meeting_id", o.id); } }
+    const { data: olds } = await sb.from("kyw_meeting").select("id"); for (const o of olds ?? []) { if (!keep.includes(String(o.id))) { await sb.from("kyw_meeting").delete().eq("id", o.id); await sb.from("kyw_results").delete().eq("meeting_id", o.id); await sb.from("kyw_prices").delete().eq("meet_id", o.id); } }
+    await sb.from("kyw_ra").delete().lt("date", aestDate(-7));
     await sb.from("kyw_feed").delete().eq("active", false).lt("date", aestDate(-14));
   }
   await sb.from("kyw_feed_log").delete().lt("at", new Date(Date.now() - 7 * 86400000).toISOString());

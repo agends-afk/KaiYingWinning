@@ -220,7 +220,7 @@ const METRICS = [
 ];
 const DEFAULT_SETTINGS = { marginRank:3, marginProb:0.12, lr:0.12, formlineGain:0.6, beta:2.2, autoAdapt:true, valueEdge:0.05, book:1.20, trust:0.5 };
 const KELLY=0.25; // fraction of Kelly used by the unit allocator test
-const BUILD='2026-09-22.1';
+const BUILD='2026-09-25.1';
 const SUPABASE = { url:'https://qgomklldlpspwilyjdqx.supabase.co', key:'sb_publishable_nhOXF3eXlHAyys2B0rzxxQ_W_Kb4OZP', flockCode:'pelicans-2026' };
 // Standard saddlecloth colours (approximate; cosmetic only)
 const CLOTH = {1:['#D7263D','#fff'],2:['#F7F5EF','#141A22'],3:['#1F4FCC','#fff'],4:['#F5C518','#141A22'],5:['#1E8B4B','#fff'],6:['#141A22','#F5C518'],7:['#F07A1A','#141A22'],8:['#F48FB1','#141A22'],9:['#3CC7C0','#141A22'],10:['#6A2C91','#fff'],11:['#9AA0A6','#B00020'],12:['#B6E51D','#141A22'],13:['#6D4322','#fff'],14:['#7B1F2B','#F5C518'],15:['#8B8455','#141A22'],16:['#B87333','#141A22'],17:['#0F2B46','#fff'],18:['#0F5132','#F5C518'],19:['#C9D6D2','#141A22'],20:['#D91E8B','#F5C518'],21:['#FF7F6E','#141A22'],22:['#E9E9E9','#141A22'],23:['#0F2B46','#F4EFE4'],24:['#D4AF37','#141A22']};
@@ -440,20 +440,29 @@ async function sbInit(){
   setSync('on','connecting');
   try{ await sbPullMeeting(); await sbPullResults(); persistLocal(); render(); setSync('on','live');
     sb.channel('kyw').on('postgres_changes',{event:'*',schema:'public',table:'kyw_meeting'},()=>sbPullMeeting().then(ch=>{ if(ch){ persistLocal(); render(); } }))
+      .on('postgres_changes',{event:'*',schema:'public',table:'kyw_prices'},()=>sbPullPrices().then(ch=>{ if(ch){ persistLocal(); render(); } }))
       .on('postgres_changes',{event:'*',schema:'public',table:'kyw_results'},()=>sbPullResults().then(ch=>{ if(ch){ persistLocal(); render(); toast('Result in'); } }))
       .subscribe(status=>{ if(status==='SUBSCRIBED') setSync('on','live'); else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT') setSync('err','live off, refresh to catch up'); });
     return true; }catch(e){ console.error(e); setSync('err','feed unreachable'); return false; }
 }
+// The feed keeps three things apart so the 10-minute cycle writes little: the meeting record (fields, scratchings, results),
+// the live prices (a few kB, rewritten each read) and the Free Fields form (read once a day). The page stitches them back together.
+const nameKey=s=>String(s||'').toUpperCase().replace(/\(.*?\)/g,'').replace(/[^A-Z0-9]/g,'');
+function applyRA(m, ra){ if(!ra||!ra.runners) return false; let ch=false; for(const race of m.races) for(const r of race.runners){ const x=ra.runners[nameKey(r.name)]; if(!x) continue; const {race:_r, no:_n, ...rest}=x; if(!r.ra){ r.ra=rest; ch=true; } } if(ra.key&&!m.raKey){ m.raKey=ra.key; ch=true; } return ch; }
+function applyPrices(m, p){ if(!p||!p.races) return false; let ch=false; for(const race of m.races){ if(race.frozenAt||race.result) continue; const pr=p.races[race.no]; if(!pr) continue; for(const r of race.runners){ if(!(r.no in pr)) continue; const o=pr[r.no]; if((r.odds??null)!==(o??null)){ r.odds=o; ch=true; } } } if(p.at&&m.pricesAt!==p.at){ m.pricesAt=p.at; ch=true; } return ch; }
 async function sbPullMeeting(){
   const {data:feed}=await sb.from('kyw_feed').select('*').eq('active',true).order('sort'); state.feed=feed||[];
   const {data,error}=await sb.from('kyw_meeting').select('*'); if(error) throw error; let ch=false; const seen=new Set();
+  const {data:ras}=await sb.from('kyw_ra').select('meet_id,status,data'); const raBy={}; for(const x of ras||[]) if(x.status==='ok') raBy[String(x.meet_id)]=x.data;
+  const {data:prs}=await sb.from('kyw_prices').select('meet_id,data'); const prBy={}; for(const x of prs||[]) prBy[String(x.meet_id)]=x.data;
   for(const row of (data||[])){ const m=row.data; if(!m||!m.races) continue; seen.add(String(m.id)); const cur=state.meetings[m.id];
-    if(cur&&(m.updatedAt||0)<=(cur.updatedAt||0)) continue;
+    if(cur&&(m.updatedAt||0)<=(cur.updatedAt||0)){ if(applyRA(cur,raBy[String(m.id)])) ch=true; if(applyPrices(cur,prBy[String(m.id)])) ch=true; continue; }
     const results=cur?Object.fromEntries(cur.races.filter(r=>r.result).map(r=>[r.no,r.result])):{}; for(const r of m.races){ if(results[r.no]&&!r.result) r.result=results[r.no]; }
     const f=state.feed.find(x=>String(x.meet_id)===String(m.id)); if(f){ m.sort=f.sort; m.meeting=f.name||m.meeting; }
-    putMeeting(m); ch=true; }
+    applyRA(m,raBy[String(m.id)]); applyPrices(m,prBy[String(m.id)]); putMeeting(m); ch=true; }
   for(const id of Object.keys(state.meetings)){ if(!seen.has(String(id))&&!state.meetings[id].example&&!state.meetings[id].manual){ delete state.meetings[id]; ch=true; } }
   if(!state.meeting||!state.meetings[state.meeting.id]) selectMeeting(state.ui.meetingId); return ch; }
+async function sbPullPrices(){ const {data}=await sb.from('kyw_prices').select('meet_id,data'); let ch=false; for(const x of data||[]){ const m=state.meetings[String(x.meet_id)]; if(m&&applyPrices(m,x.data)) ch=true; } return ch; }
 async function sbPullResults(){ const {data,error}=await sb.from('kyw_results').select('*'); if(error) throw error; let ch=false;
   for(const m of Object.values(state.meetings)){ if(m.example||m.manual) continue; for(const race of m.races){ const row=(data||[]).find(x=>String(x.meeting_id)===String(m.id)&&x.race_no===race.no); const cur=race.result;
     if(row){ const res={positions:row.positions,by:row.entered_by,enteredAt:new Date(row.entered_at).getTime()}; if(!cur||JSON.stringify(cur.positions)!==JSON.stringify(res.positions)||cur.by!==res.by){ race.result=res; ch=true; } } else if(cur){ race.result=null; ch=true; } } } return ch; }
@@ -593,7 +602,7 @@ function viewRace(){
     <div class="eyebrow" style="color:var(--panel-ink);opacity:.7;margin-top:12px">Roughie</div>
     ${rg?`<p style="margin-top:4px"><b>${cloth(rg.r.no)} ${esc(rg.r.name)}</b> at $${rg.r.odds}, form-only price ${ourPrice(rg.probFree,st,rg.book)}. Lottery ticket: across past races roughies the form liked most won 4% of the time against a market-implied 5%.</p>`:`<p style="margin-top:4px">Nothing at $8 or better the model can make a case for.</p>`}
     ${trailHTML(race)}</div>`; }
-  html+=`<section class="block"><div class="eyebrow">Ratings<span class="sl">/</span>our price on every runner${scored[0]&&scored[0].book?` at this race's ${Math.round(scored[0].book*100)}% book`:` at a ${Math.round(st.book*100)}% book`}, market alongside</div><p class="note" style="margin:6px 0 0">Ours shorter than the market means your settings like it more than the punters do. The rating uses the morning market, refreshed once about 20 minutes before the race${race.lateAt?' (refreshed '+esc(fmtTime(race.lateAt))+')':''}. The price shown is the median fixed price on racing.com${race.frozenAt||race.syncedAt?', read '+esc(fmtTime(race.frozenAt||race.syncedAt)):''}${race.frozenAt?' before the jump':''}. Tap a name for the reasons and the form book.</p><div class="rows" style="margin-top:8px">`;
+  html+=`<section class="block"><div class="eyebrow">Ratings<span class="sl">/</span>our price on every runner${scored[0]&&scored[0].book?` at this race's ${Math.round(scored[0].book*100)}% book`:` at a ${Math.round(st.book*100)}% book`}, market alongside</div><p class="note" style="margin:6px 0 0">Ours shorter than the market means your settings like it more than the punters do. The rating uses the morning market, refreshed once about 20 minutes before the race${race.lateAt?' (refreshed '+esc(fmtTime(race.lateAt))+')':''}. The price shown is the median fixed price on racing.com${race.frozenAt?', read '+esc(fmtTime(race.frozenAt))+' before the jump':(m.pricesAt?', read '+esc(fmtTime(m.pricesAt)):'')}. Tap a name for the reasons and the form book.</p><div class="rows" style="margin-top:8px">`;
   const maxR=Math.max(...scored.map(s=>s.rating)), minR=Math.min(...scored.map(s=>s.rating)); const span=(maxR-minR)||1;
   for(const s of scored){ const r=s.r; const k=runnerKey(race,r); const open=state.ui.open===k; const dynv=s.contrib.formline+s.contrib.manual; const a=my.adj[k]||{adj:0,note:''};
     const chips=[]; if(r.barrier!=null) chips.push(`Bar ${r.barrier}`); if(r.weight!=null) chips.push(`${r.weight}kg`); if(r.form) chips.push(`Form ${esc(r.form)}`);
