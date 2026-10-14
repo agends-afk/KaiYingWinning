@@ -36,41 +36,57 @@ function odds(list: any[] | null): number | null {
   if (!list) return null; const fixed = list.filter(o => o.oddsWin && !String(o.providerCode).startsWith("BTOTE") && !TOTE_PROVIDERS.has(o.providerCode)).map(o => num(o.oddsWin)!).filter(v => v && v > 1);
   const any = list.map(o => num(o.oddsWin)!).filter(v => v && v > 1); const m = median(fixed.length ? fixed : any); return m ? +m.toFixed(2) : null;
 }
-function lastStart(form: any[] | null, meetDate: string, todayClass: string) {
+// Trials and jump-outs. racing.com flags some of them; the rest are caught by class name or by the Free Fields run lines for the horse (trialDates).
+// The Maribyrnong Trial Stakes and similar named races are real races, so a trial word only counts when the class has no Listed or Group status.
+function isTrialRun(f: any, trialDates?: Set<string>): boolean {
+  if (f.isTrial || f.isJumpOut) return true;
+  if (trialDates && f.date && trialDates.has(String(f.date).slice(0, 10))) return true;
+  const c = String(f.raceClass ?? "").toUpperCase();
+  return /\bTRL\b|\bTRIAL\b|JUMP|\bJMP\b|^OUT\b/.test(c) && !/LISTED|\bLR\b|GROUP|\bG[123]\b|STAKES/.test(c);
+}
+function raceRuns(form: any[] | null, meetDate: string, trialDates?: Set<string>) {
+  return (form ?? []).filter(f => f.date && f.date < meetDate && !isTrialRun(f, trialDates)).sort((a, b) => (a.date < b.date ? 1 : -1));
+}
+// Last start: the latest race run. A horse with no race run is rated on its latest trial instead, marked trial so the app counts it at a fraction of a race.
+function lastStart(form: any[] | null, meetDate: string, todayClass: string, trialDates?: Set<string>) {
   if (!form) return null;
-  const runs = form.filter(f => !f.isTrial && !f.isJumpOut && f.date && f.date < meetDate).sort((a, b) => (a.date < b.date ? 1 : -1));
-  const l = runs[0]; if (!l) return null;
+  const runs = raceRuns(form, meetDate, trialDates);
+  const trial = !runs.length;
+  const l = trial ? form.filter(f => f.date && f.date < meetDate && f.position).sort((a, b) => (a.date < b.date ? 1 : -1))[0] : runs[0]; if (!l) return null;
   const days = Math.round((Date.parse(meetDate) - Date.parse(l.date)) / 86400000);
-  const tr = classRank(todayClass), lr = classRank(l.raceClass); let cc = 0; if (tr != null && lr != null && Math.abs(tr - lr) >= 5) cc = tr > lr ? 1 : -1;
-  return { pos: l.position ?? null, field: l.starters ?? null, margin: l.position === 1 ? 0 : num(l.margin), days, race: String(l.raceCode ?? ""), classChange: cc, venue: l.venue ?? "", date: l.date };
+  const tr = classRank(todayClass), lr = trial ? null : classRank(l.raceClass); let cc = 0; if (tr != null && lr != null && Math.abs(tr - lr) >= 5) cc = tr > lr ? 1 : -1;
+  return { pos: l.position ?? null, field: l.starters ?? null, margin: l.position === 1 ? 0 : num(l.margin), days, race: String(l.raceCode ?? ""), classChange: cc, venue: l.venue ?? "", date: l.date, ...(trial ? { trial: true } : {}) };
 }
 // average early position over the last four real runs, 0 = led, 1 = last
-function paceOf(form: any[] | null, meetDate: string): number | null {
-  if (!form) return null; const runs = form.filter(f => !f.isTrial && !f.isJumpOut && f.date && f.date < meetDate && f.positionAt800 && f.starters > 1).sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 4);
+function paceOf(form: any[] | null, meetDate: string, trialDates?: Set<string>): number | null {
+  if (!form) return null; const runs = raceRuns(form, meetDate, trialDates).filter(f => f.positionAt800 && f.starters > 1).slice(0, 4);
   if (!runs.length) return null; const v = runs.reduce((a, f) => a + Math.min(1, Math.max(0, (f.positionAt800 - 1) / (f.starters - 1))), 0) / runs.length; return +v.toFixed(2);
 }
-function recentRuns(form: any[] | null, meetDate: string) {
-  if (!form) return null; const runs = form.filter(f => !f.isTrial && !f.isJumpOut && f.date && f.date < meetDate).sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 3);
+function recentRuns(form: any[] | null, meetDate: string, trialDates?: Set<string>) {
+  if (!form) return null; const runs = raceRuns(form, meetDate, trialDates).slice(0, 3);
   return runs.map(l => ({ pos: l.position ?? null, field: l.starters ?? null, margin: l.position === 1 ? 0 : num(l.margin), cls: classRank(l.raceClass), date: l.date, venue: l.venue ?? "" }));
 }
-function formFromRuns(form: any[] | null, meetDate: string, lastTen: unknown): string {
-  const runs = (form ?? []).filter(f => !f.isTrial && !f.isJumpOut && f.date && f.date < meetDate && f.position).sort((a, b) => (a.date < b.date ? -1 : 1));
-  if (!runs.length) { try { const arr = JSON.parse(String(lastTen ?? "[]")); return arr.map((c: string) => (c === "-" ? "x" : c)).join("").slice(-8); } catch { return ""; } }
+function formFromRuns(form: any[] | null, meetDate: string, lastTen: unknown, trialDates?: Set<string>): string {
+  const runs = raceRuns(form, meetDate, trialDates).filter(f => f.position).reverse();
+  // racing.com's lastTen counts trials, so it stands in only when there is no run history at all
+  if (!runs.length) { if (form && form.length) return ""; try { const arr = JSON.parse(String(lastTen ?? "[]")); return arr.map((c: string) => (c === "-" ? "x" : c)).join("").slice(-8); } catch { return ""; } }
   let out = ""; let prev: string | null = null;
   for (const r of runs) { if (prev && (Date.parse(r.date) - Date.parse(prev)) / 86400000 >= 84) out += "x"; out += r.position >= 10 ? "0" : String(r.position); prev = r.date; }
   if (prev && (Date.parse(meetDate) - Date.parse(prev)) / 86400000 >= 84) out += "x";
   return out.slice(-8);
 }
 
-function mapEntry(e: any, meetDate: string, todayClass: string) {
+function mapEntry(e: any, meetDate: string, todayClass: string, trialDates?: Set<string>) {
   const h = e.horse ?? {};
+  // No career starts means every run in the history is a trial or jump-out, whatever its flags say.
+  const c0 = stats(h.careerStats); if (c0 && c0[0] === 0) trialDates = new Set((h.horseForm ?? []).map((f: any) => String(f.date ?? "").slice(0, 10)));
   return {
     no: e.raceEntryNumber, name: e.horseName ?? h.name ?? "", barrier: e.liveBarrierNumber || e.barrierNumber || null,
     weight: num(e.weightCarried ?? e.weight), jockey: e.jockey?.fullName ?? e.jockeyName ?? "", trainer: e.trainer?.fullName ?? e.trainerName ?? "",
     age: h.age ?? null, sex: h.sex ? String(h.sex)[0] : "",
-    career: stats(h.careerStats), track: stats(e.trackStats), distance: stats(e.distanceStats), trackDistance: stats(e.trackDistanceStats), barrierRec: stats(e.atThisBarrierNumberStats), classRec: stats(e.atThisClassStats), pace: paceOf(h.horseForm, meetDate),
+    career: stats(h.careerStats), track: stats(e.trackStats), distance: stats(e.distanceStats), trackDistance: stats(e.trackDistanceStats), barrierRec: stats(e.atThisBarrierNumberStats), classRec: stats(e.atThisClassStats), pace: paceOf(h.horseForm, meetDate, trialDates),
     good: stats(h.goodStats), soft: stats(h.softStats), heavy: stats(h.heavyStats), firstUp: stats(h.firstUpStats), secondUp: stats(h.secondUpStats),
-    form: formFromRuns(h.horseForm, meetDate, h.lastTen), last: lastStart(h.horseForm, meetDate, todayClass), recent: recentRuns(h.horseForm, meetDate),
+    form: formFromRuns(h.horseForm, meetDate, h.lastTen, trialDates), last: lastStart(h.horseForm, meetDate, todayClass, trialDates), recent: recentRuns(h.horseForm, meetDate, trialDates),
     jockeyPct: num(e.jockey?.winPercent), trainerPct: num(e.trainer?.winPercent), jockeyRecentPct: num(e.jockey?.recentWinPercent), trainerRecentPct: num(e.trainer?.recentWinPercent),
     apprentice: !!e.jockey?.apprentice, claim: num(e.jockey?.weightClaim), rating: num(h.rating ?? e.handicapRating),
     odds: odds(e.odds), scratched: !!(e.scratched || e.isLateScratching || e.finish === 109), emergency: !!e.emergency,
@@ -107,6 +123,12 @@ function compactRA(parsed: any) { const out: Record<string, any> = {};
     out[nameKey(r.name)] = { race: race.no, no: r.no, gear: r.gear || "", rec: r.rec, last10: r.last10 || "", hcp: r.hcp ?? null,
       runs: (r.runs ?? []).slice(0, 10).map((x: any) => ({ t: x.trial ? 1 : 0, pos: x.pos, of: x.of, v: x.venue, d: x.date, dist: x.distance, c: x.cond, cls: x.cls, j: x.jockey, w: x.weight, b: x.barrier, win: x.first, time: x.time, l600: x.l600, m: x.margin, p8: x.p800, p4: x.p400, sp: x.sp, open: x.prices ? x.prices[0] : null })) }; }
   return out; }
+// Dates of each horse's trials and jump-outs in its Free Fields run lines, keyed by name.
+function raTrialDates(ra: any): Record<string, Set<string>> { const out: Record<string, Set<string>> = {};
+  for (const [k, r] of Object.entries<any>(ra?.runners ?? {})) { const s = new Set<string>();
+    for (const x of r.runs ?? []) if (x.d && (x.t || /\bTRL\b|TRIAL|^OUT\b|JUMP/i.test(String(x.cls ?? "")) || /jump/i.test(String(x.c ?? ""))) && !/\bLR\b|LISTED|GROUP|\bG[123]\b/i.test(String(x.cls ?? ""))) s.add(String(x.d).slice(0, 10));
+    if (s.size) out[k] = s; }
+  return out; }
 async function raForMeeting(meetId: string, meetDate: string, state: string, venueSlug: string): Promise<any | null> {
   const { data: row } = await sb.from("kyw_ra").select("*").eq("meet_id", meetId).maybeSingle();
   if (row && String(row.date) === meetDate) { if (row.status === "ok") return row.data; if (Date.now() - Date.parse(row.fetched_at) < 2 * 3600e3) return null; }
@@ -132,6 +154,7 @@ async function syncMeeting(feed: any, existing: any | null, force: boolean) {
   const stored: any = existing?.data ?? null; const storedRaces: Record<number, any> = {}; for (const r of stored?.races ?? []) storedRaces[r.no] = r;
   const outRaces: any[] = []; const results: any[] = []; let fetched = 0;
   let ra: any = null; try { ra = await raForMeeting(meetId, String(meetDate), String(m.state ?? ""), String(m.venueName ?? "")); } catch (e) { console.error("ra", e); }
+  const trials = raTrialDates(ra);
   for (const r of races) {
     const no = r.raceNumber; const prev = storedRaces[no];
     const finished = !!(r.hasResults || (r.resultsString && r.resultsString.trim()));
@@ -143,7 +166,7 @@ async function syncMeeting(feed: any, existing: any | null, force: boolean) {
       fetched++;
       const fd = await gql(FORM_QUERY(meetId, no)); const fr = fd.r ?? r;
       const entries = mergeEntries(fr.raceEntries, fr.formRaceEntries);
-      const runners = entries.map((e: any) => mapEntry(e, meetDate, fr.class ?? r.class)).sort((a: any, b: any) => a.no - b.no);
+      const runners = entries.map((e: any) => mapEntry(e, meetDate, fr.class ?? r.class, trials[nameKey(e.horseName ?? e.horse?.name)])).sort((a: any, b: any) => a.no - b.no);
       const order = runners.filter((x: any) => x.finish && x.finish > 0 && x.finish < 100).sort((a: any, b: any) => a.finish - b.finish).map((x: any) => x.no);
       const positions = order.length ? order : (finished && fr.resultsString ? String(fr.resultsString).split(/[^0-9]+/).filter(Boolean).map(Number) : []);
       // The field the app judges a run race by is the last one read before the result: pre-race prices and scratchings, never post-race data.

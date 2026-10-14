@@ -202,7 +202,7 @@ pre.schema{font-size:11px;line-height:1.45;background:var(--surface);border:1.5p
 // The factors the model rates. `base` is the default weight: the set that tested best on past race days (fitted on one
 // month, checked on the next). `fit` says what the data showed for the factor; a slider is still yours to move.
 const METRICS = [
-  {key:'last',      label:'Last start',            base:0.7,   fit:'held', desc:'Finishing position, margin and field size last start, adjusted for a rise or drop in class today.'},
+  {key:'last',      label:'Last start',            base:0.7,   fit:'held', desc:'Finishing position, margin and field size last start, adjusted for a rise or drop in class today. Trials and jump-outs are left out; a horse yet to race is rated on its latest trial at a fifth of the weight of a race run.'},
   {key:'form',      label:'Recent form',           base:1.125, fit:'held', desc:'Last five runs, most recent counting most. Spells are skipped.'},
   {key:'classform', label:'Class of recent runs',  base:0.9,   fit:'held', desc:'The grade of the last three races and how close the horse got. A narrow defeat in a Group 1 outranks a win in a benchmark race.'},
   {key:'career',    label:'Career strike rate',    base:0.6,   fit:'held', desc:'Career win and place percentages.'},
@@ -220,7 +220,7 @@ const METRICS = [
 ];
 const DEFAULT_SETTINGS = { marginRank:3, marginProb:0.12, lr:0.12, formlineGain:0.6, beta:2.2, autoAdapt:true, valueEdge:0.05, book:1.20, trust:0.5 };
 const KELLY=0.25; // fraction of Kelly used by the unit allocator test
-const BUILD='2026-09-25.1';
+const BUILD='2026-10-14.1';
 const SUPABASE = { url:'https://qgomklldlpspwilyjdqx.supabase.co', key:'sb_publishable_nhOXF3eXlHAyys2B0rzxxQ_W_Kb4OZP', flockCode:'pelicans-2026' };
 // Standard saddlecloth colours (approximate; cosmetic only)
 const CLOTH = {1:['#D7263D','#fff'],2:['#F7F5EF','#141A22'],3:['#1F4FCC','#fff'],4:['#F5C518','#141A22'],5:['#1E8B4B','#fff'],6:['#141A22','#F5C518'],7:['#F07A1A','#141A22'],8:['#F48FB1','#141A22'],9:['#3CC7C0','#141A22'],10:['#6A2C91','#fff'],11:['#9AA0A6','#B00020'],12:['#B6E51D','#141A22'],13:['#6D4322','#fff'],14:['#7B1F2B','#F5C518'],15:['#8B8455','#141A22'],16:['#B87333','#141A22'],17:['#0F2B46','#fff'],18:['#0F5132','#F5C518'],19:['#C9D6D2','#141A22'],20:['#D91E8B','#F5C518'],21:['#FF7F6E','#141A22'],22:['#E9E9E9','#141A22'],23:['#0F2B46','#F4EFE4'],24:['#D4AF37','#141A22']};
@@ -274,6 +274,12 @@ function distanceFactor(dist){ const d=num(dist)||1400; if(d<=1200) return 1; if
 function barrierScore(r,race,n,bias){ const b=num(r.barrier); if(b==null||n<2) return null; const rel=clamp((b-1)/(n-1),0,1); const eff=clamp(distanceFactor(race.distance)*0.6+(bias||0),-1,1); return clamp(0.5-(rel-0.5)*eff,0,1); }
 function jockeyScore(r){ const p=num(r.jockeyPct), rp=num(r.jockeyRecentPct); if(p!=null||rp!=null){ const a=p!=null?clamp(p/25,0,1):null, b=rp!=null?clamp(rp/25,0,1):null; return a!=null&&b!=null?0.5*a+0.5*b:(a??b); } const g=num(r.jockeyRating); if(g!=null) return clamp(g/100,0,1); return null; }
 function trainerScore(r){ const p=num(r.trainerPct); if(p!=null) return clamp(p/20,0,1); const g=num(r.trainerRating); if(g!=null) return clamp(g/100,0,1); return null; }
+// A trial stands in as last start only for a horse with no race run, and counts at this fraction of a race run.
+const TRIAL_WEIGHT = 0.2;
+// z-scores against the race runs only; a trial's score is placed on the same scale and then shrunk toward the field average.
+function zscoresPartial(vals, part, w){ const base=vals.map((v,i)=>part[i]?null:v); const xs=base.filter(v=>v!=null); if(xs.length<2) return zscores(vals).map((z,i)=>part[i]?z*w:z);
+  const m=xs.reduce((a,b)=>a+b,0)/xs.length; const sd=Math.sqrt(xs.reduce((a,b)=>a+(b-m)**2,0)/xs.length)||0; if(sd<1e-9) return vals.map(()=>0);
+  return vals.map((v,i)=>v==null?0:clamp((v-m)/sd,-2.5,2.5)*(part[i]?w:1)); }
 function zscores(vals){ const xs=vals.filter(v=>v!=null); if(xs.length<2) return vals.map(()=>0); const m=xs.reduce((a,b)=>a+b,0)/xs.length; const sd=Math.sqrt(xs.reduce((a,b)=>a+(b-m)**2,0)/xs.length)||0; if(sd<1e-9) return vals.map(()=>0); return vals.map(v=>v==null?0:clamp((v-m)/sd,-2.5,2.5)); }
 // Records: Free Fields (ra) where the feed carries it, racing.com otherwise.
 function recOf(r,key){ const ra=r.ra&&r.ra.rec; const map={career:'career',track:'track',distance:'dist',trackDistance:'trackDist',good:'good',soft:'soft',heavy:'heavy',firstUp:'firstUp'}; if(ra&&map[key]&&ra[map[key]]) return rec(ra[map[key]]); return rec(r[key]); }
@@ -290,6 +296,7 @@ function scoreRace(race, meeting, weights, settings, dyn, adj){
   raw.weight=rs.map(r=>{const w=num(r.weight); return (w==null||meanW==null)?null:clamp(0.5+(meanW-w)/6,0,1);});
   raw.market=rs.map(r=>{const o=openOf(r); return (o>1&&maxImp>0)?(1/o)/maxImp:null;}); // the morning market, fixed for the day, so the tip does not move with the price
   const z={}; for(const k of Object.keys(raw)) z[k]=zscores(raw[k]);
+  const trialLast=rs.map(r=>!!(r.last&&r.last.trial)); if(trialLast.some(Boolean)) z.last=zscoresPartial(raw.last,trialLast,TRIAL_WEIGHT);
   z.formline=rs.map(r=>clamp(dyn.formline[runnerKey(race,r)]||0,-2,2));
   z.manual=rs.map(r=>((adj&&adj[runnerKey(race,r)]&&num(adj[runnerKey(race,r)].adj))||0)*0.5);
   const wsum=METRICS.reduce((a,m)=>a+(weights[m.key]||0),0)||1; const wsumFree=wsum-(weights.market||0)||1;
@@ -338,8 +345,8 @@ function runDay(punter, meeting){
     for(const s of scored){ const idx=pos.indexOf(s.r.no); const actual=idx>=0?idx+1:(pos.length+1+n)/2; let resid=clamp((s.rank-actual)/Math.max(n/2,1),-1,1); if(idx===0) resid=Math.max(resid,0.15);
       const b=num(s.r.barrier); if(idx===0){ const j=normKey(s.r.jockey); if(j) jockeyWins[j]=(jockeyWins[j]||0)+1; if(b!=null&&n>1) barrierRel.push({rel:(b-1)/(n-1),w:1}); }
       if(idx===1){ if(b!=null&&n>1) barrierRel.push({rel:(b-1)/(n-1),w:0.5}); }
-      const key=normKey(s.r.last&&s.r.last.race); if(!key||Math.abs(resid)<0.05) continue;
-      for(const later of races){ if(later.no<=race.no) continue; for(const q of active(later)){ if(normKey(q.last&&q.last.race)!==key) continue;
+      const key=normKey(s.r.last&&!s.r.last.trial&&s.r.last.race); if(!key||Math.abs(resid)<0.05) continue;
+      for(const later of races){ if(later.no<=race.no) continue; for(const q of active(later)){ if(q.last&&q.last.trial||normKey(q.last&&q.last.race)!==key) continue;
         const qp=num(q.last.pos), rp=num(s.r.last.pos), qm=num(q.last.margin)||0, rm=num(s.r.last.margin)||0; let f=1; if(qp!=null&&rp!=null&&qp>rp) f=clamp(1-(qm-rm)/6,0.3,1);
         const k=runnerKey(later,q); formline[k]=clamp((formline[k]||0)+resid*settings.formlineGain*f,-1.5,1.5); } } }
     if(!win){ changes.push({race:race.no,text:`Winner ${pos[0]} not among active runners; no adaptation.`,items:[]}); continue; }
@@ -487,7 +494,7 @@ function normaliseMeeting(j){
   const races=(j.races||[]).map((r,i)=>({ no:num(r.no)||num(r.race)||i+1, name:r.name||'', distance:num(r.distance), class:r.class||r.grade||'', time:r.time||'', result:(r.result&&r.result.positions)?r.result:null,
     runners:(r.runners||[]).map((h,k)=>({ no:num(h.no)||num(h.number)||k+1, name:h.name||('Runner '+(k+1)), barrier:num(h.barrier), weight:num(h.weight), jockey:h.jockey||'', trainer:h.trainer||'', age:h.age||null, sex:h.sex||'',
       career:rec(h.career), track:rec(h.track), distance:rec(h.distance), trackDistance:rec(h.trackDistance), barrierRec:rec(h.barrierRec), good:rec(h.good), soft:rec(h.soft), heavy:rec(h.heavy),
-      form:h.form||'', recent:Array.isArray(h.recent)?h.recent:null, last:h.last?{pos:num(h.last.pos),field:num(h.last.field),margin:num(h.last.margin),days:num(h.last.days),race:h.last.race||'',classChange:num(h.last.classChange)||0}:null,
+      form:h.form||'', recent:Array.isArray(h.recent)?h.recent:null, last:h.last?{pos:num(h.last.pos),field:num(h.last.field),margin:num(h.last.margin),days:num(h.last.days),race:h.last.race||'',classChange:num(h.last.classChange)||0,trial:!!h.last.trial}:null,
       jockeyPct:num(h.jockeyPct), trainerPct:num(h.trainerPct), odds:num(h.odds), scratched:!!h.scratched, gear:h.gear||'', comment:h.comment||'', ra:h.ra||undefined })) })).filter(r=>r.runners.length);
   if(!races.length) throw new Error('No races with runners found');
   const id=j.id||slug((j.meeting||'meeting')+'-'+(j.date||Date.now())); for(const r of races) r.meetingId=id;
@@ -606,7 +613,7 @@ function viewRace(){
   const maxR=Math.max(...scored.map(s=>s.rating)), minR=Math.min(...scored.map(s=>s.rating)); const span=(maxR-minR)||1;
   for(const s of scored){ const r=s.r; const k=runnerKey(race,r); const open=state.ui.open===k; const dynv=s.contrib.formline+s.contrib.manual; const a=my.adj[k]||{adj:0,note:''};
     const chips=[]; if(r.barrier!=null) chips.push(`Bar ${r.barrier}`); if(r.weight!=null) chips.push(`${r.weight}kg`); if(r.form) chips.push(`Form ${esc(r.form)}`);
-    if(r.last&&r.last.pos!=null) chips.push(`Last ${r.last.pos}${r.last.field?'/'+r.last.field:''}${r.last.margin!=null&&r.last.pos>1?' '+r.last.margin+'L':''}`); if(r.last&&r.last.days!=null) chips.push(`${r.last.days}d`);
+    if(r.last&&r.last.pos!=null) chips.push(`${r.last.trial?'Trial':'Last'} ${r.last.pos}${r.last.field?'/'+r.last.field:''}${r.last.margin!=null&&r.last.pos>1?' '+r.last.margin+'L':''}`); if(r.last&&r.last.days!=null) chips.push(`${r.last.days}d`);
     if(r.odds){ const o=num(r.openOdds), c=num(r.odds); const mv=(o>1&&c>1&&Math.abs(c-o)/o>=0.15)?(c<o?'firmed':'drifted'):null; chips.push(mv?`<span class="chip ${mv==='firmed'?'up':'dn'}">$${c} ${mv} from $${o}</span>`:`$${c}`); }
     if(s.z.formline>0.05) chips.push(`<span class="chip up">Form line +${s.z.formline.toFixed(2)}</span>`); if(s.z.formline<-0.05) chips.push(`<span class="chip dn">Form line ${s.z.formline.toFixed(2)}</span>`);
     if(a.adj) chips.push(`<span class="chip ${a.adj>0?'up':'dn'}">Your call ${a.adj>0?'+':''}${a.adj}</span>`); if(a.note) chips.push(`<span class="chip">Note</span>`); if(s.missing>=3) chips.push(`<span class="chip">thin data</span>`);
