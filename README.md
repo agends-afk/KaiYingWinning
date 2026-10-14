@@ -31,7 +31,14 @@ Once a day, at the morning roll or on the first sync, the Racing Australia Free 
 
 Within a run every race is re-read until its result is in, so fields, scratchings, prices and results are never more than ten minutes old during racing hours. The function writes a meeting only when something has changed, and logs itself only when it did work. Sync now on the Feed tab forces a full re-read.
 
-Hong Kong from racing.com carries fields, barriers, weights, riders, track and distance records, prices and results, but not the horse form history the model uses for last start, recent form and class. HKJC's results and horse pages are plain HTML and reachable from the Edge runtime, so that history can be added from HKJC later.
+Hong Kong from racing.com carries fields, barriers, weights, riders, track and distance records, prices and most results, but not the horse form history, and it labels its race times in Sydney clock time as if UTC. The feed therefore reads Hong Kong from HKJC (`supabase/functions/kyw-sync/hkjc.js`, plain HTML and a public odds endpoint, all reachable from the Edge runtime):
+
+- Form: once a day, each runner's racecard row, horse page and jockey and trainer season rates (current and previous season combined) are cached in `kyw_ra` under the meeting id, and last start, recent runs, form, career record and jockey and trainer rates are built from them. HKJC publishes race runs only on the horse page, so no trial filtering is needed. Field size is not published there, so last-start scoring assumes 12 runners. A horse with no Hong Kong race run has no last start.
+- Times: race times come from the HKJC racecard (Hong Kong time, UTC+8). Racing.com's Hong Kong times, read as UTC, were 11 hours late.
+- Results: racing.com files Hong Kong results under Sydney dates, so races that jump after Sydney midnight never get one there. When racing.com has no result eight minutes after the jump, the finishing order is read from the HKJC results page, live and when the day is archived.
+- Prices: racing.com fixed odds until 30 minutes before the meeting's first race, then the HKJC tote win pool. A per-minute job (`kyw-hk-odds`, `kyw-sync?hkodds=1`) reads each unrun race every 5 minutes and every minute inside 5 minutes of the jump, and the rating takes its late price from the tote at 5 minutes. The odds query is HKJC's own stored text and must stay verbatim, or the endpoint answers WHITELIST_ERROR; if a read fails the race keeps its fixed-odds price.
+
+On 51 archived Hong Kong races (the form rebuilt as it stood before each race) the form-only log-loss went from 2.543, the same as picking blind, to 2.357 with HKJC form and jockey and trainer rates; with default weights 2.457 to 2.342. The market still scores better (2.08 to 2.18), and the jockey and trainer rates carry a little hindsight.
 
 ## Loading the form by hand
 

@@ -4,7 +4,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { parseForm, matchKey } from "./ra.js";
-import { parseRaceCard, parseRaceInfo, parseHorse, parseStats, toteMap, toteOn, classRank as hkClassRank } from "./hkjc.js";
+import { parseRaceCard, parseRaceInfo, parseHorse, parseResults, parseStats, toteMap, toteOn, classRank as hkClassRank } from "./hkjc.js";
 
 const GQL = "https://graphql.rmdprod.racing.com/";
 const GQL_KEY = "da2-6nsi4ztsynar3l3frgxf77q5fe"; // racing.com's public site key, taken from their config.js
@@ -196,6 +196,13 @@ async function hkForMeeting(meetId: string, meetDate: string, venue: string, nRa
   await sb.from("kyw_ra").upsert({ meet_id: meetId, key: `HKJC,${meetDate},${venue}`, date: meetDate, fetched_at: new Date().toISOString(), status, data });
   return status === "ok" ? data : null;
 }
+// racing.com files Hong Kong results under Sydney dates, so a race that jumps after Sydney midnight (the back half of a Happy Valley card) never gets a result there.
+// The finishing order comes from the HKJC results page instead: saddle numbers in finishing order, or null until at least three finishers are listed.
+async function hkResults(date: string, venue: string, raceNo: number): Promise<number[] | null> {
+  const html = await hkGet(`/racing/information/English/Racing/LocalResults.aspx?RaceDate=${date.replace(/-/g, "/")}&Racecourse=${venue}&RaceNo=${raceNo}`); if (!html) return null;
+  const rows = parseResults(html).filter((x: any) => x.place != null && x.no != null).sort((a: any, b: any) => a.place - b.place);
+  return rows.length >= 3 ? rows.map((x: any) => x.no as number) : null;
+}
 const hkWithBudget = (p: Promise<any | null>) => Promise.race([p, new Promise<null>(res => setTimeout(() => res(null), 80000))]);
 // HKJC's own stored query for pool odds. The endpoint answers only this exact text (WHITELIST_ERROR otherwise), so it is kept verbatim.
 const HK_ODDS_Q = `
@@ -298,7 +305,8 @@ async function syncMeeting(feed: any, existing: any | null, force: boolean) {
       const runners = entries.map((e: any) => mapEntry(e, meetDate, fr.class ?? r.class, trials[nameKey(e.horseName ?? e.horse?.name)], hkd?.races?.[no]?.[e.raceEntryNumber])).sort((a: any, b: any) => a.no - b.no);
       if (toteNow && !finished) { const tt = await hkTote(dateOnly, hkv!, no); if (tt && Object.keys(tt.map).length) { for (const x of runners) if (tt.map[x.no]) x.odds = tt.map[x.no]; toteUsed++; } else toteFail++; }
       const order = runners.filter((x: any) => x.finish && x.finish > 0 && x.finish < 100).sort((a: any, b: any) => a.finish - b.finish).map((x: any) => x.no);
-      const positions = order.length ? order : (finished && fr.resultsString ? String(fr.resultsString).split(/[^0-9]+/).filter(Boolean).map(Number) : []);
+      let positions = order.length ? order : (finished && fr.resultsString ? String(fr.resultsString).split(/[^0-9]+/).filter(Boolean).map(Number) : []);
+      if (isHK && hkv && positions.length < 3 && rtime(r) && (now - Date.parse(rtime(r)!)) / 60000 >= 8) { const hp = await hkResults(dateOnly, hkv, no); if (hp) positions = hp; }
       // The field the app judges a run race by is the last one read before the result: pre-race prices and scratchings, never post-race data.
       // Opening price: the first price seen for the runner today. Kept across re-reads so the tip has a fixed market to work from; the live price keeps moving alongside it.
       const prevByNo: Record<number, any> = {}; for (const x of prev?.runners ?? []) prevByNo[x.no] = x;
@@ -399,6 +407,7 @@ async function backtest(meetId: string) {
   const d = await gql(`{ m: getMeeting(id:"${meetId}"){ id date meetingName venueName state trackCondition trackRating } races: getRacesForMeet(meetCode:"${meetId}"){ ${RACE_FIELDS} } }`);
   const m = d.m ?? {}; const meetDate = m.date;
   // Hong Kong: the HKJC form cached on the morning of the meeting, so the archive holds the form as it stood before the race.
+  const hkv = isHKMeet(meetId, m.state) ? hkVenue(meetId, String(m.venueName ?? "")) : null;
   let hkd: any = null; if (isHKMeet(meetId, m.state)) { const { data: hrow } = await sb.from("kyw_ra").select("status,data").eq("meet_id", meetId).maybeSingle(); if (hrow?.status === "ok" && hrow.data?.source === "hkjc") hkd = hrow.data; }
   const out: any[] = await Promise.all((d.races ?? []).sort((a: any, b: any) => a.raceNumber - b.raceNumber).map(async (r: any) => {
     const fd = await gql(FORM_QUERY(meetId, r.raceNumber)); const fr = fd.r ?? r;
@@ -408,7 +417,8 @@ async function backtest(meetId: string) {
     const hkOf = (no: number) => hkd?.races?.[r.raceNumber]?.[no];
     const runners = entries.map((e: any) => ({ x: mapEntry(e, meetDate, fr.class ?? r.class, undefined, hkOf(e.raceEntryNumber)), hk: !!hkOf(e.raceEntryNumber) })).map(({ x, hk }: any) => ({ ...x, odds: x.sp ?? x.odds, rating: null,
       career: hk ? x.career : unrun(x.career, x.finish), track: unrun(x.track, x.finish), distance: unrun(x.distance, x.finish), trackDistance: unrun(x.trackDistance, x.finish), barrierRec: unrun(x.barrierRec, x.finish), [catKey]: unrun(x[catKey], x.finish) })).sort((a: any, b: any) => a.no - b.no);
-    const positions = runners.filter((x: any) => x.finish && x.finish > 0 && x.finish < 100).sort((a: any, b: any) => a.finish - b.finish).map((x: any) => x.no);
+    let positions = runners.filter((x: any) => x.finish && x.finish > 0 && x.finish < 100).sort((a: any, b: any) => a.finish - b.finish).map((x: any) => x.no);
+    if (hkv && positions.length < 3) { const hp = await hkResults(String(meetDate).slice(0, 10), hkv, r.raceNumber); if (hp) positions = hp; }
     return { no: r.raceNumber, name: fr.name, distance: num(fr.distance), class: fr.class, condition: [fr.trackCondition, fr.trackRating].filter(Boolean).join(" "), runners: runners.map(({ finish, ...rest }: any) => rest), result: positions.length >= 3 ? { positions } : null };
   }));
   const data = { id: meetId, meeting: m.venueName, state: m.state ?? "", date: meetDate, condition: [m.trackCondition, m.trackRating].filter(Boolean).join(" "), races: out };
