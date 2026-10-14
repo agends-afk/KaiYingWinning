@@ -14,7 +14,8 @@ export function parseRaceCard(html) {
     const c = cells(m[1]); if (c.length < 20) continue;
     const id = /horseid=([A-Z0-9_]+)/i.exec(c[3]); const no = num(text(c[0]));
     if (no == null || !id) continue;
-    out.push({ no, last6: text(c[1]), name: text(c[3]), horseId: id[1].toUpperCase(), code: text(c[4]), weight: num(text(c[5])), jockey: text(c[6]), draw: num(text(c[8])), trainer: text(c[9]),
+    const jid = /jockeyid=([A-Z0-9]+)/i.exec(c[6]), tid = /trainerid=([A-Z0-9]+)/i.exec(c[9]);
+    out.push({ no, last6: text(c[1]), name: text(c[3]), horseId: id[1].toUpperCase(), code: text(c[4]), weight: num(text(c[5])), jockey: text(c[6]), jockeyId: jid ? jid[1].toUpperCase() : null, draw: num(text(c[8])), trainer: text(c[9]), trainerId: tid ? tid[1].toUpperCase() : null,
       rating: num(text(c[11])), ratingChange: num(text(c[12])), declWeight: num(text(c[13])), age: num(text(c[16])), sex: text(c[18]), daysSince: num(text(c[21])), gear: text(c[22] ?? "") });
   }
   return out;
@@ -54,3 +55,35 @@ export function parseHorse(html) {
   }
   return out;
 }
+
+// Race header on a racecard page: "Race 1 - NAME Wednesday, October 14, 2026, Happy Valley, 18:35 Turf, "A" Course, 1650M, Good". Time is Hong Kong local (UTC+8, no daylight saving).
+export function parseRaceInfo(html, date) {
+  const t = text(html); const m = /Race\s+(\d+)\s*-\s*(.*?)\s+\w+day,\s+\w+\s+\d+,\s+\d{4},\s+[A-Za-z ]+?,\s+(\d{1,2}):(\d{2})\s+(Turf|All Weather)[^,]*,\s*"?[A-Z+0-9 ]*"?\s*Course,\s*(\d{3,4})M,\s*([A-Za-z ]+?)(?:\s+Prize|\s+\$|$)/.exec(t);
+  if (!m) return null; const iso = date ? new Date(`${date}T${m[3].padStart(2, "0")}:${m[4]}:00+08:00`).toISOString() : null;
+  return { raceNo: +m[1], name: m[2].trim(), hkTime: `${m[3].padStart(2, "0")}:${m[4]}`, timeUtc: iso, surface: m[5], distance: +m[6], going: m[7].trim() };
+}
+
+// Results page rows (past races): placing, number, horse, jockey, trainer, weight, draw, LBW, running positions, finish time, final tote win odds.
+export function parseResults(html) {
+  const out = [];
+  for (const m of html.matchAll(/<tr>\s*(<td style="white-space: nowrap;">[\s\S]*?)<\/tr>/g)) {
+    const c = cells(m[1]); if (c.length < 12) continue; const id = /horseid=([A-Z0-9_]+)/i.exec(c[2]); if (!id) continue;
+    const place = /^(\d+)/.exec(text(c[0])); const jid = /jockeyid=([A-Z0-9]+)/i.exec(c[3]), tid = /trainerid=([A-Z0-9]+)/i.exec(c[4]);
+    out.push({ place: place ? +place[1] : null, status: place ? null : text(c[0]) || null, no: num(text(c[1])), name: text(c[2]).replace(/\s*\(.*?\)\s*$/, ""), horseId: id[1].toUpperCase(), jockeyId: jid ? jid[1].toUpperCase() : null, trainerId: tid ? tid[1].toUpperCase() : null,
+      weight: num(text(c[5])), draw: num(text(c[7])), margin: lbw(text(c[8])), running: [...(c[9].matchAll(/>\s*(\d+)\s*</g))].map((x) => +x[1]), winOdds: num(text(c[11])) });
+  }
+  return out;
+}
+
+// Jockey or trainer season table: the last row is "Total 17 14 12 84" = wins, seconds, thirds, unplaced.
+export function parseStats(html) {
+  const t = ent(String(html).replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ").replace(/<[^>]+>/g, " ")).replace(/\s+/g, " "); const m = [...t.matchAll(/Total\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/g)].pop(); if (!m) return null;
+  const w = +m[1], n = +m[1] + +m[2] + +m[3] + +m[4]; return { wins: w, rides: n };
+}
+
+// WIN pool nodes ("01=4.5") to { runnerNo: odds }. Scratched or unpriced runners are left out.
+export function toteMap(nodes) {
+  const out = {}; for (const n of nodes ?? []) { const no = parseInt(n.combString, 10); const o = parseFloat(n.oddsValue); if (Number.isFinite(no) && Number.isFinite(o) && o > 1) out[no] = o; } return out;
+}
+// Hong Kong price rule: fixed odds until 30 minutes before the meeting's first race, then the tote.
+export function toteOn(firstRaceMs, nowMs) { return Number.isFinite(firstRaceMs) && nowMs >= firstRaceMs - 30 * 60000; }

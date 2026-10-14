@@ -4,6 +4,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { parseForm, matchKey } from "./ra.js";
+import { parseRaceCard, parseRaceInfo, parseHorse, parseStats, toteMap, toteOn, classRank as hkClassRank } from "./hkjc.js";
 
 const GQL = "https://graphql.rmdprod.racing.com/";
 const GQL_KEY = "da2-6nsi4ztsynar3l3frgxf77q5fe"; // racing.com's public site key, taken from their config.js
@@ -76,8 +77,12 @@ function formFromRuns(form: any[] | null, meetDate: string, lastTen: unknown, tr
   return out.slice(-8);
 }
 
-function mapEntry(e: any, meetDate: string, todayClass: string, trialDates?: Set<string>) {
+// HKJC run lines in the shape of racing.com's horseForm, so lastStart, recentRuns and formFromRuns serve Hong Kong unchanged.
+const hkRaceClass = (c: string | null | undefined) => { const s = String(c ?? "").toUpperCase(); if (/^G[123]$/.test(s)) return s; const r = hkClassRank(s); return r != null ? `BM${r}` : (/GRIFFIN/.test(s) ? "MDN" : ""); };
+const hkFormRuns = (hk: any) => (hk.runs ?? []).map((q: any) => ({ date: q.d, venue: q.v ?? "", position: q.p, starters: null, margin: q.m, raceClass: hkRaceClass(q.c), raceCode: "", isTrial: false, isJumpOut: false }));
+function mapEntry(e: any, meetDate: string, todayClass: string, trialDates?: Set<string>, hk?: any) {
   const h = e.horse ?? {};
+  if (hk) { h.horseForm = hkFormRuns(hk); if (!stats(h.careerStats) && hk.rec) h.careerStats = `${hk.rec[0]}:${hk.rec[1]}-0-${hk.rec[2]}`; trialDates = undefined; }
   // No career starts means every run in the history is a trial or jump-out, whatever its flags say.
   const c0 = stats(h.careerStats); if (c0 && c0[0] === 0) trialDates = new Set((h.horseForm ?? []).map((f: any) => String(f.date ?? "").slice(0, 10)));
   return {
@@ -87,7 +92,7 @@ function mapEntry(e: any, meetDate: string, todayClass: string, trialDates?: Set
     career: stats(h.careerStats), track: stats(e.trackStats), distance: stats(e.distanceStats), trackDistance: stats(e.trackDistanceStats), barrierRec: stats(e.atThisBarrierNumberStats), classRec: stats(e.atThisClassStats), pace: paceOf(h.horseForm, meetDate, trialDates),
     good: stats(h.goodStats), soft: stats(h.softStats), heavy: stats(h.heavyStats), firstUp: stats(h.firstUpStats), secondUp: stats(h.secondUpStats),
     form: formFromRuns(h.horseForm, meetDate, h.lastTen, trialDates), last: lastStart(h.horseForm, meetDate, todayClass, trialDates), recent: recentRuns(h.horseForm, meetDate, trialDates),
-    jockeyPct: num(e.jockey?.winPercent), trainerPct: num(e.trainer?.winPercent), jockeyRecentPct: num(e.jockey?.recentWinPercent), trainerRecentPct: num(e.trainer?.recentWinPercent),
+    jockeyPct: hk?.jp ?? num(e.jockey?.winPercent), trainerPct: hk?.tp ?? num(e.trainer?.winPercent), jockeyRecentPct: num(e.jockey?.recentWinPercent), trainerRecentPct: num(e.trainer?.recentWinPercent),
     apprentice: !!e.jockey?.apprentice, claim: num(e.jockey?.weightClaim), rating: num(h.rating ?? e.handicapRating),
     odds: odds(e.odds), scratched: !!(e.scratched || e.isLateScratching || e.finish === 109), emergency: !!e.emergency,
     gear: e.gearChanges ?? "", comment: e.commentShort ?? "", horseCode: String(e.horseCode ?? h.id ?? ""), finish: e.finish ?? null, sp: num(e.startingPrice),
@@ -145,6 +150,125 @@ async function raForMeeting(meetId: string, meetDate: string, state: string, ven
   return status === "ok" ? data : null;
 }
 
+/* ---- Hong Kong: HKJC form pages, race times and tote ----
+   racing.com carries no horse form for Hong Kong and labels its race times in Sydney clock time as if UTC, so a day's HKJC racecards, horse pages and jockey and trainer
+   season stats are read once and cached in kyw_ra (data.races[raceNo][saddleNo]). Race times come from the HKJC racecard (Hong Kong time, UTC+8).
+   Prices: racing.com fixed odds until 30 minutes before the meeting's first race, then the HKJC tote win pool (every 5 minutes, every minute inside 5 minutes of the jump). */
+const HKJC = "https://racing.hkjc.com";
+const hkVenue = (meetId: string, name: string): string | null => (/-SHAT$/i.test(meetId) || /sha.?tin/i.test(name)) ? "ST" : (/-H V$|-HV$/i.test(meetId) || /happy.?valley/i.test(name)) ? "HV" : null;
+const isHKMeet = (meetId: string, state?: string) => /^HK/i.test(meetId) || state === "HK";
+async function hkGet(path: string): Promise<string | null> {
+  for (let a = 0; a < 3; a++) { try { const res = await fetch(HKJC + path, { headers: { ...RA_HEADERS, "Accept-Language": "en-US,en;q=0.9" }, redirect: "follow" }); if (res.status === 200) return await res.text(); } catch { /* retry */ } await new Promise(r => setTimeout(r, 300 * (a + 1))); }
+  return null;
+}
+async function pool<T, R>(items: T[], limit: number, fn: (x: T) => Promise<R>): Promise<R[]> { const out: R[] = []; for (let i = 0; i < items.length; i += limit) out.push(...await Promise.all(items.slice(i, i + limit).map(fn))); return out; }
+// racing.com's Hong Kong times read as Sydney local clock time; used only when the HKJC racecard time is missing.
+function sydneyClockToUtc(label: string): string {
+  const asUtc = Date.parse(String(label).replace(/(\.\d{3})\d+Z$/, "$1Z")); if (isNaN(asUtc)) return label;
+  const f = new Intl.DateTimeFormat("en-US", { timeZone: "Australia/Sydney", hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const off = (d: number) => { const p: any = Object.fromEntries(f.formatToParts(new Date(d)).map(x => [x.type, x.value])); return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second) - d; };
+  return new Date(asUtc - off(asUtc)).toISOString();
+}
+async function hkForMeeting(meetId: string, meetDate: string, venue: string, nRaces: number): Promise<any | null> {
+  const { data: row } = await sb.from("kyw_ra").select("*").eq("meet_id", meetId).maybeSingle();
+  // Only a row written by this function counts (its key starts "HKJC"); an older Free Fields miss under the same meeting id must not hold up the fetch.
+  if (row && String(row.date) === meetDate && String(row.key ?? "").startsWith("HKJC")) { if (row.status === "ok") return row.data; if (Date.now() - Date.parse(row.fetched_at) < 2 * 3600e3) return null; }
+  let status = "miss", data: any = null;
+  try {
+    const slash = meetDate.replace(/-/g, "/"); const cards: Record<number, any[]> = {}; const times: Record<number, string> = {}; const hIds = new Set<string>(), jIds = new Set<string>(), tIds = new Set<string>();
+    for (let n = 1; n <= nRaces; n++) {
+      const html = await hkGet(`/racing/information/English/Racing/RaceCard.aspx?RaceDate=${slash}&Racecourse=${venue}&RaceNo=${n}`); if (!html) continue;
+      const info = parseRaceInfo(html, meetDate); if (info?.timeUtc) times[n] = info.timeUtc;
+      const rs = parseRaceCard(html); if (!rs.length) continue; cards[n] = rs; for (const x of rs) { hIds.add(x.horseId); if (x.jockeyId) jIds.add(x.jockeyId); if (x.trainerId) tIds.add(x.trainerId); }
+    }
+    if (!Object.keys(cards).length) throw new Error("no HKJC racecards for " + meetDate + " " + venue);
+    const horses: Record<string, any> = {};
+    await pool([...hIds], 10, async (id) => { const html = await hkGet(`/racing/information/English/Horse/Horse.aspx?HorseId=${id}`); horses[id] = html ? parseHorse(html) : null; });
+    const rate = async (kind: "jockey" | "trainer", id: string) => { let w = 0, r = 0; for (const season of ["Current", "Previous"]) { const html = await hkGet(`/en-us/local/information/${kind}winstat?${kind}id=${id}&season=${season}`); const st = html ? parseStats(html) : null; if (st) { w += st.wins; r += st.rides; } } return r >= 40 ? +(100 * w / r).toFixed(1) : null; };
+    const jp: Record<string, number | null> = {}, tp: Record<string, number | null> = {};
+    await pool([...jIds], 10, async (id) => { jp[id] = await rate("jockey", id); }); await pool([...tIds], 10, async (id) => { tp[id] = await rate("trainer", id); });
+    const races: Record<number, Record<number, any>> = {};
+    for (const [n, rs] of Object.entries(cards)) { races[+n] = {}; for (const x of rs) { const h = horses[x.horseId];
+      races[+n][x.no] = { name: x.name, horseId: x.horseId, draw: x.draw, rec: h?.rec ?? null, rtg: x.rating, jp: x.jockeyId ? jp[x.jockeyId] ?? null : null, tp: x.trainerId ? tp[x.trainerId] ?? null : null,
+        runs: (h?.runs ?? []).filter((q: any) => q.pos != null).slice(0, 10).map((q: any) => ({ d: q.date, p: q.pos, c: q.cls, m: q.pos === 1 ? 0 : q.margin, v: q.venue, dist: q.dist, sp: q.sp })) }; } }
+    data = { source: "hkjc", venue, times, races, fetched: { cards: Object.keys(cards).length, horses: hIds.size, noHorsePage: Object.values(horses).filter(h => !h).length } }; status = "ok";
+  } catch (e) { data = { error: String(e).slice(0, 200) }; }
+  await sb.from("kyw_ra").upsert({ meet_id: meetId, key: `HKJC,${meetDate},${venue}`, date: meetDate, fetched_at: new Date().toISOString(), status, data });
+  return status === "ok" ? data : null;
+}
+const hkWithBudget = (p: Promise<any | null>) => Promise.race([p, new Promise<null>(res => setTimeout(() => res(null), 80000))]);
+// HKJC's own stored query for pool odds. The endpoint answers only this exact text (WHITELIST_ERROR otherwise), so it is kept verbatim.
+const HK_ODDS_Q = `
+      query racing($date: String, $venueCode: String, $oddsTypes: [OddsType], $raceNo: Int) {
+          raceMeetings(date: $date, venueCode: $venueCode)
+          {
+            pmPools(oddsTypes: $oddsTypes, raceNo: $raceNo) {
+              id
+              status
+              sellStatus
+              oddsType
+              lastUpdateTime
+              guarantee
+              minTicketCost
+              name_en
+              name_ch
+              leg {
+                number
+                races
+              }
+              cWinSelections {
+                composite
+                name_ch
+                name_en
+                starters
+              }
+              oddsNodes {
+                combString
+                oddsValue
+                hotFavourite
+                oddsDropValue
+                bankerOdds {
+                  combString
+                  oddsValue
+                }
+              }
+            }
+          }
+      }
+`;
+async function hkTote(date: string, venue: string, raceNo: number): Promise<{ map: Record<number, number>; status: string | null; updated: string | null } | null> {
+  try {
+    const res = await fetch("https://info.cld.hkjc.com/graphql/base/", { method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/json", "Origin": "https://bet.hkjc.com", "Referer": "https://bet.hkjc.com/", "User-Agent": RA_HEADERS["User-Agent"] },
+      body: JSON.stringify({ operationName: "racing", query: HK_ODDS_Q, variables: { date, venueCode: venue, oddsTypes: ["WIN"], raceNo } }) });
+    const j = await res.json(); if (j.errors) { console.error("hkTote", JSON.stringify(j.errors).slice(0, 200)); return null; }
+    const p = (j.data?.raceMeetings?.[0]?.pmPools ?? []).find((x: any) => x.oddsType === "WIN"); if (!p) return null;
+    return { map: toteMap(p.oddsNodes), status: p.sellStatus ?? p.status ?? null, updated: p.lastUpdateTime ?? null };
+  } catch (e) { console.error("hkTote", e); return null; }
+}
+// Once a minute while a Hong Kong meeting is in its tote window: refresh each unrun race's tote prices (every 5 minutes, every minute inside 5 minutes of the jump) and take the rating's late price at 5 minutes.
+async function hkOddsTick(): Promise<any[]> {
+  const out: any[] = []; const now = Date.now(); const minute = Math.floor(now / 60000);
+  const { data: feeds } = await sb.from("kyw_feed").select("meet_id,name").eq("active", true).like("meet_id", "HK%");
+  for (const f of feeds ?? []) {
+    const { data: row } = await sb.from("kyw_meeting").select("id,data").eq("id", f.meet_id).maybeSingle(); const m = row?.data; if (!m?.races?.length) continue;
+    const venue = hkVenue(String(f.meet_id), String(m.venue || f.name || "")); if (!venue) continue; const date = String(m.date).slice(0, 10);
+    const tms = m.races.map((r: any) => Date.parse(r.time)).filter((t: number) => !isNaN(t)); if (!tms.length || !toteOn(Math.min(...tms), now)) { out.push({ meetId: f.meet_id, skipped: "before the tote window" }); continue; }
+    const { data: prow } = await sb.from("kyw_prices").select("data").eq("meet_id", f.meet_id).maybeSingle(); const races: Record<string, any> = { ...(prow?.data?.races ?? {}) };
+    let wrote = false, changed = false; const log: any = { meetId: f.meet_id, read: [] as number[], none: [] as number[] };
+    for (const r of m.races) {
+      if (r.feedResult || r.frozenAt) continue; const mins = (Date.parse(r.time) - now) / 60000; if (isNaN(mins) || mins < -2) continue;
+      if (mins > 5.5 && minute % 5 !== 0) continue;
+      const tt = await hkTote(date, venue, r.no); if (!tt || !Object.keys(tt.map).length) { log.none.push(r.no); continue; }
+      races[r.no] = { ...(races[r.no] ?? {}), ...tt.map }; wrote = true; log.read.push(r.no);
+      if (mins <= 5 && !r.lateAt) { r.lateAt = new Date().toISOString(); r.priceSource = "tote"; for (const x of r.runners ?? []) x.lateOdds = tt.map[x.no] ?? x.odds ?? null; changed = true; }
+    }
+    if (wrote) await sb.from("kyw_prices").upsert({ meet_id: f.meet_id, data: { at: new Date().toISOString(), races }, updated_at: new Date().toISOString() });
+    if (changed) { m.syncedAt = new Date().toISOString(); m.updatedAt = Date.now(); await sb.from("kyw_meeting").upsert({ id: f.meet_id, data: m, updated_at: new Date().toISOString() }); }
+    out.push({ ...log, lateSet: changed }); }
+  if (out.some(o => o.lateSet || o.none?.length)) await sb.from("kyw_feed_log").insert({ summary: { hkodds: out } });
+  return out;
+}
+
 async function syncMeeting(feed: any, existing: any | null, force: boolean) {
   const meetId = String(feed.meet_id);
   const d = await gql(`{ m: getMeeting(id:"${meetId}"){ id date meetingName venueName state trackCondition trackRating railPosition weather racesCount status }
@@ -153,8 +277,13 @@ async function syncMeeting(feed: any, existing: any | null, force: boolean) {
   const meetDate = m.date ?? feed.date; const now = Date.now();
   const stored: any = existing?.data ?? null; const storedRaces: Record<number, any> = {}; for (const r of stored?.races ?? []) storedRaces[r.no] = r;
   const outRaces: any[] = []; const results: any[] = []; let fetched = 0;
-  let ra: any = null; try { ra = await raForMeeting(meetId, String(meetDate), String(m.state ?? ""), String(m.venueName ?? "")); } catch (e) { console.error("ra", e); }
+  const isHK = isHKMeet(meetId, m.state); const hkv = isHK ? hkVenue(meetId, String(m.venueName ?? feed.name ?? "")) : null; const dateOnly = String(meetDate).slice(0, 10);
+  let ra: any = null; if (!isHK) { try { ra = await raForMeeting(meetId, String(meetDate), String(m.state ?? ""), String(m.venueName ?? "")); } catch (e) { console.error("ra", e); } }
   const trials = raTrialDates(ra);
+  let hkd: any = null; if (isHK && hkv) { try { hkd = await hkWithBudget(hkForMeeting(meetId, dateOnly, hkv, races.length)); } catch (e) { console.error("hk", e); } }
+  const rtime = (r: any): string | null => !r.time ? null : isHK ? (hkd?.times?.[r.raceNumber] ?? sydneyClockToUtc(r.time)) : r.time;
+  const firstRaceMs = Math.min(...races.map((r: any) => rtime(r) ? Date.parse(rtime(r)!) : NaN).filter((t: number) => !isNaN(t)));
+  const toteNow = !!(isHK && hkv && toteOn(firstRaceMs, now)); let toteUsed = 0, toteFail = 0;
   for (const r of races) {
     const no = r.raceNumber; const prev = storedRaces[no];
     const finished = !!(r.hasResults || (r.resultsString && r.resultsString.trim()));
@@ -166,20 +295,21 @@ async function syncMeeting(feed: any, existing: any | null, force: boolean) {
       fetched++;
       const fd = await gql(FORM_QUERY(meetId, no)); const fr = fd.r ?? r;
       const entries = mergeEntries(fr.raceEntries, fr.formRaceEntries);
-      const runners = entries.map((e: any) => mapEntry(e, meetDate, fr.class ?? r.class, trials[nameKey(e.horseName ?? e.horse?.name)])).sort((a: any, b: any) => a.no - b.no);
+      const runners = entries.map((e: any) => mapEntry(e, meetDate, fr.class ?? r.class, trials[nameKey(e.horseName ?? e.horse?.name)], hkd?.races?.[no]?.[e.raceEntryNumber])).sort((a: any, b: any) => a.no - b.no);
+      if (toteNow && !finished) { const tt = await hkTote(dateOnly, hkv!, no); if (tt && Object.keys(tt.map).length) { for (const x of runners) if (tt.map[x.no]) x.odds = tt.map[x.no]; toteUsed++; } else toteFail++; }
       const order = runners.filter((x: any) => x.finish && x.finish > 0 && x.finish < 100).sort((a: any, b: any) => a.finish - b.finish).map((x: any) => x.no);
       const positions = order.length ? order : (finished && fr.resultsString ? String(fr.resultsString).split(/[^0-9]+/).filter(Boolean).map(Number) : []);
       // The field the app judges a run race by is the last one read before the result: pre-race prices and scratchings, never post-race data.
       // Opening price: the first price seen for the runner today. Kept across re-reads so the tip has a fixed market to work from; the live price keeps moving alongside it.
       const prevByNo: Record<number, any> = {}; for (const x of prev?.runners ?? []) prevByNo[x.no] = x;
       // Late market: one refresh of the rating's market about 20 minutes before the jump, taken on the first read inside that window and then held.
-      const t = r.time ? Date.parse(r.time) : null; const minsTo = t != null ? (t - now) / 60000 : null;
-      const lateAt: string | undefined = prev?.lateAt ?? ((minsTo != null && minsTo <= 20 && minsTo > -60) ? new Date().toISOString() : undefined);
+      const t = rtime(r) ? Date.parse(rtime(r)!) : null; const minsTo = t != null ? (t - now) / 60000 : null;
+      const lateAt: string | undefined = prev?.lateAt ?? ((minsTo != null && minsTo <= (isHK ? 5 : 20) && minsTo > -60) ? new Date().toISOString() : undefined);
       const freshRunners = runners.map(({ finish, ...rest }: any) => ({ ...rest,
         openOdds: prevByNo[rest.no]?.openOdds ?? prevByNo[rest.no]?.odds ?? rest.odds ?? null,
         lateOdds: prev?.lateAt ? (prevByNo[rest.no]?.lateOdds ?? null) : (lateAt ? (rest.odds ?? null) : undefined) }));
       const frozen = (prev?.frozenAt && prev?.runners?.length) ? prev.runners : (positions.length >= 3 && prev?.runners?.length && !prevHasResult ? prev.runners : null);
-      race = { no, name: fr.name ?? "", distance: num(fr.distance), class: fr.class ?? "", time: fr.time ?? null, raceStatus: fr.raceStatus ?? "", condition: [fr.trackCondition, fr.trackRating].filter(Boolean).join(" "), prizemoney: fr.totalPrizeMoney ?? null, meetingId: meetId,
+      race = { no, name: fr.name ?? "", distance: num(fr.distance), class: fr.class ?? "", time: (isHK ? rtime(r) : fr.time) ?? null, ...(isHK ? { priceSource: toteNow ? "tote" : "fixed" } : {}), raceStatus: fr.raceStatus ?? "", condition: [fr.trackCondition, fr.trackRating].filter(Boolean).join(" "), prizemoney: fr.totalPrizeMoney ?? null, meetingId: meetId,
         runners: frozen ? frozen.map(({ ra, ...x }: any) => x) : freshRunners, frozenAt: frozen ? (prev.frozenAt ?? prev.syncedAt) : undefined, lateAt: frozen ? prev?.lateAt : lateAt, lockOverride: prev?.lockOverride, feedResult: positions.length >= 3 ? { positions, at: prev?.feedResult?.at ?? new Date().toISOString() } : null, syncedAt: new Date().toISOString() };
     } else { race = { ...prev, raceStatus: r.raceStatus ?? prev.raceStatus }; }
     outRaces.push(race);
@@ -201,11 +331,11 @@ async function syncMeeting(feed: any, existing: any | null, force: boolean) {
   const newResults = results.filter(r => !(storedRaces[r.race_no]?.feedResult));
   if (newResults.length) { const { error: e2 } = await sb.from("kyw_results").upsert(newResults, { onConflict: "meeting_id,race_no", ignoreDuplicates: true }); if (e2) throw e2; }
   // Keep the feed row's race window current so the scheduler knows when to run.
-  const times = races.map((r: any) => r.time ? Date.parse(r.time) : NaN).filter((t: number) => !isNaN(t));
+  const times = races.map((r: any) => rtime(r) ? Date.parse(rtime(r)!) : NaN).filter((t: number) => !isNaN(t));
   if (times.length) { const first = new Date(Math.min(...times)).toISOString(), last = new Date(Math.max(...times)).toISOString();
     const same = (a: any, b: string) => a && Date.parse(a) === Date.parse(b);
     if (!same(feed.first_at, first) || !same(feed.last_at, last)) await sb.from("kyw_feed").update({ first_at: first, last_at: last }).eq("meet_id", meetId); }
-  return { meetId, name: meeting.meeting, races: outRaces.length, fetched, changed, results: newResults.length };
+  return { meetId, name: meeting.meeting, races: outRaces.length, fetched, changed, results: newResults.length, ...(isHK ? { hk: { form: !!hkd, times: hkd ? Object.keys(hkd.times ?? {}).length : 0, toteNow, toteUsed, toteFail } } : {}) };
 }
 
 // Venues we name. Metro list first (used in full on Wednesdays and Saturdays), then Hong Kong and Canberra.
@@ -254,7 +384,7 @@ async function dailyRoll(): Promise<{ date: string; picks: any[]; archived: any[
     await sb.from("kyw_feed").update({ active: false }).eq("active", true);
     await sb.from("kyw_feed").upsert(picks.map(({ state, venue, ...f }) => ({ ...f, active: true, first_at: null, last_at: null })), { onConflict: "meet_id" });
     // Read the day's Free Fields form once, now, so the first sync carries it.
-    for (const p of picks) { try { await raForMeeting(p.meet_id, date, p.state, p.venue); } catch (e) { console.error("ra roll", e); } }
+    for (const p of picks) { if (isHKMeet(String(p.meet_id), p.state)) continue; try { await raForMeeting(p.meet_id, date, p.state, p.venue); } catch (e) { console.error("ra roll", e); } }
     const keep = picks.map(f => f.meet_id);
     const { data: olds } = await sb.from("kyw_meeting").select("id"); for (const o of olds ?? []) { if (!keep.includes(String(o.id))) { await sb.from("kyw_meeting").delete().eq("id", o.id); await sb.from("kyw_results").delete().eq("meeting_id", o.id); await sb.from("kyw_prices").delete().eq("meet_id", o.id); } }
     await sb.from("kyw_ra").delete().lt("date", aestDate(-7));
@@ -268,13 +398,16 @@ async function dailyRoll(): Promise<{ date: string; picks: any[]; archived: any[
 async function backtest(meetId: string) {
   const d = await gql(`{ m: getMeeting(id:"${meetId}"){ id date meetingName venueName state trackCondition trackRating } races: getRacesForMeet(meetCode:"${meetId}"){ ${RACE_FIELDS} } }`);
   const m = d.m ?? {}; const meetDate = m.date;
+  // Hong Kong: the HKJC form cached on the morning of the meeting, so the archive holds the form as it stood before the race.
+  let hkd: any = null; if (isHKMeet(meetId, m.state)) { const { data: hrow } = await sb.from("kyw_ra").select("status,data").eq("meet_id", meetId).maybeSingle(); if (hrow?.status === "ok" && hrow.data?.source === "hkjc") hkd = hrow.data; }
   const out: any[] = await Promise.all((d.races ?? []).sort((a: any, b: any) => a.raceNumber - b.raceNumber).map(async (r: any) => {
     const fd = await gql(FORM_QUERY(meetId, r.raceNumber)); const fr = fd.r ?? r;
     const entries = mergeEntries(fr.raceEntries, fr.formRaceEntries);
     const cond = String(fr.trackCondition ?? "").toLowerCase(); const catKey = cond.startsWith("h") ? "heavy" : (cond.startsWith("so") || cond.startsWith("sy")) ? "soft" : "good";
     const unrun = (rec: any, fin: number | null) => { if (!rec || !fin || fin > 100) return rec; const [s, w, p] = rec; return [Math.max(0, s - 1), Math.max(0, w - (fin === 1 ? 1 : 0)), Math.max(0, p - (fin === 2 || fin === 3 ? 1 : 0))]; };
-    const runners = entries.map((e: any) => mapEntry(e, meetDate, fr.class ?? r.class)).map((x: any) => ({ ...x, odds: x.sp ?? x.odds, rating: null,
-      career: unrun(x.career, x.finish), track: unrun(x.track, x.finish), distance: unrun(x.distance, x.finish), trackDistance: unrun(x.trackDistance, x.finish), barrierRec: unrun(x.barrierRec, x.finish), [catKey]: unrun(x[catKey], x.finish) })).sort((a: any, b: any) => a.no - b.no);
+    const hkOf = (no: number) => hkd?.races?.[r.raceNumber]?.[no];
+    const runners = entries.map((e: any) => ({ x: mapEntry(e, meetDate, fr.class ?? r.class, undefined, hkOf(e.raceEntryNumber)), hk: !!hkOf(e.raceEntryNumber) })).map(({ x, hk }: any) => ({ ...x, odds: x.sp ?? x.odds, rating: null,
+      career: hk ? x.career : unrun(x.career, x.finish), track: unrun(x.track, x.finish), distance: unrun(x.distance, x.finish), trackDistance: unrun(x.trackDistance, x.finish), barrierRec: unrun(x.barrierRec, x.finish), [catKey]: unrun(x[catKey], x.finish) })).sort((a: any, b: any) => a.no - b.no);
     const positions = runners.filter((x: any) => x.finish && x.finish > 0 && x.finish < 100).sort((a: any, b: any) => a.finish - b.finish).map((x: any) => x.no);
     return { no: r.raceNumber, name: fr.name, distance: num(fr.distance), class: fr.class, condition: [fr.trackCondition, fr.trackRating].filter(Boolean).join(" "), runners: runners.map(({ finish, ...rest }: any) => rest), result: positions.length >= 3 ? { positions } : null };
   }));
@@ -297,6 +430,7 @@ Deno.serve(async (req) => {
   const url = new URL(req.url);
   const code = req.headers.get("x-flock-code") ?? url.searchParams.get("code");
   if (code !== FLOCK) return new Response(JSON.stringify({ error: "not the flock" }), { status: 401, headers: { "Content-Type": "application/json", ...CORS } });
+  if (url.searchParams.get("hkodds") === "1") { try { return new Response(JSON.stringify({ ok: true, at: new Date().toISOString(), hk: await hkOddsTick() }), { headers: { "Content-Type": "application/json", ...CORS } }); } catch (e) { return new Response(JSON.stringify({ error: String(e).slice(0, 300) }), { status: 500, headers: { "Content-Type": "application/json", ...CORS } }); } }
   const force = url.searchParams.get("force") === "1";
   const only = url.searchParams.get("meet");
   const raq = url.searchParams.get("ra");
