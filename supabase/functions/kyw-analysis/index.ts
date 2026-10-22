@@ -76,9 +76,11 @@ async function buildVIC(from: string, to: string) {
 // Fit: set, filter {tier, state, wet, notState, hkClassMin}, split {before} (train before the date, test on and after) or {folds, fold}.
 async function fit(body: any) {
   const set = body.set ?? "au"; let q = () => { let x: any = sb.from("kyw_model_rows").select("data").eq("set", set); const f = body.filter ?? {};
-    if (f.tier) x = x.in("tier", [].concat(f.tier)); if (f.state) x = x.in("state", [].concat(f.state)); if (f.wet != null) x = x.eq("wet", f.wet); return x; };
+    if (f.tier) x = x.in("tier", [].concat(f.tier)); if (f.state) x = x.in("state", [].concat(f.state)); if (f.wet != null) x = x.eq("wet", f.wet); if (f.from) x = x.gte("date", f.from); if (f.to) x = x.lte("date", f.to); return x; };
   const stored = (await all(q, 500)).map((r: any) => r.data);
   const rows = design(stored, body.extra ?? [], body.inter ?? []); const p = rows[0]?.X[0]?.length ?? KEYS.length;
+  // use: feature indices kept in the model; the rest are zeroed so a subset can be compared with a fuller set on the same races
+  if (body.use) { const keep = new Set(body.use); for (const r of rows as any[]) { r.Xfull = r.X; r.X = r.X.map((x: number[]) => x.map((v, k) => (keep.has(k) ? v : 0))); } }
   const pick = (b: any) => (Array.isArray(b) ? b : b === "zero" ? new Array(p).fill(0) : [...appCoefficients(), ...new Array(Math.max(0, p - KEYS.length)).fill(0)].slice(0, p));
   const prior = pick(body.prior ?? "app"); const start = body.start ? pick(body.start) : prior;
   const nonneg = body.nonneg === false ? [] : (body.nonneg ?? KEYS.map((_, i) => i)).filter((i: number) => i < p);
@@ -86,9 +88,10 @@ async function fit(body: any) {
   if (body.split?.before) { train = rows.filter(r => r.date < body.split.before); test = rows.filter(r => r.date >= body.split.before); }
   else if (body.split?.folds) { const meets = [...new Set(rows.map(r => r.meet))].sort(); const fm = new Set(meets.filter((_, i) => i % body.split.folds === body.split.fold)); train = rows.filter(r => !fm.has(r.meet)); test = rows.filter(r => fm.has(r.meet)); }
   const beta = body.fixed ? pick(body.fixed) : fitLogit(train, prior, body.lambda ?? 0, nonneg);
-  const appB = set === "vic" ? new Array(p).fill(0) : pick("app"); // Victoria has no app equivalent; its baseline is picking blind
-  const evalOn = (rs: any[]) => { if (!rs.length) return null; const mF = metrics(rs, beta), mA = metrics(rs, appB);
-    const diff = (r: any) => { const pf = probs(r.X, beta)[r.win], pa = probs(r.X, appB)[r.win]; return Math.log(Math.max(pf, 1e-9)) - Math.log(Math.max(pa, 1e-9)); };
+  // baseline the gain is measured against: the app's weights by default (picking blind for Victoria), or any coefficient vector
+  const appB = body.baseline ? pick(body.baseline) : set === "vic" ? new Array(p).fill(0) : pick("app");
+  const evalOn = (rs: any[]) => { if (!rs.length) return null; const mF = metrics(rs, beta), mA = metrics(rs.map((r: any) => (r.Xfull ? { ...r, X: r.Xfull } : r)), appB);
+    const diff = (r: any) => { const pf = probs(r.X, beta)[r.win], pa = probs(r.Xfull ?? r.X, appB)[r.win]; return Math.log(Math.max(pf, 1e-9)) - Math.log(Math.max(pa, 1e-9)); };
     return { fitted: mF, current: mA, gainPerRace: rs.reduce((a, r) => a + diff(r), 0) / rs.length, gainCI: body.boot === false ? null : bootstrap(rs, diff, 300) }; };
   return { set, filter: body.filter ?? {}, nTrain: train.length, nTest: test.length, features: [...KEYS, ...(body.extra ?? []), ...(body.inter ?? []).map((x: any) => x.join("*"))].slice(0, p),
     beta: beta.map(v => +v.toFixed(4)), asWeights: toWeights(beta), train: body.evalTrain === false ? null : evalOn(train), test: evalOn(test) };
