@@ -11,11 +11,11 @@ create or replace function public.kyw_set_job(job text, sched text, cmd text) re
 language plpgsql security definer set search_path = public, cron as $$
 declare cur record;
 begin
-  select jobid, schedule, command into cur from cron.job where jobname = job;
+  select j.jobid, j.schedule, j.command into cur from cron.job j where j.jobname = kyw_set_job.job;
   if sched is null then
     if found then perform cron.unschedule(cur.jobid); end if;
   elsif not found then
-    perform cron.schedule(job, sched, cmd);
+    perform cron.schedule(kyw_set_job.job, sched, cmd);
   elsif cur.schedule is distinct from sched or cur.command is distinct from cmd then
     perform cron.alter_job(cur.jobid, schedule := sched, command := cmd);
   end if;
