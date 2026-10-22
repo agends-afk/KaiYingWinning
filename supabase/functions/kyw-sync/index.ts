@@ -252,7 +252,7 @@ async function hkTote(date: string, venue: string, raceNo: number): Promise<{ ma
     return { map: toteMap(p.oddsNodes), status: p.sellStatus ?? p.status ?? null, updated: p.lastUpdateTime ?? null };
   } catch (e) { console.error("hkTote", e); return null; }
 }
-// Once a minute while a Hong Kong meeting is in its tote window: refresh each unrun race's tote prices (every 5 minutes, every minute inside 5 minutes of the jump) and take the rating's late price at 5 minutes.
+// Once a minute while a Hong Kong meeting is in its tote window (the job is only scheduled on Hong Kong race days, for race hours: see kyw_arm_jobs): refresh each unrun race's tote prices (every 5 minutes, every minute inside 5 minutes of the jump) and take the rating's late price at 5 minutes.
 async function hkOddsTick(): Promise<any[]> {
   const out: any[] = []; const now = Date.now(); const minute = Math.floor(now / 60000);
   const { data: feeds } = await sb.from("kyw_feed").select("meet_id,name").eq("active", true).like("meet_id", "HK%");
@@ -265,7 +265,8 @@ async function hkOddsTick(): Promise<any[]> {
     for (const r of m.races) {
       if (r.feedResult || r.frozenAt) continue; const mins = (Date.parse(r.time) - now) / 60000; if (isNaN(mins) || mins < -2) continue;
       if (mins > 5.5 && minute % 5 !== 0) continue;
-      const tt = await hkTote(date, venue, r.no); if (!tt || !Object.keys(tt.map).length) { log.none.push(r.no); continue; }
+      const tt = await hkTote(date, venue, r.no); if (!tt || !Object.keys(tt.map).length) { log.none.push(r.no);
+        if (mins <= 2 && !r.lateAt) { r.lateAt = new Date().toISOString(); r.priceSource = "fixed"; for (const x of r.runners ?? []) x.lateOdds = x.odds ?? null; changed = true; } continue; }
       races[r.no] = { ...(races[r.no] ?? {}), ...tt.map }; wrote = true; log.read.push(r.no);
       if (mins <= 5 && !r.lateAt) { r.lateAt = new Date().toISOString(); r.priceSource = "tote"; for (const x of r.runners ?? []) x.lateOdds = tt.map[x.no] ?? x.odds ?? null; changed = true; }
     }
@@ -276,7 +277,7 @@ async function hkOddsTick(): Promise<any[]> {
   return out;
 }
 
-async function syncMeeting(feed: any, existing: any | null, force: boolean) {
+async function syncMeeting(feed: any, existing: any | null, force: boolean, live: any = null) {
   const meetId = String(feed.meet_id);
   const d = await gql(`{ m: getMeeting(id:"${meetId}"){ id date meetingName venueName state trackCondition trackRating railPosition weather racesCount status }
     races: getRacesForMeet(meetCode:"${meetId}"){ ${RACE_FIELDS} } }`);
@@ -290,7 +291,8 @@ async function syncMeeting(feed: any, existing: any | null, force: boolean) {
   let hkd: any = null; if (isHK && hkv) { try { hkd = await hkWithBudget(hkForMeeting(meetId, dateOnly, hkv, races.length)); } catch (e) { console.error("hk", e); } }
   const rtime = (r: any): string | null => !r.time ? null : isHK ? (hkd?.times?.[r.raceNumber] ?? sydneyClockToUtc(r.time)) : r.time;
   const firstRaceMs = Math.min(...races.map((r: any) => rtime(r) ? Date.parse(rtime(r)!) : NaN).filter((t: number) => !isNaN(t)));
-  const toteNow = !!(isHK && hkv && toteOn(firstRaceMs, now)); let toteUsed = 0, toteFail = 0;
+  // Inside the tote window the per-minute odds job (hkOddsTick) owns Hong Kong prices and the late price; this sync leaves both alone.
+  const toteNow = !!(isHK && hkv && toteOn(firstRaceMs, now));
   for (const r of races) {
     const no = r.raceNumber; const prev = storedRaces[no];
     const finished = !!(r.hasResults || (r.resultsString && r.resultsString.trim()));
@@ -303,7 +305,8 @@ async function syncMeeting(feed: any, existing: any | null, force: boolean) {
       const fd = await gql(FORM_QUERY(meetId, no)); const fr = fd.r ?? r;
       const entries = mergeEntries(fr.raceEntries, fr.formRaceEntries);
       const runners = entries.map((e: any) => mapEntry(e, meetDate, fr.class ?? r.class, trials[nameKey(e.horseName ?? e.horse?.name)], hkd?.races?.[no]?.[e.raceEntryNumber])).sort((a: any, b: any) => a.no - b.no);
-      if (toteNow && !finished) { const tt = await hkTote(dateOnly, hkv!, no); if (tt && Object.keys(tt.map).length) { for (const x of runners) if (tt.map[x.no]) x.odds = tt.map[x.no]; toteUsed++; } else toteFail++; }
+      // The tote prices the odds job last stored, so a field frozen at the result still carries tote prices.
+      if (toteNow && !finished) { const tp = live?.races?.[no]; if (tp) for (const x of runners) if (tp[x.no] != null) x.odds = tp[x.no]; }
       const order = runners.filter((x: any) => x.finish && x.finish > 0 && x.finish < 100).sort((a: any, b: any) => a.finish - b.finish).map((x: any) => x.no);
       let positions = order.length ? order : (finished && fr.resultsString ? String(fr.resultsString).split(/[^0-9]+/).filter(Boolean).map(Number) : []);
       if (isHK && hkv && positions.length < 3 && rtime(r) && (now - Date.parse(rtime(r)!)) / 60000 >= 8) { const hp = await hkResults(dateOnly, hkv, no); if (hp) positions = hp; }
@@ -312,7 +315,7 @@ async function syncMeeting(feed: any, existing: any | null, force: boolean) {
       const prevByNo: Record<number, any> = {}; for (const x of prev?.runners ?? []) prevByNo[x.no] = x;
       // Late market: one refresh of the rating's market about 20 minutes before the jump, taken on the first read inside that window and then held.
       const t = rtime(r) ? Date.parse(rtime(r)!) : null; const minsTo = t != null ? (t - now) / 60000 : null;
-      const lateAt: string | undefined = prev?.lateAt ?? ((minsTo != null && minsTo <= (isHK ? 5 : 20) && minsTo > -60) ? new Date().toISOString() : undefined);
+      const lateAt: string | undefined = prev?.lateAt ?? ((!isHK && minsTo != null && minsTo <= 20 && minsTo > -60) ? new Date().toISOString() : undefined);
       const freshRunners = runners.map(({ finish, ...rest }: any) => ({ ...rest,
         openOdds: prevByNo[rest.no]?.openOdds ?? prevByNo[rest.no]?.odds ?? rest.odds ?? null,
         lateOdds: prev?.lateAt ? (prevByNo[rest.no]?.lateOdds ?? null) : (lateAt ? (rest.odds ?? null) : undefined) }));
@@ -335,7 +338,7 @@ async function syncMeeting(feed: any, existing: any | null, force: boolean) {
   const sig = (x: any) => canon({ ...x, syncedAt: 0, updatedAt: 0, races: (x.races ?? []).map((r: any) => ({ ...r, syncedAt: 0, feedResult: r.feedResult ? { positions: r.feedResult.positions } : null, runners: r.frozenAt ? r.runners : (r.runners ?? []).map((q: any) => ({ ...q, odds: null })) })) });
   const changed = !stored || sig(meeting) !== sig(stored);
   if (changed) { meeting.syncedAt = new Date().toISOString(); meeting.updatedAt = Date.now(); const { error } = await sb.from("kyw_meeting").upsert({ id: meetId, data: meeting, updated_at: new Date().toISOString() }); if (error) throw error; }
-  if (Object.keys(prices).length) { const { error: e3 } = await sb.from("kyw_prices").upsert({ meet_id: meetId, data: { at: new Date().toISOString(), races: prices }, updated_at: new Date().toISOString() }); if (e3) throw e3; }
+  if (Object.keys(prices).length && !toteNow) { const { error: e3 } = await sb.from("kyw_prices").upsert({ meet_id: meetId, data: { at: new Date().toISOString(), races: prices }, updated_at: new Date().toISOString() }); if (e3) throw e3; }
   const newResults = results.filter(r => !(storedRaces[r.race_no]?.feedResult));
   if (newResults.length) { const { error: e2 } = await sb.from("kyw_results").upsert(newResults, { onConflict: "meeting_id,race_no", ignoreDuplicates: true }); if (e2) throw e2; }
   // Keep the feed row's race window current so the scheduler knows when to run.
@@ -343,7 +346,7 @@ async function syncMeeting(feed: any, existing: any | null, force: boolean) {
   if (times.length) { const first = new Date(Math.min(...times)).toISOString(), last = new Date(Math.max(...times)).toISOString();
     const same = (a: any, b: string) => a && Date.parse(a) === Date.parse(b);
     if (!same(feed.first_at, first) || !same(feed.last_at, last)) await sb.from("kyw_feed").update({ first_at: first, last_at: last }).eq("meet_id", meetId); }
-  return { meetId, name: meeting.meeting, races: outRaces.length, fetched, changed, results: newResults.length, ...(isHK ? { hk: { form: !!hkd, times: hkd ? Object.keys(hkd.times ?? {}).length : 0, toteNow, toteUsed, toteFail } } : {}) };
+  return { meetId, name: meeting.meeting, races: outRaces.length, fetched, changed, results: newResults.length, ...(isHK ? { hk: { form: !!hkd, times: hkd ? Object.keys(hkd.times ?? {}).length : 0, toteNow } } : {}) };
 }
 
 // Venues we name. Metro list first (used in full on Wednesdays and Saturdays), then Hong Kong and Canberra.
@@ -380,17 +383,22 @@ async function selectMeetings(date: string) {
   return picks;
 }
 
+// A feed write that must land: retried twice, 5 and 10 seconds apart, then thrown so the roll stops before anything is cleaned up.
+async function must<T>(label: string, f: () => PromiseLike<{ data: T; error: any }>): Promise<T> {
+  for (let i = 0; ; i++) { const { data, error } = await f(); if (!error) return data; if (i >= 2) throw new Error(`${label}: ${error.message ?? error}`); await new Promise(r => setTimeout(r, 5000 * (i + 1))); }
+}
 // Once a day: point the feed at today's meetings, drop yesterday's, trim the log.
 async function dailyRoll(): Promise<{ date: string; picks: any[]; archived: any[] }> {
   const date = aestDate(0);
   const picks = await selectMeetings(date);
   // Archive the meetings we followed, as the form stood that morning and priced at SP, so any weights can be tested against them later.
   const archived: any[] = [];
-  const { data: oldFeeds } = await sb.from("kyw_feed").select("meet_id,name,date").eq("active", true);
+  const oldFeeds: any[] = await must("feed read", () => sb.from("kyw_feed").select("meet_id,name,date").eq("active", true));
   for (const f of oldFeeds ?? []) { if (String(f.date) >= date) continue; try { archived.push(await backtest(String(f.meet_id))); } catch (e) { archived.push({ meetId: f.meet_id, error: String(e).slice(0, 200) }); } }
   if (picks.length) {
-    await sb.from("kyw_feed").update({ active: false }).eq("active", true);
-    await sb.from("kyw_feed").upsert(picks.map(({ state, venue, ...f }) => ({ ...f, active: true, first_at: null, last_at: null })), { onConflict: "meet_id" });
+    // Today's meetings go in before yesterday's come out, so a failed write leaves the old feed running and nothing deleted.
+    await must("feed upsert", () => sb.from("kyw_feed").upsert(picks.map(({ state, venue, ...f }) => ({ ...f, active: true, first_at: null, last_at: null })), { onConflict: "meet_id" }));
+    await must("feed retire", () => sb.from("kyw_feed").update({ active: false }).eq("active", true).not("meet_id", "in", `(${picks.map(p => JSON.stringify(String(p.meet_id))).join(",")})`));
     // Read the day's Free Fields form once, now, so the first sync carries it.
     for (const p of picks) { if (isHKMeet(String(p.meet_id), p.state)) continue; try { await raForMeeting(p.meet_id, date, p.state, p.venue); } catch (e) { console.error("ra roll", e); } }
     const keep = picks.map(f => f.meet_id);
@@ -459,9 +467,11 @@ Deno.serve(async (req) => {
   if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { "Content-Type": "application/json", ...CORS } });
   const { data: existingRows } = await sb.from("kyw_meeting").select("id,data");
   const existing: Record<string, any> = {}; for (const r of existingRows ?? []) existing[r.id] = r;
+  const { data: priceRows } = await sb.from("kyw_prices").select("meet_id,data").like("meet_id", "HK%");
+  const live: Record<string, any> = {}; for (const r of priceRows ?? []) live[r.meet_id] = r.data;
   const out: any[] = [];
   const todo = (feeds ?? []).filter((f: any) => !only || String(f.meet_id) === only);
-  const one = async (f: any) => { try { return await syncMeeting(f, existing[String(f.meet_id)] ?? null, force || daily); } catch (e) { return { meetId: f.meet_id, error: String(e).slice(0, 300) }; } };
+  const one = async (f: any) => { try { return await syncMeeting(f, existing[String(f.meet_id)] ?? null, force || daily, live[String(f.meet_id)] ?? null); } catch (e) { return { meetId: f.meet_id, error: String(e).slice(0, 300) }; } };
   if (daily || force) out.push(...await Promise.all(todo.map(one))); else for (const f of todo) out.push(await one(f));
   if (daily || out.some(o => o.error || o.changed || o.fetched)) await sb.from("kyw_feed_log").insert({ summary: { rolled, meetings: out } });
   return new Response(JSON.stringify({ ok: true, at: new Date().toISOString(), rolled, meetings: out }), { headers: { "Content-Type": "application/json", ...CORS } });
