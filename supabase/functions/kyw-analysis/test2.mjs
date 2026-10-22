@@ -1,0 +1,13 @@
+import { hkRunner, hkExtras, raceRow, design, fitLogit, metrics, appCoefficients } from "./lib.js";
+const runsA = [{ date: "2025-11-01", pos: 2, venue: "ST", dist: 1200, cls: "3", going: "G", rtg: 62, margin: 0.5 }, { date: "2025-10-01", pos: 5, venue: "HV", dist: 1200, cls: "3", going: "GF", rtg: 63, margin: 3 }, { date: "2025-12-01", pos: 1, venue: "ST", dist: 1200, cls: "4", going: "G", rtg: 58 }];
+const runsB = [{ date: "2025-11-05", pos: 1, venue: "ST", dist: 1200, cls: "4", going: "G", rtg: 50, margin: null }, { date: "2025-12-01", pos: 4, venue: "ST", dist: 1200, cls: "4", going: "G", rtg: 55 }];
+const A = hkRunner({ no: 1, name: "A", draw: 3, weight: 130, winOdds: 4.5, place: 1 }, runsA, "2025-12-01", "ST", 1200, { j: 12, t: 9 });
+const B = hkRunner({ no: 2, name: "B", draw: 9, weight: 120, winOdds: 3, place: 2 }, runsB, "2025-12-01", "ST", 1200, { j: 20, t: 11 });
+const C = hkRunner({ no: 3, name: "C", draw: 1, weight: 125, winOdds: 9, place: 3 }, [], "2025-12-01", "ST", 1200, null);
+console.log(A.form, A.last, A.career, A._rating, A._lastCls);
+console.log(hkExtras(A, 4, [60, 40]), hkExtras(B, 4, [60, 40]));
+const race = { no: 1, distance: 1200, class: "Class 4", condition: "Good 4", runners: [A, B, C], result: { positions: [1, 2, 3] } };
+const row = raceRow(race, { id: "x", meeting: "sha-tin", state: "HK", date: "2025-12-01" }, { 1: hkExtras(A, 4, [60, 40]), 2: hkExtras(B, 4, [60, 40]), 3: hkExtras(C, 4, [60, 40]) });
+console.log(row.tier, row.state, row.wet, row.runners.map(r => r.x.join(",")));
+const d = design([row], ["classDrop"], [["last", "classDrop"]]); console.log(d[0].X[0].length, d[0].X[0].slice(-2), d[0].mkt);
+console.log(JSON.stringify(row.runners.map(r=>({no:r.no,e:r.e}))));
