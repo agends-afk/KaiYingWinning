@@ -380,17 +380,28 @@ async function selectMeetings(date: string) {
   return picks;
 }
 
+// A Supabase call the roll cannot do without: 3 tries over about 20 seconds, then throw so nothing downstream runs on a half-switched feed.
+async function must<T = any>(label: string, q: () => PromiseLike<{ data: T; error: any }>): Promise<T> {
+  let last: any = null;
+  for (const wait of [0, 5000, 15000]) { if (wait) await new Promise(r => setTimeout(r, wait));
+    try { const { data, error } = await q(); if (!error) return data; last = error; } catch (e) { last = e; }
+    console.error("must", label, last); }
+  throw new Error(`${label}: ${last?.message ?? String(last)}`.slice(0, 200));
+}
+
 // Once a day: point the feed at today's meetings, drop yesterday's, trim the log.
+// The feed switch must land before anything is deleted: a failed select, upsert or update throws, so yesterday's meetings stay intact for a re-run.
 async function dailyRoll(): Promise<{ date: string; picks: any[]; archived: any[] }> {
   const date = aestDate(0);
   const picks = await selectMeetings(date);
   // Archive the meetings we followed, as the form stood that morning and priced at SP, so any weights can be tested against them later.
   const archived: any[] = [];
-  const { data: oldFeeds } = await sb.from("kyw_feed").select("meet_id,name,date").eq("active", true);
+  const oldFeeds = await must<any[]>("feed select", () => sb.from("kyw_feed").select("meet_id,name,date").eq("active", true));
   for (const f of oldFeeds ?? []) { if (String(f.date) >= date) continue; try { archived.push(await backtest(String(f.meet_id))); } catch (e) { archived.push({ meetId: f.meet_id, error: String(e).slice(0, 200) }); } }
   if (picks.length) {
-    await sb.from("kyw_feed").update({ active: false }).eq("active", true);
-    await sb.from("kyw_feed").upsert(picks.map(({ state, venue, ...f }) => ({ ...f, active: true, first_at: null, last_at: null })), { onConflict: "meet_id" });
+    // Today's picks go live first, then the rest are switched off, so a failure part way never leaves the feed empty.
+    await must("feed upsert", () => sb.from("kyw_feed").upsert(picks.map(({ state, venue, ...f }) => ({ ...f, active: true, first_at: null, last_at: null })), { onConflict: "meet_id" }));
+    await must("feed update", () => sb.from("kyw_feed").update({ active: false }).eq("active", true).not("meet_id", "in", `(${picks.map(f => `"${f.meet_id}"`).join(",")})`));
     // Read the day's Free Fields form once, now, so the first sync carries it.
     for (const p of picks) { if (isHKMeet(String(p.meet_id), p.state)) continue; try { await raForMeeting(p.meet_id, date, p.state, p.venue); } catch (e) { console.error("ra roll", e); } }
     const keep = picks.map(f => f.meet_id);
@@ -453,8 +464,16 @@ Deno.serve(async (req) => {
   const bt = url.searchParams.get("backtest"); const btd = url.searchParams.get("backtestdate");
   if (btd) { try { const r = await backtestDate(btd); return new Response(JSON.stringify(r), { headers: { "Content-Type": "application/json", ...CORS } }); } catch (e) { return new Response(JSON.stringify({ error: String(e).slice(0, 400) }), { status: 500, headers: { "Content-Type": "application/json", ...CORS } }); } }
   if (bt) { try { const r = await backtest(bt); return new Response(JSON.stringify(r), { headers: { "Content-Type": "application/json", ...CORS } }); } catch (e) { return new Response(JSON.stringify({ error: String(e).slice(0, 400) }), { status: 500, headers: { "Content-Type": "application/json", ...CORS } }); } }
-  const daily = url.searchParams.get("daily") === "1";
+  let daily = url.searchParams.get("daily") === "1";
+  // A missed roll heals itself: after 6am AEST, if the active feed is not wholly today's and no roll has logged today's date, roll now.
+  if (!daily && !only && new Date(Date.now() + 10 * 3600 * 1000).getUTCHours() >= 6) { const today = aestDate(0);
+    const { data: act, error: ae } = await sb.from("kyw_feed").select("date").eq("active", true);
+    if (!ae && (!(act ?? []).length || (act ?? []).some((f: any) => String(f.date) !== today))) {
+      const { data: done, error: le } = await sb.from("kyw_feed_log").select("id").gte("at", new Date(Date.parse(today + "T06:00:00+10:00")).toISOString()).eq("summary->rolled->>date", today).limit(1);
+      if (!le && !(done ?? []).length) daily = true; } }
   let rolled: any = null; if (daily) { try { rolled = await dailyRoll(); } catch (e) { console.error("dailyRoll", e); rolled = { error: String(e).slice(0, 200) }; } }
+  if (rolled?.error) { await sb.from("kyw_feed_log").insert({ summary: { rolled, meetings: [] } });
+    return new Response(JSON.stringify({ ok: false, at: new Date().toISOString(), error: rolled.error, rolled }), { status: 500, headers: { "Content-Type": "application/json", ...CORS } }); }
   const { data: feeds, error } = await sb.from("kyw_feed").select("*").eq("active", true).order("sort");
   if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { "Content-Type": "application/json", ...CORS } });
   const { data: existingRows } = await sb.from("kyw_meeting").select("id,data");

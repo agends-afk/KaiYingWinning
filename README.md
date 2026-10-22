@@ -22,7 +22,7 @@ When a result lands, the winner's rated position and chance are compared with th
 
 A Supabase Edge Function reads racing.com's public GraphQL and writes the meetings, fields, prices and results the app reads. It runs on two schedules:
 
-- 6am AEST daily: archives yesterday's followed meetings into the backtest table (form as at the morning, priced at SP, with results), picks the day's meetings, and loads every field.
+- 6am AEST daily: archives yesterday's followed meetings into the backtest table (form as at the morning, priced at SP, with results), picks the day's meetings, and loads every field. Each feed write is retried three times over about 20 seconds; if the switch still fails, nothing is deleted and the call returns the error. Any later sync after 6am that finds the feed not on today's date, with no roll logged for today, runs the roll itself.
 - Every 10 minutes, but only while a followed meeting is racing (45 minutes before its first race to 20 minutes after its last).
 
 Which meetings: every metro meeting on Wednesdays and Saturdays; on every day, the richest TAB card in each of NSW, Victoria, Queensland, the ACT and WA where no metro is already taken; Hong Kong (Sha Tin and Happy Valley) on Wednesdays and Sundays.
