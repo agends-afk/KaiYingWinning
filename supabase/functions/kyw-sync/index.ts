@@ -94,6 +94,8 @@ function mapEntry(e: any, meetDate: string, todayClass: string, trialDates?: Set
     form: formFromRuns(h.horseForm, meetDate, h.lastTen, trialDates), last: lastStart(h.horseForm, meetDate, todayClass, trialDates), recent: recentRuns(h.horseForm, meetDate, trialDates),
     jockeyPct: hk?.jp ?? num(e.jockey?.winPercent), trainerPct: hk?.tp ?? num(e.trainer?.winPercent), jockeyRecentPct: num(e.jockey?.recentWinPercent), trainerRecentPct: num(e.trainer?.recentWinPercent),
     apprentice: !!e.jockey?.apprentice, claim: num(e.jockey?.weightClaim), rating: num(h.rating ?? e.handicapRating),
+    // Hong Kong: the HKJC rating from the day's racecard, which the app places within the race's class band.
+    ...(hk ? { hkRating: num(hk.rtg) } : {}),
     odds: odds(e.odds), scratched: !!(e.scratched || e.isLateScratching || e.finish === 109), emergency: !!e.emergency,
     gear: e.gearChanges ?? "", comment: e.commentShort ?? "", horseCode: String(e.horseCode ?? h.id ?? ""), finish: e.finish ?? null, sp: num(e.startingPrice),
   };

@@ -108,6 +108,17 @@ No bucket of any angle returned a profit at SP in either half. The stable findin
 
 The instrument is calibrated against this. The edge, if any, is the person's, and the proving ground is where it shows.
 
+### Model tuning, October 2026
+
+The form weights were refitted by conditional logit (one winner per race, softmax over the factors' z-scores, exactly as the page scores them) with the analysis function `kyw-analysis`, which rebuilds every archived race with the page's own scoring code (`supabase/functions/kyw-analysis/model.js` is a copy of it). The market was left out of the fit because the archive is priced at SP. Each change had to beat the previous weights on races it was not fitted on.
+
+- Australia: fitted on the 825 archived races before 6 October 2026 and tested on the 493 since. Log-loss on the winner improved by 0.049 a race against the previous defaults (90% bootstrap range by meeting 0.039 to 0.061) and the top pick's strike rate went from 26.6% to 28.0%. Career strike rate dropped to zero, jockey came down by about a fifth, trainer and track record rose, and sharpness moved from 2.2 to 2.32. Separate weights for metro, provincial and country, or by state, did no better than the shared set on held-out races, so there is one Australian profile.
+- Hong Kong: `kyw-hk-backfill` read every Sha Tin and Happy Valley meeting from September 2025 (101 meetings, 990 races) and the horse page of every runner, so each race's form could be rebuilt as it stood the day before. Its own weights, fitted on 650 races and tested on the next 340, beat the Australian defaults by 0.055 a race (0.029 to 0.084). Jockey counts for well under half as much as in Australia; track and distance, barrier and weight carried count for more. Where the horse's HKJC rating sits within the race's class band (0 at the floor, 1 at the ceiling) added 0.010 a race (0.001 to 0.020). A class drop, and recent form credited for the strength of the class it came from, added nothing.
+- Wet tracks: on 377 Victorian races on Soft 7 or worse, a horse's wet record added nothing to its ordinary form, and form split into wet and dry runs did worse. Track condition stays off and there is no automatic wet adjustment.
+- Not tested: the record from this barrier is missing from the archive, so its weight is unchanged.
+
+Hong Kong meetings use `HK_WEIGHTS` and `HK_BETA` in `index.html`; a slider moved from its Australian default moves the Hong Kong weight in the same proportion. The feed carries each Hong Kong runner's racecard rating as `hkRating`; the band comes from the race's class label ("RTG 80-60") or, failing that, the standard band for the class. A phone holding weights from an earlier model is reset to these defaults once (`MODEL_VERSION`), keeping its other settings.
+
 ## Limitations
 
 Hong Kong meetings carry fields, prices and results from racing.com but no Free Fields form. Sectional times come only from the Free Fields run lines and racing.com's Victorian timing; there is no live sectional or in-running feed. Track condition and rail are as racing.com and Racing Australia publish them on the morning. The example meeting is fictional throughout.
