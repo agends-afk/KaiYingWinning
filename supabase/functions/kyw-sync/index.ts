@@ -356,17 +356,18 @@ const METRO: [RegExp, string, string][] = [
   [/flemington/, "Flemington", "VIC"], [/caulfield/, "Caulfield", "VIC"], [/moonee-valley|the-valley/, "Moonee Valley", "VIC"], [/sandown/, "Sandown", "VIC"],
   [/randwick/, "Randwick", "NSW"], [/rosehill/, "Rosehill", "NSW"], [/warwick-farm/, "Warwick Farm", "NSW"], [/canterbury/, "Canterbury", "NSW"], [/kensington/, "Kensington", "NSW"],
   [/eagle-farm/, "Eagle Farm", "QLD"], [/doomben/, "Doomben", "QLD"], [/gold-coast/, "Gold Coast", "QLD"], [/sunshine-coast/, "Sunshine Coast", "QLD"],
-  [/morphettville/, "Morphettville", "SA"], [/ascot/, "Ascot", "WA"], [/belmont/, "Belmont", "WA"],
+  [/morphettville-parks/, "Morphettville Parks", "SA"], [/morphettville/, "Morphettville", "SA"], [/ascot/, "Ascot", "WA"], [/belmont/, "Belmont", "WA"],
 ];
 const HK_VENUES: [RegExp, string][] = [[/sha-tin/, "Sha Tin"], [/happy-valley/, "Happy Valley"]];
 const TOP_STATES = ["NSW", "VIC", "QLD", "ACT", "WA"]; // one meeting a day from each, the richest card
+const EVERY_DAY = /morphettville/; // followed whenever it races, on any day
 const STATE_ORDER: Record<string, number> = { VIC: 1, NSW: 2, QLD: 3, SA: 4, ACT: 5, WA: 6, HK: 7 };
 function aestDate(offsetDays = 0) { const d = new Date(Date.now() + 10 * 3600 * 1000 + offsetDays * 86400000); return d.toISOString().slice(0, 10); }
 function aestDow(date: string) { return new Date(date + "T00:00:00Z").getUTCDay(); } // 0 Sun .. 6 Sat
 function prettyVenue(slug: string) { return slug.split("-").filter(w => !/^(bet365|ladbrokes|sportsbet|tab|pioneer|park)$/i.test(w)).map(w => w[0].toUpperCase() + w.slice(1)).join(" "); }
 
 // Which meetings we follow on a given day.
-// Wednesday and Saturday: every metro meeting. Every day: the richest TAB meeting in each of NSW, VIC, QLD, ACT and WA where no metro is already taken.
+// Wednesday and Saturday: every metro meeting. Every day: Morphettville whenever it races, and the richest TAB meeting in each of NSW, VIC, QLD, ACT and WA where no metro is already taken.
 // Wednesday and Sunday: Hong Kong.
 async function selectMeetings(date: string) {
   const dow = aestDow(date); const metroDay = dow === 3 || dow === 6; const hkDay = dow === 3 || dow === 0;
@@ -375,6 +376,8 @@ async function selectMeetings(date: string) {
   const picks: any[] = []; const taken = new Set<string>();
   if (metroDay) for (const m of all) { const slug = String(m.venueName ?? "").toLowerCase(); const hit = METRO.find(([re]) => re.test(slug)); if (!hit) continue;
     picks.push({ meet_id: String(m.id), name: hit[1], state: hit[2], venue: slug, date, sort: STATE_ORDER[hit[2]] ?? 9 }); taken.add(hit[2]); }
+  for (const m of all) { const slug = String(m.venueName ?? "").toLowerCase(); if (!EVERY_DAY.test(slug) || picks.some(p => p.meet_id === String(m.id))) continue; const hit = METRO.find(([re]) => re.test(slug));
+    picks.push({ meet_id: String(m.id), name: hit ? hit[1] : prettyVenue(slug), state: String(m.state ?? "SA"), venue: slug, date, sort: STATE_ORDER[String(m.state)] ?? 9 }); taken.add(String(m.state)); }
   for (const st of TOP_STATES) { if (taken.has(st)) continue; const cands = all.filter((m: any) => m.state === st); if (!cands.length) continue;
     let best: any = null, bestPrize = -1;
     for (const c of cands) { let prize = 0; try { const r = await gql(`{ races: getRacesForMeet(meetCode:"${c.id}"){ totalPrizeMoney } }`); prize = (r.races ?? []).reduce((a: number, x: any) => a + (num(x.totalPrizeMoney) ?? 0), 0); } catch { prize = 0; }
