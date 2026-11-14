@@ -22,7 +22,7 @@ When a result lands, the winner's rated position and chance are compared with th
 
 A Supabase Edge Function reads racing.com's public GraphQL and writes the meetings, fields, prices and results the app reads. It runs on two schedules:
 
-- 6am AEST daily: archives yesterday's followed meetings into the backtest table (form as at the morning, priced at SP, with results), picks the day's meetings, and loads every field.
+- 6am AEST daily: archives yesterday's followed meetings into the backtest table (form as at the morning, priced at SP, with results), picks the day's meetings, and loads every field. If that call fails, `kyw_roll_retry` (`supabase/migrations/20261114000000_kyw_roll_retry.sql`) runs the roll again at 6:20 and 6:45, only when the feed has no meeting dated today.
 - Every 10 minutes, but only while a followed meeting is racing (45 minutes before its first race to 20 minutes after its last).
 - The live jobs exist only while racing is on. A trigger on `kyw_feed` (`kyw_arm_jobs`, `supabase/migrations/20261022000000_kyw_arm_jobs.sql`) schedules the 10-minute sync for the hours of the day's racing window and the Hong Kong odds job for the hours of a Hong Kong meeting's tote window, and removes each when no meeting is in it; on a day without Hong Kong racing there is no Hong Kong job. The morning roll writes today's meetings before retiring yesterday's, retries each write, and stops before any clean-up if the switch fails.
 
