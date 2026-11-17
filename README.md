@@ -8,7 +8,7 @@ The whole app is `index.html`, published on GitHub Pages. The feed is a Supabase
 
 It is an instrument, not a tipster. On the archived race days the fitted defaults trail the market (form-only log-loss 2.05 against the market's 1.82 on the held-out month, best bet return -20% at SP) and every mechanical rule tested, value calls, roughies and the unit allocator, lost at starting price. The app says so on its face. What it offers is a rating whose default weights were fitted on one month and held on the next, a slider for each factor with what the data showed for it, a price beside the market's for every runner, a record of every tip as it stood at the jump, and a proving ground that tests any setting against real past days. The edge, where there is one, is the person's view; the tool makes that view a number and reports whether it paid.
 
-Removed from the earlier build as noise: the roster of named punters, comments, the club bet book, tip overrides and the leaderboard, the best multi, bank and stake suggestions. Planned: a notes page, so the whole thing reads like a form book someone has written in.
+Removed from the earlier build as noise: the roster of named punters, comments, the club bet book, tip overrides and the leaderboard, and the best multi. Stake suggestions came back in November 2026 as the Bets tab (see "Betting advisory"). Planned: a notes page, so the whole thing reads like a form book someone has written in.
 
 ## What it does
 
@@ -118,6 +118,30 @@ The form weights were refitted by conditional logit (one winner per race, softma
 - Not tested: the record from this barrier is missing from the archive, so its weight is unchanged.
 
 Hong Kong meetings use `HK_WEIGHTS` and `HK_BETA` in `index.html`; a slider moved from its Australian default moves the Hong Kong weight in the same proportion. The feed carries each Hong Kong runner's racecard rating as `hkRating`; the band comes from the race's class label ("RTG 80-60") or, failing that, the standard band for the class. A phone holding weights from an earlier model is reset to these defaults once (`MODEL_VERSION`), keeping its other settings.
+
+## Betting advisory
+
+The Bets tab lays out a day's units (100 by default, set on the Model tab) across every meeting on the feed. It considers win, each way, place, quinella, exacta, trifecta box and first four box in every race still to run, and each bet it offers names the price at which it is worth taking. No profit has been shown for it. On the 42 archived race days from 6 October to 16 November 2026, which the form weights were not fitted on, the win bets lost 11% of the units placed at starting price.
+
+How it works (`ADV`, `raceBets`, `allocDay` and `dayPlan` in `index.html`):
+
+- Chance. The market's own chance for each runner, tilted by the form rating at 0.18 of its fitted strength and by the person's own call at full strength. The 0.18 was fitted by conditional logit on the archive; values between 0.16 and 0.28 came out of every split, and on held-out races the tilt improved log-loss on the winner by about 0.006 a race over the market alone.
+- Minor placings. Second, third and fourth are drawn on the win chances raised to 0.8, 0.65 and 0.55, fitted on archived finishing orders, because a favourite fills the placings less often than its win chance alone implies.
+- Win bets. One a race at most, on a runner at $5 or shorter (any price if it carries the person's call) whose tilted chance comes within 5% of paying at the feed's price. Stakes are in proportion to the size of the disagreement over the price less one, capped at 10% of the day.
+- Exotics. Up to 20% of the day, 4% a bet, one a race. The feed carries no tote dividends, so a dividend is estimated as the market's chance of the combination less the tote's take (17.5% quinella, 20% exacta, 21% trifecta, 22.5% first four), and a bet is offered where the plan's chance beats that by enough. The disagreement is capped at 1.3 and halved for trifectas and first fours, which in practice leaves quinellas and exactas.
+- Each way and place. Offered only on a runner carrying the person's call. Place chances follow the market otherwise, because on held-out races the runners the form liked placed 317 times where the market implied 329.
+- Fixed at the jump. The plan as last worked out before a race starts is kept on the device, as tips are. Win bets settle at the last price before the jump; place and exotic returns are estimates and are labelled as such.
+
+What the archive showed, on the 42 held-out days with default settings:
+
+| | Bets | Units | Landed | Market implied | Plan implied | Return |
+| --- | --- | --- | --- | --- | --- | --- |
+| Win | 405 | 2,770 | 139 | 116 | 139 | -11% at SP |
+| Quinella and exacta | 742 | 840 | 85 | 72 | 92 | not settled; 88 needed to break even |
+
+The plan's win selections won a fifth more often than their prices implied, which is the right direction and less than the 21% the median bookmaker book takes. On the newest 24 of those days the win bets returned -13% and the exotics landed 41 times against 42 implied, so the result is not steady from month to month. The proving ground on the Model tab runs the same test on any settings.
+
+Two things would change the sums. The first is price: the feed's price is the median of the bookmakers on racing.com, and a win bet that needs 7% more than the median may be on at the best bookmaker or the exchange. The second is evidence for the exotics, which needs dividends in the archive. Neither is built: the feed does not yet record the best price or any dividend.
 
 ## Limitations
 
