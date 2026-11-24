@@ -218,17 +218,18 @@ const METRICS = [
   {key:'weight',    label:'Weight carried',        base:0.282,  fit:'held', desc:'Weight relative to the field average.'},
   {key:'market',    label:'Opening market',        base:0.75,   fit:'held', desc:'Implied chance from the morning prices, refreshed once about 20 minutes before the race. At 0.75 it improved the return on past races without handing every tip to the favourite. Zero is pure form.'},
   {key:'band',      label:'Rating in its class band', base:0,      fit:'held', hidden:true, desc:'Hong Kong only: where the horse\'s HKJC rating sits in today\'s class band, 0 at the floor and 1 at the ceiling. A horse near the top of its band wins more often than its form alone says.'},
-  {key:'formline',  label:'Form lines today',      base:1.0,    fit:'live', hidden:true, desc:'Horses out of the same last-start race as one that ran above or below expectation today, and riders winning on the day.'},
+  {key:'formline',  label:'Form lines today',      base:1.0,    fit:'live', hidden:true, desc:'Horses out of the same last-start race as one that ran above or below its rating earlier today.'},
+  {key:'pacebias',  label:'Track pattern today',   base:1.0,    fit:'live', hidden:true, desc:'Where the first two home have been settling today. If on-pace runners keep winning, runners that usually settle forward are marked up for the later races, and the reverse.'},
   {key:'manual',    label:'Your call',             base:1.0,    fit:'live', hidden:true, desc:'Your own plus or minus on a runner, set on the race screen.'}
 ];
-const DEFAULT_SETTINGS = { marginRank:3, marginProb:0.12, lr:0.12, formlineGain:0.6, beta:2.32, autoAdapt:true, valueEdge:0.05, book:1.20, trust:0.5, dayUnits:100, exoticShare:0.2 };
+const DEFAULT_SETTINGS = { marginRank:3, formlineGain:0.6, beta:2.32, valueEdge:0.05, book:1.20, trust:0.5, dayUnits:100, exoticShare:0.2 };
 // Hong Kong meetings use their own fitted weights (650 races of the 2025/26 season, checked on the 340 that followed). Your slider
 // moves carry across in proportion: a factor set to twice its Australian default counts twice its Hong Kong default too.
 const HK_WEIGHTS = { last:0.527, form:0.781, classform:0.235, career:0, track:0.495, trackdist:0.982, condition:0, jockey:0.848, trainer:0.283, barrier:0.617, barrierrec:0.9, weight:0.954, band:2.164 };
 const HK_BETA = 1.291; // Hong Kong sharpness relative to the Australian setting
 // When a phone's saved weights predate this version, they are reset to the defaults above once, on load.
 const MODEL_VERSION = '2026-10-23';
-const BUILD='2026-11-17.1';
+const BUILD='2026-11-24.1';
 const SUPABASE = { url:'https://qgomklldlpspwilyjdqx.supabase.co', key:'sb_publishable_nhOXF3eXlHAyys2B0rzxxQ_W_Kb4OZP', flockCode:'pelicans-2026' };
 // Standard saddlecloth colours (approximate; cosmetic only)
 const CLOTH = {1:['#D7263D','#fff'],2:['#F7F5EF','#141A22'],3:['#1F4FCC','#fff'],4:['#F5C518','#141A22'],5:['#1E8B4B','#fff'],6:['#141A22','#F5C518'],7:['#F07A1A','#141A22'],8:['#F48FB1','#141A22'],9:['#3CC7C0','#141A22'],10:['#6A2C91','#fff'],11:['#9AA0A6','#B00020'],12:['#B6E51D','#141A22'],13:['#6D4322','#fff'],14:['#7B1F2B','#F5C518'],15:['#8B8455','#141A22'],16:['#B87333','#141A22'],17:['#0F2B46','#fff'],18:['#0F5132','#F5C518'],19:['#C9D6D2','#141A22'],20:['#D91E8B','#F5C518'],21:['#FF7F6E','#141A22'],22:['#E9E9E9','#141A22'],23:['#0F2B46','#F4EFE4'],24:['#D4AF37','#141A22']};
@@ -320,6 +321,7 @@ function scoreRace(race, meeting, weights, settings, dyn, adj){
   const band=hk?hkBand(race.class):null; z.band=rs.map(r=>{ const rt=num(r.hkRating); return band&&rt!=null?clamp((rt-band[1])/(band[0]-band[1]),-0.5,1.5):0; });
   const trialLast=rs.map(r=>!!(r.last&&r.last.trial)); if(trialLast.some(Boolean)) z.last=zscoresPartial(raw.last,trialLast,TRIAL_WEIGHT);
   z.formline=rs.map(r=>clamp(dyn.formline[runnerKey(race,r)]||0,-2,2));
+  { const zp=zscores(rs.map(r=>{ const p=num(r.pace); return p==null?null:1-p; })); z.pacebias=zp.map(v=>clamp(v*(dyn.paceBias||0),-2,2)); }
   z.manual=rs.map(r=>((adj&&adj[runnerKey(race,r)]&&num(adj[runnerKey(race,r)].adj))||0)*0.5);
   const wsum=METRICS.reduce((a,m)=>a+(weights[m.key]||0),0)||1; const wsumFree=wsum-(weights.market||0)||1;
   const scored=rs.map((r,i)=>{ let rating=0, ratingFree=0; const contrib={}; for(const m of METRICS){ const c=(weights[m.key]||0)*(z[m.key][i]||0)/wsum; contrib[m.key]=c; rating+=c; if(m.key!=='market') ratingFree+=(weights[m.key]||0)*(z[m.key][i]||0)/wsumFree; }
@@ -356,29 +358,29 @@ function valueBoardHTML(m,run,st){ const rows=[];
    the prediction each race carried when it was run, and the change log. */
 function runDay(punter, meeting){
   const races=[...meeting.races].sort((a,b)=>a.no-b.no); const settings={...DEFAULT_SETTINGS,...punter.settings};
-  let w={...punter.weights}; let formline={}, jockeyWins={}, barrierRel=[]; const dyn={}, pred={}, changes=[];
+  const w={...punter.weights}; let formline={}, barrierRel=[], paceRel=[]; const dyn={}, pred={}, changes=[];
+  const biasWord=(bb,pb)=>[bb?(bb>0?'inside draws':'wide draws'):'', pb?(pb>0?'on-pace runners':'runners from back in the field'):''].filter(Boolean).join(' and ');
   for(const race of races){
-    const fl={...formline}; for(const r of active(race)){ const jw=jockeyWins[normKey(r.jockey)]||0; if(jw>0){ const k=runnerKey(race,r); fl[k]=(fl[k]||0)+Math.min(0.4,0.2*jw); } }
-    dyn[race.no]={formline:fl, barrierBias:barrierBiasFrom(barrierRel)};
+    dyn[race.no]={formline:{...formline}, barrierBias:barrierBiasFrom(barrierRel), paceBias:paceBiasFrom(paceRel)};
     const scored=scoreRace(race,meeting,w,settings,dyn[race.no],punter.adj);
     pred[race.no]=scored.map(s=>({no:s.r.no,rank:s.rank,prob:s.prob}));
     const res=race.result; if(!res||!res.positions||!res.positions.length) continue;
-    const pos=res.positions.map(Number); const n=scored.length; const win=scored.find(s=>s.r.no===pos[0]);
-    for(const s of scored){ const idx=pos.indexOf(s.r.no); const actual=idx>=0?idx+1:(pos.length+1+n)/2; let resid=clamp((s.rank-actual)/Math.max(n/2,1),-1,1); if(idx===0) resid=Math.max(resid,0.15);
-      const b=num(s.r.barrier); if(idx===0){ const j=normKey(s.r.jockey); if(j) jockeyWins[j]=(jockeyWins[j]||0)+1; if(b!=null&&n>1) barrierRel.push({rel:(b-1)/(n-1),w:1}); }
-      if(idx===1){ if(b!=null&&n>1) barrierRel.push({rel:(b-1)/(n-1),w:0.5}); }
-      const key=normKey(s.r.last&&!s.r.last.trial&&s.r.last.race); if(!key||Math.abs(resid)<0.05) continue;
+    const pos=res.positions.map(Number); const n=scored.length; const win=scored.find(s=>s.r.no===pos[0]); const items=[];
+    const paces=scored.map(s=>num(s.r.pace)).filter(v=>v!=null); const meanPace=paces.length>=Math.max(4,n/2)?paces.reduce((a,b)=>a+b,0)/paces.length:null;
+    for(const s of scored){ const idx=pos.indexOf(s.r.no); const actual=idx>=0?idx+1:(pos.length+1+n)/2; let resid=clamp((s.rank-actual)/Math.max(n/2,1),-1,1); if(idx===0) resid=Math.max(resid,0.3);
+      // Track bias: where the first two home were drawn, and where they usually settle, against their fields.
+      if(idx===0||idx===1){ const wt=idx===0?1:0.5; const b=num(s.r.barrier), pc=num(s.r.pace); if(b!=null&&n>1) barrierRel.push({rel:(b-1)/(n-1),w:wt}); if(pc!=null&&meanPace!=null) paceRel.push({dev:meanPace-pc,w:wt}); }
+      // Form lines: a run above or below its rating today carries to later runners out of the same last-start race.
+      const key=normKey(s.r.last&&!s.r.last.trial&&s.r.last.race); if(!key||Math.abs(resid)<0.3) continue;
       for(const later of races){ if(later.no<=race.no) continue; for(const q of active(later)){ if(q.last&&q.last.trial||normKey(q.last&&q.last.race)!==key) continue;
         const qp=num(q.last.pos), rp=num(s.r.last.pos), qm=num(q.last.margin)||0, rm=num(s.r.last.margin)||0; let f=1; if(qp!=null&&rp!=null&&qp>rp) f=clamp(1-(qm-rm)/6,0.3,1);
-        const k=runnerKey(later,q); formline[k]=clamp((formline[k]||0)+resid*settings.formlineGain*f,-1.5,1.5); } } }
-    if(!win){ changes.push({race:race.no,text:`Winner ${pos[0]} not among active runners; no adaptation.`,items:[]}); continue; }
-    const outside=win.rank>settings.marginRank||win.prob<settings.marginProb;
-    const entry={race:race.no,text:`${win.r.name} won, rated ${ordinal(win.rank)} at ${pct(win.prob)}. ${outside?(settings.autoAdapt?'Outside the margin, weights moved.':'Outside the margin, adaptation is off.'):'Inside the margin, weights held.'}`,items:[]};
-    if(outside&&settings.autoAdapt){ const pw=[3,2,1,0.5]; for(const met of METRICS){ if(met.hidden) continue; let acc=0,sw=0; pos.slice(0,4).forEach((no,i)=>{ const s=scored.find(x=>x.r.no===no); if(!s) return; acc+=s.z[met.key]*pw[i]; sw+=pw[i]; }); if(!sw) continue;
-      const perf=Math.tanh(acc/sw); const w0=w[met.key]; const w1=clamp(w0*(1+settings.lr*perf),met.base*0.15,Math.max(1.5,met.base*2.5)); if(Math.abs(w1-w0)>0.005){ w[met.key]=+w1.toFixed(3); entry.items.push(`${met.label} ${w0.toFixed(2)} to ${w1.toFixed(2)}`); } } }
-    changes.push(entry);
+        const k=runnerKey(later,q); const d=resid*settings.formlineGain*f; formline[k]=clamp((formline[k]||0)+d,-1.5,1.5);
+        items.push(`${q.name} in race ${later.no} marked ${d>0?'up':'down'}: it comes out of the same last race as ${s.r.name}, who ran ${idx>=0?ordinal(idx+1):'unplaced'} here when rated ${ordinal(s.rank)}.`); } } }
+    const bb=barrierBiasFrom(barrierRel), pb=paceBiasFrom(paceRel); const before=dyn[race.no];
+    if(bb!==before.barrierBias||pb!==before.paceBias) items.push(bb||pb?`Track reading after this race: favouring ${biasWord(bb,pb)}. Later races are rated with that.`:'Track reading after this race: no bias showing.');
+    changes.push({race:race.no,text:win?`${win.r.name} won, rated ${ordinal(win.rank)} at ${pct(win.prob)}.${items.length?'':' Nothing carried to later races.'}`:`Winner ${pos[0]} was not among the active runners.`,items});
   }
-  const run={weights:w, dyn, pred, changes, roughie:{}, locked:{}, final:{barrierBias:barrierBiasFrom(barrierRel), jockeyWins}};
+  const run={weights:w, dyn, pred, changes, roughie:{}, locked:{}, final:{barrierBias:barrierBiasFrom(barrierRel), paceBias:paceBiasFrom(paceRel)}};
   applyLocks(punter, meeting, run, settings);
   return run;
 }
@@ -411,6 +413,8 @@ function applyLocks(punter, meeting, run, settings){
     run.roughie[race.no]=punter.locks[k].roughie; run.locked[race.no]=true; added=true; }
   if(added) persistLocal();
 }
+// Run style of the first two home against their fields, over the day so far. Positive favours runners that settle forward.
+function paceBiasFrom(list){ if(list.length<3) return 0; const sw=list.reduce((a,b)=>a+b.w,0); const dev=list.reduce((a,b)=>a+b.dev*b.w,0)/sw; if(Math.abs(dev)<0.08) return 0; return clamp(dev*4,-0.8,0.8); }
 function barrierBiasFrom(list){ if(list.length<2) return 0; const sw=list.reduce((a,b)=>a+b.w,0); const mean=list.reduce((a,b)=>a+b.rel*b.w,0)/sw; const dev=0.5-mean; if(Math.abs(dev)<0.12) return 0; return clamp(dev*1.5,-0.6,0.6); }
 
 /* ---------------- proving ground: your model against real past race days ---------------- */
@@ -538,7 +542,7 @@ function planTestHTML(t){ if(!t) return ''; const w=t.win, x=t.ex; const pl=w.re
   ${t.other.n?`Each way and place bets: ${t.other.n}.`:'No each way or place bet qualified: they need your own call on a runner, and the archive has none.'} Starting price here is the median fixed price, which is the price the plan has to beat.</p>`; }
 function provingHTML(ev){ if(!ev) return ''; const pc=(a,b)=>b?Math.round(100*a/b)+'%':'-'; const roi=v=>(v>=0?'+':'')+Math.round(v*100)+'%';
   return `<div class="kpis"><div class="kpi"><b class="num">${pc(ev.top.w,ev.races)}</b><span>Best bet won</span></div><div class="kpi"><b class="num" style="color:${ev.top.roi>0?'var(--good)':'var(--bad)'}">${roi(ev.top.roi)}</b><span>Best bet ROI at SP</span></div><div class="kpi"><b class="num">${pc(ev.fav.w,ev.races)}</b><span>Favourite won</span></div></div>
-  <p class="note" style="margin-top:8px">${ev.races} races. Best bet placed ${pc(ev.top.pl,ev.races)}. With the day's adaptation running, best bet won ${pc(ev.adapt.w,ev.races)} for ${roi(ev.adapt.roi)}. Favourites returned ${roi(ev.fav.roi)}.
+  <p class="note" style="margin-top:8px">${ev.races} races. Best bet placed ${pc(ev.top.pl,ev.races)}. With the day's form lines and track bias applied, best bet won ${pc(ev.adapt.w,ev.races)} for ${roi(ev.adapt.roi)}. Favourites returned ${roi(ev.fav.roi)}.
   Value calls: ${ev.value.n} made, ${ev.value.w} won, ${roi(ev.value.roi)}. Roughies: ${ev.rough.n} named, ${ev.rough.w} won, ${roi(ev.rough.roi)}.
   ${ev.ll!=null?`Calibration (log-loss on the winner, lower is better): your model ${ev.ll.toFixed(2)}, the market ${ev.llM.toFixed(2)}.`:''}</p>`; }
 
@@ -665,7 +669,7 @@ function aboutHTML(){ const open=state.ui.about; return `<div class="banner"><di
   <details ${open?'open':''} data-about><summary>What it does and does not do</summary><ul>
   <li>Does: rate the field from last start, recent form, class, career and track records, rider, trainer, barrier, weight and the morning market, each weighted by a slider you control.</li>
   <li>Does: show its price beside the market's, flag where the two disagree, and keep the tip it had at the jump.</li>
-  <li>Does: adapt during the day when a result lands outside your margin, and show you every move and why.</li>
+  <li>Does: carry two things from each result to the later races, and show you each one: a form line when a horse out of the same last race runs above or below its rating, and the track's bias for draw and run style.</li>
   <li>Does: test any setting you choose against real past race days at starting price.</li>
   <li>Does not: beat the market by default, know the track bias before the results show it, or see sectionals the feed does not carry.</li>
   <li>Does: lay out a day's units on the Bets tab across win, each way, place and the exotics, with the price each bet needs. On past race days that plan lost at starting price, and the tab says so.</li>
@@ -680,8 +684,7 @@ function viewRaces(){
   if(m.source==='racing.com') html+=`<p class="note" style="margin:0 0 12px">${esc(m.condition)}${m.rail?', rail '+esc(m.rail):''}${m.weather?', '+esc(String(m.weather).toLowerCase()):''}. ${m.races.filter(r=>r.runners.length).length} of ${m.races.length} fields loaded${m.raKey?', Free Fields form attached':''}. Feed last read ${fmtTime(m.syncedAt)}.</p>`;
   const fin=run.final; const st={...DEFAULT_SETTINGS,...me().settings};
   html+=`<div class="eyebrow">Tips<span class="sl">/</span>one per race<span class="sl">/</span>${done} of ${m.races.length} results in</div>${done?`<p class="small" style="margin:4px 0 0">A tip is fixed at the jump. Before that it can move when a result lands, a horse is scratched, or the market is refreshed about 20 minutes out; Moved marks a race where it has, and the race screen shows the trail. Run races show the winner, where the tip finished (Tip), where the winner sat in the ratings (Wnr), and whether it was the roughie.</p>`:''}
-  <div class="bias"><span>Barrier bias <b>${Math.abs(fin.barrierBias)>0?(fin.barrierBias>0?'inside':'outside')+' ('+fin.barrierBias.toFixed(2)+')':'none read yet'}</b></span>
-  ${Object.keys(fin.jockeyWins).length?`<span>Riders on the board <b>${Object.entries(fin.jockeyWins).map(([j,w])=>titleCase(j)+(w>1?' x'+w:'')).join(', ')}</b></span>`:''}</div>`;
+  <div class="bias"><span>Draw today <b>${fin.barrierBias?(fin.barrierBias>0?'inside favoured':'wide favoured'):'no bias read'}</b></span><span>Run style today <b>${fin.paceBias?(fin.paceBias>0?'on-pace favoured':'backmarkers favoured'):'no bias read'}</b></span></div>`;
   html+=valueBoardHTML(m,run,st);
   html+=`<section class="block" style="margin-top:14px"><div class="rows">`;
   for(const race of m.races){ const p=run.pred[race.no]||[]; const res=race.result; const tipNo=modelPick(race,run); const tipR=tipNo&&race.runners.find(r=>r.no===tipNo); let right;
@@ -713,7 +716,7 @@ function viewRace(){
     <div class="actions" style="margin:0"><button class="btn" data-act="openrace" data-no="${prev?prev.no:race.no}" ${prev?'':'disabled'}>Prev</button><button class="btn" data-act="openrace" data-no="${next?next.no:race.no}" ${next?'':'disabled'}>Next</button></div></div>`;
   const pr=res&&(run.pred[race.no]||[]).find(x=>x.no===res.positions[0]);
   html+=`<section class="block"><div class="eyebrow">Result<span class="sl">/</span>${res?'in':'not yet run'}</div>
-  ${res?`<p class="note" style="margin-top:8px">${res.positions.slice(0,4).map((n,i)=>ordinal(i+1)+' '+cloth(n)).join(' ')}</p><p class="note">The model had the winner ${pr?ordinal(pr.rank)+' at '+pct(pr.prob):'unrated'}. ${tipNo===res.positions[0]?'The tip won.':(res.positions.slice(1,3).includes(tipNo)?'The tip ran a place.':'The tip missed.')}</p>`:`<p class="note" style="margin-top:8px">Results arrive from the feed within a few minutes of being declared. Your weights move only when the winner was rated worse than ${ordinal(st.marginRank)} or under ${pct(st.marginProb)}.</p>`}</section>`;
+  ${res?`<p class="note" style="margin-top:8px">${res.positions.slice(0,4).map((n,i)=>ordinal(i+1)+' '+cloth(n)).join(' ')}</p><p class="note">The model had the winner ${pr?ordinal(pr.rank)+' at '+pct(pr.prob):'unrated'}. ${tipNo===res.positions[0]?'The tip won.':(res.positions.slice(1,3).includes(tipNo)?'The tip ran a place.':'The tip missed.')}</p>`:`<p class="note" style="margin-top:8px">Results arrive from the feed within a few minutes of being declared. A result changes later races in two ways only: a form line from the same last-start race, and the track's bias for draw and run style.</p>`}</section>`;
   if(adv&&!res){ const t=adv.top; const tR=t.r; const mkt=t.r.odds?`market $${t.r.odds}`:'no market price'; const rg=adv.roughie;
     html+=`<div class="banner"><div class="eyebrow" style="color:var(--panel-ink);opacity:.7">Top rated<span class="sl">/</span>${adv.tier} ${pct(t.prob)}${adv.gap<0.04?', not much between the top two':''}</div>
     <h2>${cloth(tR.no)} ${esc(tR.name)}</h2><p>Our price ${ourPrice(t.prob,st,t.book)} at ${t.book?'this race\'s '+Math.round(t.book*100)+'%':'a '+Math.round(st.book*100)+'%'} book (fair ${fmtOdds(t.prob)}), ${mkt}.${t.edge!=null?(isValue(t,st)?` Value: market ${pct(t.market)}, form-only ${pct(t.probFree)}, blended at ${pct(t.probValue)}.`:` No value at the market price (form-only ${pct(t.probFree)} against market ${pct(t.market)}).`):''}</p>
@@ -723,11 +726,12 @@ function viewRace(){
     ${trailHTML(race)}</div>`; }
   html+=`<section class="block"><div class="eyebrow">Ratings<span class="sl">/</span>our price on every runner${scored[0]&&scored[0].book?` at this race's ${Math.round(scored[0].book*100)}% book`:` at a ${Math.round(st.book*100)}% book`}, market alongside</div><p class="note" style="margin:6px 0 0">Ours shorter than the market means your settings like it more than the punters do. ${m.state==='HK'?`The rating uses the morning fixed-odds market, switched to the HKJC tote about 5 minutes before the jump${race.lateAt?' (taken '+esc(fmtTime(race.lateAt))+')':''}. The price shown is the median fixed price on racing.com until 30 minutes before the meeting's first race, then the HKJC tote${race.priceSource==='tote'?' (on the tote now)':''}`:`The rating uses the morning market, refreshed once about 20 minutes before the race${race.lateAt?' (refreshed '+esc(fmtTime(race.lateAt))+')':''}. The price shown is the median fixed price on racing.com`}${race.frozenAt?', read '+esc(fmtTime(race.frozenAt))+' before the jump':(m.pricesAt?', read '+esc(fmtTime(m.pricesAt)):'')}. Tap a name for the reasons and the form book.</p><div class="rows" style="margin-top:8px">`;
   const maxR=Math.max(...scored.map(s=>s.rating)), minR=Math.min(...scored.map(s=>s.rating)); const span=(maxR-minR)||1;
-  for(const s of scored){ const r=s.r; const k=runnerKey(race,r); const open=state.ui.open===k; const dynv=s.contrib.formline+s.contrib.manual; const a=my.adj[k]||{adj:0,note:''};
+  for(const s of scored){ const r=s.r; const k=runnerKey(race,r); const open=state.ui.open===k; const dynv=s.contrib.formline+s.contrib.pacebias+s.contrib.manual; const a=my.adj[k]||{adj:0,note:''};
     const chips=[]; if(r.barrier!=null) chips.push(`Bar ${r.barrier}`); if(r.weight!=null) chips.push(`${r.weight}kg`); if(r.form) chips.push(`Form ${esc(r.form)}`);
     if(r.last&&r.last.pos!=null) chips.push(`${r.last.trial?'Trial':'Last'} ${r.last.pos}${r.last.field?'/'+r.last.field:''}${r.last.margin!=null&&r.last.pos>1?' '+r.last.margin+'L':''}`); if(r.last&&r.last.days!=null) chips.push(`${r.last.days}d`);
     if(r.odds){ const o=num(r.openOdds), c=num(r.odds); const mv=(o>1&&c>1&&Math.abs(c-o)/o>=0.15)?(c<o?'firmed':'drifted'):null; chips.push(mv?`<span class="chip ${mv==='firmed'?'up':'dn'}">$${c} ${mv} from $${o}</span>`:`$${c}`); }
     if(s.z.formline>0.05) chips.push(`<span class="chip up">Form line +${s.z.formline.toFixed(2)}</span>`); if(s.z.formline<-0.05) chips.push(`<span class="chip dn">Form line ${s.z.formline.toFixed(2)}</span>`);
+    if(s.z.pacebias>0.15) chips.push(`<span class="chip up">Suits today's track</span>`); if(s.z.pacebias<-0.15) chips.push(`<span class="chip dn">Against today's track</span>`);
     if(a.adj) chips.push(`<span class="chip ${a.adj>0?'up':'dn'}">Your call ${a.adj>0?'+':''}${a.adj}</span>`); if(a.note) chips.push(`<span class="chip">Note</span>`); if(s.missing>=3) chips.push(`<span class="chip">thin data</span>`);
     const gear=(r.ra&&r.ra.gear)||r.gear; if(gear) chips.push(`<span class="chip">${esc(gear)}</span>`);
     const resPos=res?res.positions.indexOf(r.no):-1; const isTip=tipNo===r.no;
@@ -807,11 +811,7 @@ function viewWeights(){
   <div class="actions" style="margin:0 0 10px"><button class="btn primary" id="proveBtn" data-act="prove" ${sb?'':'disabled'}>Test these settings</button>${PAST?`<span class="small">${PAST.length} meetings, ${PAST.reduce((a,m)=>a+m.races.length,0)} races loaded</span>`:''}</div>
   <div id="proveOut">${state.ui.prove?provingHTML(state.ui.prove):''}</div>
   <div class="actions" style="margin:14px 0 6px"><button class="btn" id="planBtn" data-act="plantest" ${sb?'':'disabled'}>Test the ${s.dayUnits||100}-unit day plan</button><span class="small">The Bets plan on each archived day with results hidden: win bets settled at starting price, exotics counted against how often they needed to land.</span></div><div id="planOut">${state.ui.plan?planTestHTML(state.ui.plan):''}</div></section>`;
-  html+=`<section class="block" style="margin-top:26px"><div class="eyebrow">Settings<span class="sl">/</span>adaptation, value and pricing</div><div class="rows" style="margin-top:8px">
-    <div class="wrow"><div class="l"><b>Adapt weights from results</b><span><input type="checkbox" data-act="setting" data-key="autoAdapt" ${s.autoAdapt?'checked':''}></span></div><div class="d">A surprising result nudges your weights for the later races. A tip can move when that happens; the race screen shows when and why.</div></div>
-    <div class="wrow"><div class="l"><b>Margin of error: rated position</b><span class="num">${s.marginRank}</span></div><div class="d">A winner rated this position or better is inside the margin and triggers no weight change.</div><input type="range" min="1" max="8" step="1" value="${s.marginRank}" data-act="setting" data-key="marginRank"></div>
-    <div class="wrow"><div class="l"><b>Margin of error: rated chance</b><span class="num">${pct(s.marginProb)}</span></div><div class="d">A winner rated under this chance is outside the margin even if it was placed high.</div><input type="range" min="0.02" max="0.3" step="0.01" value="${s.marginProb}" data-act="setting" data-key="marginProb"></div>
-    <div class="wrow"><div class="l"><b>Learning rate</b><span class="num">${s.lr.toFixed(2)}</span></div><div class="d">How far each surprising result moves the weights toward the factors that would have picked it.</div><input type="range" min="0.02" max="0.5" step="0.01" value="${s.lr}" data-act="setting" data-key="lr"></div>
+  html+=`<section class="block" style="margin-top:26px"><div class="eyebrow">Settings<span class="sl">/</span>form lines, value and pricing</div><div class="rows" style="margin-top:8px">
     <div class="wrow"><div class="l"><b>Form line gain</b><span class="num">${s.formlineGain.toFixed(2)}</span></div><div class="d">How strongly a horse's run today carries to horses out of the same last-start race.</div><input type="range" min="0" max="1.5" step="0.05" value="${s.formlineGain}" data-act="setting" data-key="formlineGain"></div>
     <div class="wrow"><div class="l"><b>Units a day</b><span class="num">${s.dayUnits}</span></div><div class="d">The day's budget for the Bets plan. A unit is whatever you make it. The plan never goes over this and holds units back when too few bets qualify.</div><input type="range" min="10" max="300" step="10" value="${s.dayUnits}" data-act="setting" data-key="dayUnits"></div>
     <div class="wrow"><div class="l"><b>Exotics share</b><span class="num">${Math.round(s.exoticShare*100)}%</span></div><div class="d">The most of the day's units that can go on quinellas, exactas, trifectas and first fours. Their returns are estimates, because the feed carries no tote dividends, so this is kept small. Zero leaves them out.</div><input type="range" min="0" max="0.4" step="0.05" value="${s.exoticShare}" data-act="setting" data-key="exoticShare"></div>
@@ -819,7 +819,7 @@ function viewWeights(){
     <div class="wrow"><div class="l"><b>Value threshold</b><span class="num">${(s.valueEdge*100).toFixed(0)} pts</span></div><div class="d">How far the blended chance must beat the market's before a runner is flagged as value.</div><input type="range" min="0.01" max="0.10" step="0.01" value="${s.valueEdge}" data-act="setting" data-key="valueEdge"></div>
     <div class="wrow"><div class="l"><b>Sharpness</b><span class="num">${s.beta.toFixed(2)}</span></div><div class="d">Higher concentrates the percentages on the top few; lower spreads them. The default was the best calibrated on past races.</div><input type="range" min="0.8" max="4" step="0.1" value="${s.beta}" data-act="setting" data-key="beta"></div>
     <div class="wrow"><div class="l"><b>Book percentage when no market</b><span class="num">${Math.round(s.book*100)}%</span></div><div class="d">Our prices are framed at the race's own book percentage from the live prices. This applies only when a race has no prices yet. 100% shows fair prices.</div><input type="range" min="1" max="1.4" step="0.01" value="${s.book}" data-act="setting" data-key="book"></div></div></section>`;
-  if(run.changes&&run.changes.length){ html+=`<section class="block"><div class="eyebrow">What the results did to your model</div>`; for(const e of [...run.changes].reverse()){ html+=`<div class="logrow"><div class="when">Race ${e.race}</div>${esc(e.text)}${e.items.length?`<ul>${e.items.map(i=>`<li>${esc(i)}</li>`).join('')}</ul>`:''}</div>`; } html+=`</section>`; }
+  if(run.changes&&run.changes.length){ html+=`<section class="block"><div class="eyebrow">What today's results carried forward</div>`; for(const e of [...run.changes].reverse()){ html+=`<div class="logrow"><div class="when">Race ${e.race}</div>${esc(e.text)}${e.items.length?`<ul>${e.items.map(i=>`<li>${esc(i)}</li>`).join('')}</ul>`:''}</div>`; } html+=`</section>`; }
   return html;
 }
 
@@ -846,7 +846,7 @@ function viewLoad(){
 function bind(root){
   root.querySelectorAll('[data-act="wrace"]').forEach(el=>el.addEventListener('click',()=>{ state.ui.raceNo=+el.dataset.no; const wt=document.getElementById('wtips'); if(wt){ wt.innerHTML=weightTipsHTML(); bind(wt); } }));
   root.querySelectorAll('[data-act="weight"]').forEach(el=>{ el.addEventListener('input',()=>{ me().weights[el.dataset.key]=+el.value; const sp=el.closest('.wrow').querySelector('.l span'); sp.innerHTML=weightWord(+el.value,+sp.dataset.base); const wt=document.getElementById('wtips'); if(wt){ wt.innerHTML=weightTipsHTML(); bind(wt); } }); el.addEventListener('change',()=>{ state.ui.prove=null; state.ui.plan=null; save(); }); });
-  root.querySelectorAll('[data-act="setting"]').forEach(el=>{ const h=()=>{ me().settings[el.dataset.key]= el.type==='checkbox'?el.checked:+el.value; }; el.addEventListener('input',()=>{ h(); const sp=el.closest('.wrow').querySelector('.l span'); if(sp&&el.type!=='checkbox'){ const k=el.dataset.key; sp.textContent= k==='marginProb'?pct(+el.value):k==='marginRank'?el.value:k==='valueEdge'?(+el.value*100).toFixed(0)+' pts':k==='book'?Math.round(+el.value*100)+'%':k==='trust'||k==='exoticShare'?Math.round(+el.value*100)+'%':k==='dayUnits'?el.value:(+el.value).toFixed(2); } }); el.addEventListener('change',()=>{ h(); state.ui.prove=null; state.ui.plan=null; save(); }); });
+  root.querySelectorAll('[data-act="setting"]').forEach(el=>{ const h=()=>{ me().settings[el.dataset.key]= el.type==='checkbox'?el.checked:+el.value; }; el.addEventListener('input',()=>{ h(); const sp=el.closest('.wrow').querySelector('.l span'); if(sp&&el.type!=='checkbox'){ const k=el.dataset.key; sp.textContent= k==='valueEdge'?(+el.value*100).toFixed(0)+' pts':k==='book'?Math.round(+el.value*100)+'%':k==='trust'||k==='exoticShare'?Math.round(+el.value*100)+'%':k==='dayUnits'?el.value:(+el.value).toFixed(2); } }); el.addEventListener('change',()=>{ h(); state.ui.prove=null; state.ui.plan=null; save(); }); });
   root.querySelectorAll('[data-act="adj"]').forEach(el=>{ el.addEventListener('input',()=>{ el.nextElementSibling.textContent=(+el.value>0?'+':'')+el.value; }); el.addEventListener('change',()=>{ const a=me().adj[el.dataset.key]||(me().adj[el.dataset.key]={adj:0,note:''}); a.adj=+el.value; save(); }); });
   root.querySelectorAll('[data-act="note"]').forEach(el=>el.addEventListener('change',()=>{ const a=me().adj[el.dataset.key]||(me().adj[el.dataset.key]={adj:0,note:''}); a.note=el.value; save(); }));
   root.querySelectorAll('[data-about]').forEach(el=>el.addEventListener('toggle',()=>{ state.ui.about=el.open; }));
